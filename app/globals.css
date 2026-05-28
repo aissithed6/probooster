@@ -1,0 +1,2176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "leaflet/dist/leaflet.css";
+
+/* Test pour forcer le chargement */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 24.6 95% 53.1%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 24.6 95% 53.1%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Pro Slate: bleu-nuit + surfaces ardoise + contrastes nets */
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 41% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 41% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 24.6 95% 53.1%;
+    --primary-foreground: 222 47% 7%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 72%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 26% 22%;
+    --input: 217 26% 22%;
+    --ring: 24.6 95% 53.1%;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: Arial, sans-serif;
+  }
+}
+
+/* Styles de base pour le dashboard */
+.dashboard-container {
+  background-color: hsl(var(--background));
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.dark .dashboard-container {
+  background:
+    radial-gradient(1200px 600px at 18% 0%, rgba(255, 102, 0, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 100% 28%, rgba(59, 130, 246, 0.12), transparent 55%),
+    linear-gradient(180deg, #0b1220 0%, #070a12 100%);
+}
+
+.dashboard-card {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  padding: 20px;
+  margin: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.dark .dashboard-card {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.50);
+}
+
+.dashboard-button {
+  background: linear-gradient(135deg, #ff6600 0%, #ff8533 50%, #ff6600 100%);
+  color: #0b1220;
+  border: 1px solid rgba(255, 102, 0, 0.35);
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.dashboard-button:hover {
+  background: linear-gradient(135deg, #ff8533 0%, #ff6600 50%, #ff8533 100%);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Animations personnalisées */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-20px) rotate(5deg);
+  }
+  50% {
+    transform: translateY(-30px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-15px) rotate(-5deg);
+  }
+}
+
+@keyframes float2 {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+  }
+  33% {
+    transform: translateY(-25px) rotate(8deg) scale(1.1);
+  }
+  66% {
+    transform: translateY(-35px) rotate(-3deg) scale(0.9);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0,0,0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -30px, 0);
+  }
+  70% {
+    transform: translate3d(0, -15px, 0);
+  }
+  90% {
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes bubbleGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 179, 102, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 179, 102, 0.6), 0 0 60px rgba(255, 179, 102, 0.3);
+  }
+}
+
+@keyframes bubbleGlowBlue {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(135, 206, 235, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(135, 206, 235, 0.6), 0 0 60px rgba(135, 206, 235, 0.3);
+  }
+}
+
+@keyframes bubbleRotate {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.05);
+  }
+  50% {
+    transform: rotate(180deg) scale(0.95);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.05);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes dropdown-open {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scaleY(0.85);
+    transform-origin: top right;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    transform-origin: top right;
+  }
+}
+
+@keyframes dropdown-close {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    transform-origin: top right;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.9);
+    transform-origin: top right;
+  }
+}
+
+/* Classes utilitaires pour les animations */
+.animated-card {
+  transition: all 0.3s ease;
+}
+
+.animated-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+}
+
+.animated-button {
+  transition: all 0.3s ease;
+}
+
+.animated-button:hover {
+  transform: translateY(-3px) scale(1.05);
+}
+
+.floating-bubble {
+  animation: float 6s ease-in-out infinite;
+}
+
+.floating-bubble:nth-child(2) {
+  animation-delay: -3s;
+}
+
+/* Animations spécifiques pour les bulles */
+.bubble-orange {
+  animation: float 8s ease-in-out infinite, bubbleGlow 4s ease-in-out infinite, bubbleRotate 20s linear infinite;
+}
+
+.bubble-blue {
+  animation: float2 10s ease-in-out infinite, bubbleGlowBlue 4s ease-in-out infinite reverse, bubbleRotate 25s linear infinite reverse;
+}
+
+/* Animations pour le chat */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Barre de défilement personnalisée */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 102, 0, 0.3);
+  border-radius: 10px;
+  transition: all 0.3s;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 102, 0, 0.5);
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Classes d'animation */
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out forwards;
+}
+
+.animate-count-up {
+  animation: count-up 1s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.8s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.8s ease-out forwards;
+}
+
+/* Animations pour le footer */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 102, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 102, 0, 0.6);
+  }
+}
+
+@keyframes text-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.text-shimmer {
+  background: linear-gradient(90deg, #ff6600, #ff8533, #ff6600);
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 3s ease-in-out infinite;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.6s ease-out forwards;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.8s ease-out forwards;
+}
+
+/* Délais d'animation */
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}
+
+.animation-delay-600 {
+  animation-delay: 0.6s;
+}
+
+.animation-delay-800 {
+  animation-delay: 0.8s;
+}
+
+.animation-delay-1000 {
+  animation-delay: 1s;
+}
+
+/* Effets de survol améliorés */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Effets de gradient animés */
+.gradient-shift {
+  background: linear-gradient(45deg, #ff6600, #ff8533, #ff6600);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Animations spécifiques pour les boutons CTA */
+@keyframes buttonHover {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  }
+}
+
+@keyframes buttonClick {
+  0% {
+    transform: translateY(-5px) scale(1.02);
+  }
+  50% {
+    transform: translateY(0) scale(0.95);
+  }
+  100% {
+    transform: translateY(-5px) scale(1.02);
+  }
+}
+
+@keyframes buttonPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@keyframes buttonShine {
+  0% {
+    background-position: -100px 0;
+  }
+  100% {
+    background-position: 200px 0;
+  }
+}
+
+/* Classes pour les boutons CTA */
+.cta-button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.cta-button:hover::before {
+  left: 100%;
+}
+
+.cta-button:hover {
+  animation: buttonHover 0.6s ease-out forwards;
+}
+
+.cta-button:active {
+  animation: buttonClick 0.2s ease-out;
+}
+
+.cta-button-primary {
+  background: linear-gradient(135deg, #ff6600, #ff8533);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 15px 30px;
+  border-radius: 50px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-button-primary:hover {
+  background: linear-gradient(135deg, #ff8533, #ff6600);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(255, 102, 0, 0.4);
+}
+
+.cta-button-secondary {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 15px 30px;
+  border-radius: 50px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-button-secondary:hover {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+}
+
+.cta-button:focus {
+  outline: none;
+  animation: buttonPulse 0.6s ease-in-out;
+}
+
+/* Animation spéciale pour le bouton "Devenir Vendeur" */
+.cta-button-vendor {
+  background: linear-gradient(135deg, #059669, #10b981);
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 18px 35px;
+  border-radius: 50px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  font-size: 1.1rem;
+}
+
+.cta-button-vendor:hover {
+  background: linear-gradient(135deg, #10b981, #059669);
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 15px 35px rgba(5, 150, 105, 0.5);
+}
+
+.cta-button-vendor:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* Styles spécifiques pour les boutons CTA du bas */
+.cta-button-vendor-bottom {
+  background: white;
+  border: 2px solid #ff6600;
+  color: #ff6600;
+  font-weight: 600;
+  padding: 18px 35px;
+  border-radius: 50px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  font-size: 1.1rem;
+  transition: all 0.3s ease;
+}
+
+.cta-button-vendor-bottom:hover {
+  background: #ff6600;
+  color: white;
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 15px 35px rgba(255, 102, 0, 0.3);
+}
+
+.cta-button-vendor-bottom:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+.cta-button-buy-bottom {
+  background: #ff6600;
+  border: 2px solid white;
+  color: white;
+  font-weight: 600;
+  padding: 18px 35px;
+  border-radius: 50px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  font-size: 1.1rem;
+  transition: all 0.3s ease;
+}
+
+.cta-button-buy-bottom:hover {
+  background: white;
+  color: #ff6600;
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 15px 35px rgba(255, 255, 255, 0.3);
+}
+
+.cta-button-buy-bottom:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* Animations spéciales pour le titre principal */
+@keyframes titleGlow {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 30px rgba(255, 102, 0, 0.6), 0 0 40px rgba(255, 102, 0, 0.4);
+  }
+}
+
+@keyframes titleFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes futureGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes futureGlow {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(255, 102, 0, 0.8);
+  }
+  25% {
+    text-shadow: 0 0 30px rgba(255, 102, 0, 1), 0 0 40px rgba(255, 102, 0, 0.8);
+  }
+  50% {
+    text-shadow: 0 0 25px rgba(255, 133, 51, 0.9), 0 0 35px rgba(255, 133, 51, 0.7);
+  }
+  75% {
+    text-shadow: 0 0 30px rgba(255, 102, 0, 1), 0 0 40px rgba(255, 102, 0, 0.8);
+  }
+}
+
+@keyframes futurePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Classes pour les animations du titre */
+.title-main {
+  animation: titleGlow 3s ease-in-out infinite, titleFloat 4s ease-in-out infinite;
+}
+
+.future-word {
+  background: linear-gradient(135deg, #ff6600, #ff8533, #ff6600, #ff6600, #ff8533);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: futureGradient 4s ease infinite, futureGlow 3s ease-in-out infinite, futurePulse 2s ease-in-out infinite;
+  font-weight: 800;
+  position: relative;
+}
+
+.future-word::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, #ff6600, #ff8533, #ff6600);
+  background-size: 200% 100%;
+  animation: futureGradient 3s ease infinite;
+  border-radius: 1px;
+}
+
+/* Nouvelles animations captivantes et incitatives */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+@keyframes magneticPull {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.1);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.15);
+  }
+  70% {
+    transform: scale(1);
+  }
+}
+
+@keyframes wave {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-8px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+  75% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes neonGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(255, 102, 0, 0.5), 0 0 10px rgba(255, 102, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 102, 0, 0.8), 0 0 30px rgba(255, 102, 0, 0.6), 0 0 40px rgba(255, 102, 0, 0.4);
+  }
+}
+
+@keyframes textReveal {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-20px);
+  }
+  100% {
+    clip-path: inset(0 0% 0 0);
+    transform: translateX(0);
+  }
+}
+
+@keyframes iconDance {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(10deg) scale(1.1);
+  }
+  50% {
+    transform: rotate(-5deg) scale(0.9);
+  }
+  75% {
+    transform: rotate(15deg) scale(1.05);
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Classes pour les nouvelles animations */
+.sparkle-effect {
+  position: relative;
+}
+
+.sparkle-effect::before,
+.sparkle-effect::after {
+  content: '✨';
+  position: absolute;
+  font-size: 1.2rem;
+  opacity: 0;
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+.sparkle-effect::before {
+  top: -10px;
+  left: -15px;
+  animation-delay: 0s;
+}
+
+.sparkle-effect::after {
+  top: -5px;
+  right: -10px;
+  animation-delay: 1s;
+}
+
+.magnetic-hover:hover {
+  animation: magneticPull 0.6s ease-in-out;
+}
+
+.heartbeat-animation {
+  animation: heartbeat 2s ease-in-out infinite;
+}
+
+.wave-animation {
+  animation: wave 3s ease-in-out infinite;
+}
+
+.neon-glow {
+  animation: neonGlow 2s ease-in-out infinite;
+}
+
+.text-reveal {
+  animation: textReveal 1.5s ease-out forwards;
+}
+
+.icon-dance {
+  animation: iconDance 3s ease-in-out infinite;
+}
+
+.gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 4s ease infinite;
+}
+
+/* Animations captivantes pour les icônes des boutons */
+@keyframes iconSpin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.2);
+  }
+  50% {
+    transform: rotate(180deg) scale(0.8);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes iconBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(-8px) scale(1.1);
+  }
+  50% {
+    transform: translateY(-12px) scale(0.9);
+  }
+  75% {
+    transform: translateY(-6px) scale(1.05);
+  }
+}
+
+@keyframes iconPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.8;
+  }
+}
+
+@keyframes iconWiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(15deg);
+  }
+  50% {
+    transform: rotate(-10deg);
+  }
+  75% {
+    transform: rotate(8deg);
+  }
+}
+
+@keyframes iconFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-6px) rotate(5deg);
+  }
+  66% {
+    transform: translateY(-10px) rotate(-3deg);
+  }
+}
+
+@keyframes iconGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(255, 102, 0, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(255, 102, 0, 0.8)) drop-shadow(0 0 25px rgba(255, 102, 0, 0.6));
+  }
+}
+
+@keyframes iconShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-3px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes iconZoom {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.4);
+  }
+}
+
+@keyframes iconRotate3D {
+  0% {
+    transform: perspective(400px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(400px) rotateY(360deg);
+  }
+}
+
+@keyframes iconRainbow {
+  0%, 100% {
+    filter: hue-rotate(0deg) brightness(1);
+  }
+  25% {
+    filter: hue-rotate(90deg) brightness(1.2);
+  }
+  50% {
+    filter: hue-rotate(180deg) brightness(0.8);
+  }
+  75% {
+    filter: hue-rotate(270deg) brightness(1.1);
+  }
+}
+
+/* Classes pour les animations des icônes */
+.icon-spin {
+  animation: iconSpin 3s linear infinite;
+}
+
+.icon-bounce {
+  animation: iconBounce 2s ease-in-out infinite;
+}
+
+.icon-pulse {
+  animation: iconPulse 1.5s ease-in-out infinite;
+}
+
+.icon-wiggle {
+  animation: iconWiggle 2s ease-in-out infinite;
+}
+
+.icon-float {
+  animation: iconFloat 4s ease-in-out infinite;
+}
+
+.icon-glow {
+  animation: iconGlow 2s ease-in-out infinite;
+}
+
+.icon-shake {
+  animation: iconShake 0.8s ease-in-out infinite;
+}
+
+.icon-zoom {
+  animation: iconZoom 2s ease-in-out infinite;
+}
+
+.icon-rotate3d {
+  animation: iconRotate3D 4s linear infinite;
+}
+
+.icon-rainbow {
+  animation: iconRainbow 3s ease-in-out infinite;
+}
+
+/* Animation spéciale pour les icônes au survol des boutons */
+.cta-button:hover .icon-animated {
+  animation: iconPulse 0.6s ease-in-out;
+}
+
+.cta-button:active .icon-animated {
+  animation: iconShake 0.3s ease-in-out;
+}
+
+/* Styles pour l'en-tête fixe */
+.fixed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Ajustement du contenu principal pour compenser l'en-tête fixe */
+.main-content {
+  padding-top: 12rem; /* 192px - ajustez selon la hauteur de votre en-tête */
+}
+
+/* Responsive pour l'en-tête fixe */
+@media (max-width: 768px) {
+  .main-content {
+    padding-top: 10rem; /* 160px pour les écrans mobiles */
+  }
+}
+
+/* Styles pour le chat support client */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #ec4899 #fdf2f8;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #fdf2f8;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #ef4444, #ec4899);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #dc2626, #db2777);
+}
+
+/* Animation pour les messages du chat */
+.chat-message-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.chat-message-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+
+/* Styles pour les boutons d'emojis et pièces jointes */
+.chat-toolbar-button {
+  transition: all 0.2s ease-in-out;
+}
+
+.chat-toolbar-button:hover {
+  transform: scale(1.1);
+}
+
+/* Animation pour l'indicateur de frappe */
+.typing-indicator {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Animation du menu inférieur */
+.bottom-menu-enter {
+  transform: translateY(0);
+  opacity: 1;
+  height: auto;
+  padding: 1rem 0;
+}
+
+.bottom-menu-exit {
+  transform: translateY(-100%);
+  opacity: 0;
+  height: 0;
+  padding: 0;
+}
+
+/* Transition fluide pour le menu inférieur */
+.bottom-menu-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animation de la hauteur du menu inférieur */
+.bottom-menu-height-transition {
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animations personnalisées pour le modal de comparaison */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce-slow {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.6s ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.6s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.6s ease-out;
+}
+
+/* Animations pour la page des vendeurs */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out;
+}
+
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+}
+
+.animation-delay-600 {
+  animation-delay: 0.6s;
+}
+
+.animation-delay-800 {
+  animation-delay: 0.8s;
+}
+
+.animation-delay-1000 {
+  animation-delay: 1s;
+}
+
+.animation-delay-1200 {
+  animation-delay: 1.2s;
+}
+
+.animation-delay-1400 {
+  animation-delay: 1.4s;
+}
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-count-up {
+  animation: count-up 1s ease-out;
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 2s infinite;
+}
+
+/* Délais d'animation */
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+/* Transitions fluides pour tous les éléments */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Hover effects améliorés */
+.hover-lift {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations pour les icônes */
+.icon-bounce {
+  animation: bounce-slow 2s infinite;
+}
+
+.icon-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Effets de brillance */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.shine:hover::before {
+  left: 100%;
+}
+
+/* Animations pour les boutons */
+.btn-animate {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-animate:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.btn-animate:active {
+  transform: translateY(0) scale(1);
+}
+
+/* Effets de survol pour les cartes */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations pour les tableaux */
+.table-row-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.table-row-hover:hover {
+  background-color: rgba(249, 115, 22, 0.05);
+  transform: scale(1.01);
+}
+
+/* Effets de focus améliorés */
+.focus-ring {
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.3);
+}
+
+/* Animations pour les badges */
+.badge-animate {
+  transition: all 0.2s ease-in-out;
+}
+
+.badge-animate:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Effets de survol pour les images */
+.image-hover {
+  transition: all 0.3s ease-in-out;
+}
+
+.image-hover:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Animations pour les graphiques */
+.graph-bar {
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.graph-bar:hover {
+  height: 1.5rem;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+/* Effets de survol pour les étoiles */
+.star-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.star-hover:hover {
+  transform: scale(1.2) rotate(5deg);
+  color: #fbbf24;
+}
+
+/* Animations pour les menus déroulants */
+.dropdown-animate {
+  animation: slide-in-up 0.3s ease-out;
+}
+
+/* Effets de survol pour les boutons d'action */
+.action-btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+/* Animations pour les icônes de partage */
+.share-icon {
+  transition: all 0.2s ease-in-out;
+}
+
+.share-icon:hover {
+  transform: scale(1.1) rotate(5deg);
+}
+
+/* Effets de survol pour les résumés */
+.summary-card {
+  transition: all 0.3s ease-in-out;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations pour les prix */
+.price-animate {
+  transition: all 0.2s ease-in-out;
+}
+
+.price-animate:hover {
+  transform: scale(1.05);
+  color: #ea580c;
+}
+
+/* Effets de survol pour les caractéristiques */
+.feature-item {
+  transition: all 0.2s ease-in-out;
+}
+
+.feature-item:hover {
+  background-color: rgba(255, 255, 255, 0.8);
+  transform: translateX(4px);
+}
+
+/* Animations pour les boutons de suppression */
+.delete-btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.delete-btn:hover {
+  transform: scale(1.05);
+  background-color: #fef2f2;
+  border-color: #f87171;
+}
+
+/* Effets de survol pour les en-têtes de tableau */
+.table-header {
+  transition: all 0.2s ease-in-out;
+}
+
+.table-header:hover {
+  background: linear-gradient(135deg, #f97316, #eab308);
+  transform: scale(1.01);
+}
+
+/* Animations pour les cellules de tableau */
+.table-cell {
+  transition: all 0.2s ease-in-out;
+}
+
+.table-cell:hover {
+  background-color: rgba(249, 115, 22, 0.05);
+}
+
+/* Effets de survol pour les boutons d'exportation */
+.export-btn {
+  transition: all 0.3s ease-in-out;
+}
+
+.export-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+}
+
+.export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Animations pour les boutons d'ajout au panier */
+.cart-btn {
+  transition: all 0.3s ease-in-out;
+}
+
+.cart-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.3);
+}
+
+.cart-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Effets de survol pour les icônes de vendeur */
+.seller-icon {
+  transition: all 0.2s ease-in-out;
+}
+
+.seller-icon:hover {
+  transform: scale(1.1);
+  color: #3b82f6;
+}
+
+/* Animations pour les informations de prix */
+.price-info {
+  transition: all 0.2s ease-in-out;
+}
+
+.price-info:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Effets de survol pour les évaluations */
+.rating-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.rating-hover:hover {
+  transform: scale(1.05);
+}
+
+/* Animations pour les caractéristiques techniques */
+.tech-feature {
+  transition: all 0.2s ease-in-out;
+}
+
+.tech-feature:hover {
+  background-color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Effets de survol pour les informations de livraison */
+.delivery-info {
+  transition: all 0.2s ease-in-out;
+}
+
+.delivery-info:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations pour les graphiques de comparaison */
+.comparison-graph {
+  transition: all 0.3s ease-in-out;
+}
+
+.comparison-graph:hover {
+  transform: scale(1.02);
+}
+
+/* Effets de survol pour les résumés intelligents */
+.smart-summary {
+  transition: all 0.3s ease-in-out;
+}
+
+.smart-summary:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations pour les boutons de partage */
+.share-btn {
+  transition: all 0.3s ease-in-out;
+}
+
+.share-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+}
+
+/* Effets de survol pour les icônes de réseaux sociaux */
+.social-icon {
+  transition: all 0.2s ease-in-out;
+}
+
+.social-icon:hover {
+  transform: scale(1.15) rotate(5deg);
+}
+
+/* Animations pour les boutons de suppression de comparaison */
+.remove-btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.remove-btn:hover {
+  transform: scale(1.05);
+  background-color: #fef2f2;
+  border-color: #f87171;
+}
+
+/* Effets de survol pour les en-têtes de modal */
+.modal-header {
+  transition: all 0.3s ease-in-out;
+}
+
+.modal-header:hover {
+  transform: scale(1.01);
+}
+
+/* Animations pour les descriptions */
+.description-text {
+  transition: all 0.2s ease-in-out;
+}
+
+.description-text:hover {
+  color: #374151;
+}
+
+/* Effets de survol pour les badges de comptage */
+.count-badge {
+  transition: all 0.3s ease-in-out;
+}
+
+.count-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.3);
+}
+
+/* Styles personnalisés pour le modal d'achat avec points */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, #f97316, #eab308);
+  outline: none;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #f97316, #eab308);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+  transition: all 0.3s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.6);
+}
+
+.slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #f97316, #eab308);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+  transition: all 0.3s ease;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.6);
+}
+
+/* Animations pour le modal */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+.sparkle-animation {
+  animation: sparkle 2s ease-in-out infinite;
+}
+
+/* Effet de particules pour les boutons */
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particle-float 3s ease-in-out infinite;
+}
+
+@keyframes particle-float {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-20px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(0);
+  }
+}
+
+/* Animation de progression pour les points */
+.points-progress {
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+  background-size: 200% 100%;
+  animation: gradient-shift 3s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Effet de brillance pour les cartes */
+.shine-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine-effect::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.shine-effect:hover::before {
+  left: 100%;
+}
+
+/* Animation de pulsation pour les badges */
+.badge-pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(249, 115, 22, 0);
+  }
+}
+
+/* Animation de rebond pour les icônes */
+.bounce-icon {
+  animation: bounce-icon 2s ease-in-out infinite;
+}
+
+@keyframes bounce-icon {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+/* Animation de rotation pour les étoiles */
+.rotate-star {
+  animation: rotate-star 3s linear infinite;
+}
+
+@keyframes rotate-star {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Animation de glissement pour les cartes */
+.slide-in-card {
+  animation: slide-in-card 0.6s ease-out;
+}
+
+@keyframes slide-in-card {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Animation de zoom pour les images */
+.zoom-image {
+  transition: transform 0.5s ease;
+}
+
+.zoom-image:hover {
+  transform: scale(1.1);
+}
+
+/* Animation de fade pour les textes */
+.fade-text {
+  animation: fade-text 0.8s ease-in;
+}
+
+@keyframes fade-text {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animation de scale pour les boutons */
+.scale-button {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.scale-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Animation de rotation pour les icônes de chargement */
+.loading-rotate {
+  animation: loading-rotate 1s linear infinite;
+}
+
+@keyframes loading-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Animation de pulse pour les éléments importants */
+.important-pulse {
+  animation: important-pulse 2s ease-in-out infinite;
+}
+
+@keyframes important-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+/* Animation de slide pour les confirmations */
+.slide-confirmation {
+  animation: slide-confirmation 0.5s ease-out;
+}
+
+@keyframes slide-confirmation {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Animation de bounce pour les succès */
+.bounce-success {
+  animation: bounce-success 0.8s ease-out;
+}
+
+@keyframes bounce-success {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Styles de scrollbar personnalisés pour les modales */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Scrollbar pour les modales avec couleurs du site */
+.scrollbar-modal {
+  scrollbar-width: thin;
+  scrollbar-color: #ff6600 #fef3c7;
+}
+
+.scrollbar-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-modal::-webkit-scrollbar-track {
+  background: #fef3c7;
+  border-radius: 4px;
+}
+
+.scrollbar-modal::-webkit-scrollbar-thumb {
+  background: #ff6600;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.scrollbar-modal::-webkit-scrollbar-thumb:hover {
+  background: #e55a00;
+}

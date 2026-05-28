@@ -1,0 +1,440 @@
+"use client";
+
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { PointsService, CartService, WishlistService } from '@/lib/services'
+import { useAuth } from '@/contexts/AuthContext'
+import { 
+  ShoppingCart, Package, Coins, Wallet, RefreshCw, Home, Settings, 
+  Share2, Bell, Download, Send, Clock, TrendingUp, User, MessageCircle,
+  Gift, CreditCard, BarChart3, Shield, LogOut, ChevronRight, X, Smartphone,
+  Check, AlertCircle, Info, Copy, ExternalLink, Plus, Minus, ArrowRight,
+  Facebook, Twitter, Instagram, Mail as MailIcon, Printer, FileText,
+  Eye, Edit3, Trash2, Search, Filter, Calendar, MapPin, Phone
+} from 'lucide-react'
+import { ChatProvider, useChatContext } from '@/lib/chat-context'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Separator } from '@/components/ui/separator'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { useLocalStorageNumber, useLocalStorageArray } from '@/hooks/use-local-storage'
+import { useToast } from '@/hooks/use-toast'
+import { useDashboardData as usePointSettingsDashboardData } from '@/lib/hooks/use-dashboard-data'
+import { useDashboardData as useClientDashboardData, UserOrderWithItems } from '@/lib/services/dashboard-service'
+import { DEFAULT_ADMIN_POINT_SETTINGS } from '@/lib/services/point-settings-service'
+import { CartItem } from '@/lib/types'
+
+export default function DashboardPage() {
+  return (
+    <ChatProvider>
+      <DashboardPageContent />
+    </ChatProvider>
+  )
+}
+
+function DashboardPageContent() {
+  const router = useRouter()
+  const { user, userProfile, loading: authLoading } = useAuth()
+  const { toast } = useToast()
+  const { data: dashboardData, loading: dashboardLoading } = useClientDashboardData(user?.id ?? null)
+  const { pointSettings: dashboardPointSettings } = usePointSettingsDashboardData()
+  
+  // États principaux
+  const [isHydrated, setIsHydrated] = useState(false)
+  const [activeSection, setActiveSection] = useState('overview')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  
+  // États pour les modals
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [showExchangeModal, setShowExchangeModal] = useState(false)
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false)
+  const [showCartModal, setShowCartModal] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  
+  // États pour les formulaires
+  const [withdrawalPointsValue, setWithdrawalPointsValue] = useState(0)
+  const [selectedWithdrawalMethod, setSelectedWithdrawalMethod] = useState<'mobile-money' | 'paypal' | null>(null)
+  const [withdrawalMobileNumber, setWithdrawalMobileNumber] = useState('')
+  const [withdrawalPaypalEmail, setWithdrawalPaypalEmail] = useState('')
+  const [transferPointsValue, setTransferPointsValue] = useState(0)
+  const [transferEmail, setTransferEmail] = useState('')
+  const [transferMessage, setTransferMessage] = useState('')
+  const [exchangePointsValue, setExchangePointsValue] = useState(0)
+  const [exchangeCurrency, setExchangeCurrency] = useState<'XOF' | 'USD' | 'EUR'>('XOF')
+  
+  // État pour la commande sélectionnée
+  const [selectedOrder, setSelectedOrder] = useState<UserOrderWithItems | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<any>(null)
+  
+  // Hooks localStorage
+  const { value: cartItems } = useLocalStorageArray<CartItem>('cart', [])
+  const { value: userPoints, setValue: setUserPoints } = useLocalStorageNumber('userPoints', PointsService.getUserPoints())
+  
+  // Configuration des points
+  const pointSettings = dashboardPointSettings
+  const pointValue = pointSettings?.pointValue ?? DEFAULT_ADMIN_POINT_SETTINGS.pointValue
+  const withdrawalValue = pointSettings?.withdrawalValue ?? DEFAULT_ADMIN_POINT_SETTINGS.withdrawalValue
+  const minWithdrawalPoints = pointSettings?.minWithdrawal ?? DEFAULT_ADMIN_POINT_SETTINGS.minWithdrawal
+  const maxWithdrawalPoints = pointSettings?.maxWithdrawal ?? DEFAULT_ADMIN_POINT_SETTINGS.maxWithdrawal
+  
+  // Calculs des frais
+  const withdrawalFeeConfig = pointSettings?.fees?.withdrawal ?? DEFAULT_ADMIN_POINT_SETTINGS.fees.withdrawal
+  const transferFeeConfig = pointSettings?.fees?.transfer ?? { flat: 50, percentage: 0 }
+  const exchangeFeeConfig = pointSettings?.fees?.exchange ?? { flat: 100, percentage: 0 }
+  
+  const calculateFeePoints = (amount: number, fee: { flat: number; percentage: number }) => {
+    if (!Number.isFinite(amount) || amount <= 0) return 0
+    const percentagePortion = fee.percentage ? (amount * fee.percentage) / 100 : 0
+    return Math.max(0, Math.ceil(fee.flat + percentagePortion))
+  }
+  
+  const withdrawalFeePoints = calculateFeePoints(withdrawalPointsValue, withdrawalFeeConfig)
+  const transferFeePoints = calculateFeePoints(transferPointsValue, transferFeeConfig)
+  const exchangeFeePoints = calculateFeePoints(exchangePointsValue, exchangeFeeConfig)
+  
+  const totalWithdrawalCost = withdrawalPointsValue + withdrawalFeePoints
+  const totalTransferCost = transferPointsValue + transferFeePoints
+  const totalExchangeCost = exchangePointsValue + exchangeFeePoints
+  
+  const canConfirmWithdrawal = 
+    withdrawalPointsValue > 0 &&
+    withdrawalPointsValue >= minWithdrawalPoints &&
+    (maxWithdrawalPoints <= 0 || withdrawalPointsValue <= maxWithdrawalPoints) &&
+    totalWithdrawalCost <= userPoints &&
+    selectedWithdrawalMethod !== null &&
+    (selectedWithdrawalMethod === 'mobile-money' ? withdrawalMobileNumber.trim().length >= 8 : 
+     selectedWithdrawalMethod === 'paypal' ? /\S+@\S+\.\S+/.test(withdrawalPaypalEmail.trim()) : false)
+  
+  const canConfirmTransfer = 
+    transferPointsValue > 0 && 
+    transferEmail.trim().length > 0 && 
+    /\S+@\S+\.\S+/.test(transferEmail.trim()) &&
+    totalTransferCost <= userPoints
+  
+  // Données du dashboard
+  const clientOrders = dashboardData?.orders ?? []
+  const clientSharedProducts = dashboardData?.sharedProducts ?? []
+  const clientNotifications = dashboardData?.notifications ?? []
+  const clientStats = dashboardData?.stats
+  
+  // Menu de navigation sidebar
+  const menuItems = [
+    { id: 'overview', label: 'Aperçu', icon: Home },
+    { id: 'points', label: 'Points', icon: Coins },
+    { id: 'orders', label: 'Commandes', icon: Package },
+    { id: 'shares', label: 'Partages', icon: Share2 },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'chat', label: 'Messages', icon: MessageCircle },
+    { id: 'settings', label: 'Paramètres', icon: Settings },
+  ]
+  
+  // Hydratation
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  // Redirection si non authentifié
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/')
+    }
+  }, [authLoading, router, user])
+  
+  // Fonction pour retirer les points
+  const handleWithdrawal = async () => {
+    if (!canConfirmWithdrawal) return
+    
+    try {
+      const newPoints = userPoints - totalWithdrawalCost
+      setUserPoints(newPoints)
+      PointsService.setUserPoints(newPoints)
+      
+      toast({
+        title: "Retrait effectué !",
+        description: `${withdrawalPointsValue} points retirés avec succès`,
+      })
+      
+      setShowWithdrawalModal(false)
+      setWithdrawalPointsValue(0)
+      setSelectedWithdrawalMethod(null)
+      setWithdrawalMobileNumber('')
+      setWithdrawalPaypalEmail('')
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  // Fonction pour transférer les points
+  const handleTransfer = async () => {
+    if (!canConfirmTransfer) return
+    
+    try {
+      const newPoints = userPoints - totalTransferCost
+      setUserPoints(newPoints)
+      PointsService.setUserPoints(newPoints)
+      
+      toast({
+        title: "Transfert effectué !",
+        description: `${transferPointsValue} points transférés à ${transferEmail}`,
+      })
+      
+      setShowTransferModal(false)
+      setTransferPointsValue(0)
+      setTransferEmail('')
+      setTransferMessage('')
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  // Fonction pour partager un produit
+  const handleShareProduct = (product: any, platform: string) => {
+    const shareUrl = `${window.location.origin}/products/${product.id}`
+    const shareText = `Découvrez ${product.product_name} sur notre plateforme !`
+    
+    let url = ''
+    switch(platform) {
+      case 'facebook':
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
+        break
+      case 'twitter':
+        url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
+        break
+      case 'whatsapp':
+        url = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`
+        break
+      case 'email':
+        url = `mailto:?subject=${encodeURIComponent(shareText)}&body=${encodeURIComponent(shareUrl)}`
+        break
+    }
+    
+    if (url) {
+      window.open(url, '_blank', 'width=600,height=400')
+      toast({
+        title: "Partage effectué !",
+        description: `+10 points gagnés pour le partage sur ${platform}`,
+      })
+    }
+  }
+
+  if (!isHydrated || authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-white via-orange-50 to-white flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-6">
+          <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center animate-pulse">
+            <Wallet className="w-10 h-10 text-[#ff6600]" />
+          </div>
+          <div className="flex items-center space-x-2 text-[#ff6600] font-semibold text-lg">
+            <span>Chargement du tableau de bord...</span>
+            <RefreshCw className="w-5 h-5 animate-spin" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50">
+      <div className="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-12 w-12">
+                <AvatarFallback className="bg-orange-500 text-white">
+                  {user?.email?.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h1 className="text-2xl font-bold">Tableau de bord</h1>
+                <p className="text-sm text-gray-500">Bienvenue, {user?.email}</p>
+              </div>
+            </div>
+            <Button variant="outline" className="border-orange-300">
+              <Coins className="h-4 w-4 mr-2 text-orange-600" />
+              <span className="font-bold text-orange-600">{userPoints.toLocaleString()}</span>
+              <span className="ml-1">pts</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Points totaux</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{userPoints.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Commandes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{clientOrders.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Partages</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{clientSharedProducts.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Notifications</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{clientNotifications.length}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview"><Home className="h-4 w-4 mr-2" />Aperçu</TabsTrigger>
+            <TabsTrigger value="points"><Coins className="h-4 w-4 mr-2" />Points</TabsTrigger>
+            <TabsTrigger value="orders"><Package className="h-4 w-4 mr-2" />Commandes</TabsTrigger>
+            <TabsTrigger value="shares"><Share2 className="h-4 w-4 mr-2" />Partages</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Activité récente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {clientOrders.length > 0 ? (
+                  <div className="space-y-4">
+                    {clientOrders.slice(0, 5).map((order) => (
+                      <div key={order.id} className="flex justify-between p-4 border rounded-lg">
+                        <div>
+                          <p className="font-medium">Commande #{order.order_number}</p>
+                          <p className="text-sm text-gray-500">{new Date(order.created_at).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">{order.total_amount.toLocaleString()} FCFA</p>
+                          <Badge>{order.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">Aucune commande</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="points" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestion des points</CardTitle>
+                <CardDescription>Retrait et transfert de points</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Coins className="h-16 w-16 text-orange-500 mx-auto mb-4" />
+                  <p className="text-3xl font-bold text-orange-600 mb-2">{userPoints.toLocaleString()} pts</p>
+                  <p className="text-gray-500 mb-6">Solde disponible</p>
+                  <div className="flex gap-4 justify-center">
+                    <Button className="bg-orange-600 hover:bg-orange-700">
+                      <Download className="h-4 w-4 mr-2" />
+                      Retirer
+                    </Button>
+                    <Button variant="outline">
+                      <Send className="h-4 w-4 mr-2" />
+                      Transférer
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="orders" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mes commandes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {clientOrders.length > 0 ? (
+                  <div className="space-y-4">
+                    {clientOrders.map((order) => (
+                      <div key={order.id} className="flex justify-between p-4 border rounded-lg">
+                        <div>
+                          <p className="font-bold">Commande #{order.order_number}</p>
+                          <p className="text-sm text-gray-500">{new Date(order.created_at).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">{order.total_amount.toLocaleString()} FCFA</p>
+                          <Badge>{order.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Package className="h-20 w-20 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">Aucune commande</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="shares" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mes partages</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {clientSharedProducts.length > 0 ? (
+                  <div className="space-y-4">
+                    {clientSharedProducts.map((product: any) => (
+                      <div key={product.id} className="border rounded-lg p-4">
+                        <p className="font-medium">{product.product_name}</p>
+                        <Badge variant="secondary" className="mt-2">
+                          {product.total_shares || 0} partages
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Share2 className="h-20 w-20 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">Aucun partage</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}

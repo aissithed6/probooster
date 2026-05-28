@@ -1,0 +1,62 @@
+name: Uptime Check
+
+on:
+  schedule:
+    - cron: '* * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.UPTIME_SITE_URL }}" ]; then echo "Missing secret UPTIME_SITE_URL" && exit 1; fi
+          if [ -z "${{ secrets.UPTIME_REPORT_TOKEN }}" ]; then echo "Missing secret UPTIME_REPORT_TOKEN" && exit 1; fi
+
+      - name: Run health check
+        id: health
+        shell: bash
+        run: |
+          set +e
+          URL="${{ secrets.UPTIME_SITE_URL }}"
+          HEALTH="$URL/api/health"
+
+          START_MS=$(date +%s%3N)
+          HTTP_CODE=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 20 "$HEALTH")
+          END_MS=$(date +%s%3N)
+          LATENCY_MS=$((END_MS-START_MS))
+
+          STATUS="down"
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+            STATUS="up"
+          fi
+
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "latency_ms=$LATENCY_MS" >> $GITHUB_OUTPUT
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      - name: Report result
+        shell: bash
+        run: |
+          set -e
+          URL="${{ secrets.UPTIME_SITE_URL }}"
+          REPORT="$URL/api/public/uptime-report"
+
+          STATUS="${{ steps.health.outputs.status }}"
+          LATENCY_MS="${{ steps.health.outputs.latency_ms }}"
+          CHECKED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          BODY=$(jq -n \
+            --arg checkedUrl "$URL/api/health" \
+            --arg status "$STATUS" \
+            --arg checkedAtIso "$CHECKED_AT" \
+            --argjson latencyMs "$LATENCY_MS" \
+            '{checkedUrl: $checkedUrl, status: $status, latencyMs: $latencyMs, checkedAtIso: $checkedAtIso}')
+
+          curl -sS -X POST "$REPORT" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.UPTIME_REPORT_TOKEN }}" \
+            --data "$BODY" \
+            --max-time 20

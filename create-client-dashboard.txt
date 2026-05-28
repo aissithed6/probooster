@@ -1,0 +1,11 @@
+Je vais créer le dashboard client styled comme le dashboard vendeur.
+
+Caractéristiques à implémenter:
+1. Header avec Titre + Badge Client + Boutons (Notifications, Aide, Panier, Déconnexion)
+2. Sidebar fixe à gauche avec profil utilisateur, points, navigation
+3. Sections: Aperçu, Points, Commandes, Partages, Notifications, Paramètres
+4. Cartes avec gradients colorés (orange, vert, bleu, violet)
+5. Modals fonctionnels pour retrait, transfert, détails commande
+6. Style professionnel avec ombres et bordures colorées
+
+Le dashboard sera créé avec Next.js 14, TypeScript, Tailwind CSS, shadcn/ui.

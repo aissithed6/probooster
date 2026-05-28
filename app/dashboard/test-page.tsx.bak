@@ -1,0 +1,10 @@
+"use client"
+
+export default function TestPage() {
+  return (
+    <div className="min-h-screen bg-red-100 p-8">
+      <h1 className="text-2xl font-bold">Test de rendu</h1>
+      <p>Si cette page s'affiche, le problème vient du contenu de page.tsx</p>
+    </div>
+  )
+}

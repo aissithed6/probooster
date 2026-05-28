@@ -1,0 +1,175 @@
+"use client"
+
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  ShoppingBag, 
+  MessageCircle, 
+  Share2, 
+  Gift, 
+  User, 
+  Settings, 
+  Bell,
+  TrendingUp,
+  Package,
+  Heart,
+  CreditCard,
+  BarChart3,
+  PieChart,
+  LineChart,
+  BarChart,
+  RefreshCw,
+  Calendar,
+  MapPin,
+  Phone,
+  Mail,
+  Shield,
+  Camera,
+  Edit3,
+  Download,
+  Upload,
+  Filter,
+  Search,
+  Plus,
+  MoreVertical,
+  ChevronRight,
+  Star,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  Truck,
+  Home,
+  Users,
+  Activity,
+  Zap,
+  Target,
+  Award,
+  Coins,
+  Wallet,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Smartphone,
+  Wifi,
+  WifiOff,
+  ShoppingCart,
+  Minus,
+  Percent,
+  Key,
+  Trash2,
+  AlertTriangle,
+  Check,
+  Sparkles,
+  Tag,
+  TrendingDown,
+  Send,
+  Paperclip,
+  Sun,
+  Moon,
+  Monitor,
+  FileText,
+  Info,
+  Copy,
+  Headphones,
+  Laptop,
+  Gamepad,
+  Building,
+  ExternalLink,
+  Lightbulb,
+  HelpCircle,
+  Archive,
+  QrCode,
+  X,
+  Pin,
+  Video,
+  Smile,
+  Mic,
+  ChevronLeft,
+  CheckSquare
+} from 'lucide-react';
+import { ChatInterface } from '@/components/chat/ChatInterface';
+import { DashboardChatIntegration } from '@/components/chat';
+import { ChatProvider, useChatContext } from '@/lib/chat-context';
+import { GlobalChatInterface } from '@/components/chat/GlobalChatInterface';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import HeaderCart from '@/components/layout/header-cart';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useLocalStorageArray, useLocalStorageNumber } from '@/hooks/use-local-storage';
+import { useToast } from '@/hooks/use-toast';
+import { useDashboardData as usePointSettingsDashboardData } from '@/lib/hooks/use-dashboard-data';
+import { useDashboardData as useClientDashboardData, UserOrderWithItems } from '@/lib/services/dashboard-service';
+import { DEFAULT_ADMIN_POINT_SETTINGS } from '@/lib/services/point-settings-service';
+import { Product, CartItem, ChatSession, Seller } from '@/lib/types';
+import { 
+  PointsEvolutionChart, 
+  SharesDistributionChart, 
+  OrdersChart, 
+  WeeklyActivityChart, 
+  PerformanceRadarChart, 
+  RealTimeStats 
+} from '@/components/charts/dashboard-charts';
+import SystemSettingsSection from '@/components/dashboard/system-settings-section';
+import { PointsService } from '@/lib/services';
+
+import { DashboardLayout } from './components/DashboardLayout';
+import { useDashboard } from './hooks/useDashboard';
+
+export default function DashboardPage() {
+  const {
+    activeTab,
+    handleTabChange,
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    cartItems,
+    wishlist,
+    isLoading,
+    error,
+    profile,
+    user,
+    authLoading,
+  } = useDashboard();
+
+  // Si l'utilisateur n'est pas connecté, le hook useDashboard le redirigera
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <DashboardLayout
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      notifications={notifications}
+      unreadCount={unreadCount}
+      markAsRead={markAsRead}
+      markAllAsRead={markAllAsRead}
+      cartItems={cartItems}
+      wishlist={wishlist}
+      isLoading={isLoading}
+      error={error}
+      profile={profile}
+      user={user}
+    />
+  );
+}

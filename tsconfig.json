@@ -1,0 +1,63 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "target": "ES6",
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.corrupted-*.ts",
+    "**/*.backup.tsx",
+    "**/*.backup.ts",
+    "**/*.old.tsx",
+    "**/*.old.ts",
+    ".next",
+    "backup-*/*",
+    "backup_*/*",
+    "app/seller-dashboard/page-backup-before-chat.tsx",
+    "app/**/test-*/**",
+    "app/test*/**",
+    "app/seller-dashboard/**",
+    "app/super-admin-dashboard/**",
+    "components/**/test-*/**",
+    "components/test-*/**",
+    "scripts/**",
+    "supabase/functions/**"
+  ]
+}
