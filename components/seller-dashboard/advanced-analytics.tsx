@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   TrendingUp,
   TrendingDown,
@@ -31,19 +31,51 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
-import type { VendorAnalyticsData } from '@/lib/vendor-analytics'
+import {
+  resolveVendorReportExportType,
+  type VendorAnalyticsData,
+  type VendorAnalyticsPeriod
+} from '@/lib/vendor-analytics'
+import { AnalyticsExportFormatMenu } from './analytics-export-format-menu'
+
+const EXPORT_MODAL_TYPE_MAP: Record<string, string> = {
+  all: 'all',
+  sales: 'ventes',
+  analytics: 'detailed',
+  insights: 'insights'
+}
+
+const ADVANCED_FILTERS_STORAGE_KEY = 'vendor-advanced-analytics-filters'
 
 interface AdvancedAnalyticsProps {
   analytics: VendorAnalyticsData | null
   isLoading: boolean
+  period: VendorAnalyticsPeriod
+  onPeriodChange: (period: VendorAnalyticsPeriod) => Promise<void> | void
   onExportInsights: (type: string, format: string) => void
   onViewDetailedReport: (metric: string) => void
   onRefresh: () => Promise<void>
 }
 
+function periodToFilterTimeframe(period: VendorAnalyticsPeriod): string {
+  if (period === '7d') return 'week'
+  if (period === '90d') return 'quarter'
+  if (period === '1y') return 'year'
+  return 'month'
+}
+
+function timeframeToPeriod(timeframe: string): VendorAnalyticsPeriod {
+  if (timeframe === 'week') return '7d'
+  if (timeframe === 'quarter') return '90d'
+  if (timeframe === 'year') return '1y'
+  return '30d'
+}
+
 export default function AdvancedAnalytics({
   analytics,
   isLoading,
+  period,
+  onPeriodChange,
   onExportInsights,
   onViewDetailedReport,
   onRefresh
@@ -55,6 +87,7 @@ export default function AdvancedAnalytics({
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', minimumFractionDigits: 0 }).format(amount)
 
   const formatPct = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}%`
+  const formatPctAbsolute = (value: number) => `${value.toFixed(1)}%`
   const [showNotification, setShowNotification] = useState(false)
   const [notificationData, setNotificationData] = useState({ type: 'info', title: '', message: '' })
 
@@ -89,10 +122,22 @@ export default function AdvancedAnalytics({
   })
 
   const [filterOptions, setFilterOptions] = useState({
-    timeframe: 'month',
+    timeframe: periodToFilterTimeframe(period),
     metric: 'conversion',
     category: 'all'
   })
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(ADVANCED_FILTERS_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as typeof filterOptions
+        setFilterOptions((prev) => ({ ...prev, ...parsed, timeframe: periodToFilterTimeframe(period) }))
+      }
+    } catch {
+      // ignore
+    }
+  }, [period])
 
   const [reportOptions, setReportOptions] = useState({
     period: 'month',
@@ -114,10 +159,30 @@ export default function AdvancedAnalytics({
 
   const handleExport = async () => {
     setIsExporting(true)
-    onExportInsights(exportOptions.type, exportOptions.format === 'pdf' ? 'json' : exportOptions.format)
-    showSimpleNotification('success', 'Export réussi', 'Insights exportés (JSON) depuis la base de données.')
+    const exportType = EXPORT_MODAL_TYPE_MAP[exportOptions.type] ?? exportOptions.type
+    onExportInsights(exportType, exportOptions.format)
+    showSimpleNotification('success', 'Export réussi', 'Fichier téléchargé avec vos données synchronisées.')
     setShowExportModal(false)
     setIsExporting(false)
+  }
+
+  const handleApplyFilters = async () => {
+    try {
+      sessionStorage.setItem(ADVANCED_FILTERS_STORAGE_KEY, JSON.stringify(filterOptions))
+    } catch {
+      // ignore
+    }
+    const nextPeriod = timeframeToPeriod(filterOptions.timeframe)
+    onPeriodChange(nextPeriod)
+    setShowFiltersModal(false)
+  }
+
+  const handleRefreshDirect = async () => {
+    setIsRefreshing(true)
+    showSimpleNotification('info', 'Actualisation', 'Synchronisation avec la base de données...')
+    await onRefresh()
+    showSimpleNotification('success', 'Actualisation terminée', 'Analyses avancées à jour.')
+    setIsRefreshing(false)
   }
 
   const handleFiltersModal = () => {
@@ -137,11 +202,24 @@ export default function AdvancedAnalytics({
     setIsRefreshing(false)
   }
 
-  const reportTypeToExportKey = (reportType: string): string => {
-    if (reportType === 'Insights IA') return 'insights'
-    if (reportType === 'Synthèse') return 'summary'
-    if (reportType === 'Données Détaillées') return 'detailed'
-    return 'detailed'
+  const resolveExportFormat = (format: string): 'json' | 'csv' => {
+    if (format === 'csv' || format === 'excel') return 'csv'
+    return 'json'
+  }
+
+  const exportReportQuick = (reportLabel: string, format: 'json' | 'csv' = 'json') => {
+    if (!analytics) {
+      showSimpleNotification('warning', 'Export impossible', 'Les données ne sont pas encore chargées.')
+      return
+    }
+    const exportKey = resolveVendorReportExportType(reportLabel)
+    onExportInsights(exportKey, format)
+    const formatLabel = format === 'csv' ? 'CSV' : 'JSON'
+    showSimpleNotification(
+      'success',
+      'Export réussi',
+      `Rapport « ${reportLabel} » téléchargé (${formatLabel}, données synchronisées).`
+    )
   }
 
   const closeReportModal = (reportType: string) => {
@@ -180,13 +258,8 @@ export default function AdvancedAnalytics({
 
   const handleGenerateReport = async (reportType: string) => {
     setIsGeneratingReport(true)
-    showSimpleNotification('info', 'Génération en cours', `Export JSON du rapport ${reportType}...`)
-
-    const exportKey = reportTypeToExportKey(reportType)
-    onExportInsights(exportKey, 'json')
+    exportReportQuick(reportType, reportOptions.format)
     onViewDetailedReport(reportType)
-
-    showSimpleNotification('success', 'Rapport généré', `Rapport ${reportType} exporté (JSON).`)
     setIsGeneratingReport(false)
     closeReportModal(reportType)
   }
@@ -251,7 +324,7 @@ export default function AdvancedAnalytics({
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-medium text-orange-700">ROI</p>
-                <p className="text-2xl font-bold text-orange-900">{formatPct(advanced?.roiPercent ?? 0)}</p>
+                <p className="text-2xl font-bold text-orange-900">{formatPctAbsolute(advanced?.roiPercent ?? 0)}</p>
               </div>
               <div className="p-2 bg-orange-100 rounded-full">
                 <TrendingUp className="w-5 h-5 text-[#ff6600]" />
@@ -334,20 +407,20 @@ export default function AdvancedAnalytics({
            Filtres Avancés
          </Button>
          
-         <Button 
-           variant="outline" 
-           onClick={handleExportModal}
+         <AnalyticsExportFormatMenu
+           reportType="insights"
+           onExport={onExportInsights}
+           disabled={isLoading || !analytics}
+           label="Export Insights"
            className="border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white"
-         >
-           <Download className="w-4 h-4 mr-2" />
-           Export Insights
-         </Button>
+         />
          
          <Button 
-           onClick={handleRefreshModal}
+           onClick={() => void handleRefreshDirect()}
+           disabled={isLoading || isRefreshing}
            className="bg-[#3b82f6] hover:bg-[#3b82f6]/90"
          >
-           <RefreshCw className="w-4 h-4 mr-2" />
+           <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
            Actualiser
          </Button>
        </div>
@@ -379,65 +452,76 @@ export default function AdvancedAnalytics({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowPerformanceReportModal(true)}
-              className="h-auto p-4 flex flex-col items-center space-y-2 border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white"
-            >
-              <Activity className="w-6 h-6" />
-              <span className="font-medium">Rapport Performance</span>
-              <span className="text-xs text-gray-500">Métriques détaillées</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setShowCustomerReportModal(true)}
-              className="h-auto p-4 flex flex-col items-center space-y-2 border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white"
-            >
-              <Users className="w-6 h-6" />
-              <span className="font-medium">Rapport Clients</span>
-              <span className="text-xs text-gray-500">Analyse comportementale</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setShowRevenueReportModal(true)}
-              className="h-auto p-4 flex flex-col items-center space-y-2 border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white"
-            >
-              <TrendingUp className="w-6 h-6" />
-              <span className="font-medium">Rapport Revenus</span>
-              <span className="text-xs text-gray-500">Analyse financière</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setShowComparisonReportModal(true)}
-              className="h-auto p-4 flex flex-col items-center space-y-2 border-[#8b5cf6] text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white"
-            >
-              <LineChart className="w-6 h-6" />
-              <span className="font-medium">Rapport Comparatif</span>
-              <span className="text-xs text-gray-500">Évolution temporelle</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setShowPredictiveReportModal(true)}
-              className="h-auto p-4 flex flex-col items-center space-y-2 border-[#f59e0b] text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white"
-            >
-              <Lightbulb className="w-6 h-6" />
-              <span className="font-medium">Rapport Prédictif</span>
-              <span className="text-xs text-gray-500">Prévisions IA</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setShowCustomReportModal(true)}
-              className="h-auto p-4 flex flex-col items-center space-y-2 border-[#ef4444] text-[#ef4444] hover:bg-[#ef4444] hover:text-white"
-            >
-              <Zap className="w-6 h-6" />
-              <span className="font-medium">Rapport Personnalisé</span>
-              <span className="text-xs text-gray-500">Configuration libre</span>
-            </Button>
+            {(
+              [
+                {
+                  label: 'Performance',
+                  icon: <Activity className="w-6 h-6" />,
+                  title: 'Rapport Performance',
+                  sub: 'Métriques détaillées',
+                  className:
+                    'h-auto p-4 flex flex-col items-center space-y-2 border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white'
+                },
+                {
+                  label: 'Clients',
+                  icon: <Users className="w-6 h-6" />,
+                  title: 'Rapport Clients',
+                  sub: 'Analyse comportementale',
+                  className:
+                    'h-auto p-4 flex flex-col items-center space-y-2 border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white'
+                },
+                {
+                  label: 'Revenus',
+                  icon: <TrendingUp className="w-6 h-6" />,
+                  title: 'Rapport Revenus',
+                  sub: 'Analyse financière',
+                  className:
+                    'h-auto p-4 flex flex-col items-center space-y-2 border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white'
+                },
+                {
+                  label: 'Comparatif',
+                  icon: <LineChart className="w-6 h-6" />,
+                  title: 'Rapport Comparatif',
+                  sub: 'Évolution temporelle',
+                  className:
+                    'h-auto p-4 flex flex-col items-center space-y-2 border-[#8b5cf6] text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white'
+                },
+                {
+                  label: 'Prédictif',
+                  icon: <Lightbulb className="w-6 h-6" />,
+                  title: 'Rapport Prédictif',
+                  sub: 'Prévisions IA',
+                  className:
+                    'h-auto p-4 flex flex-col items-center space-y-2 border-[#f59e0b] text-[#f59e0b] hover:bg-[#f59e0b] hover:text-white'
+                },
+                {
+                  label: 'Personnalisé',
+                  icon: <Zap className="w-6 h-6" />,
+                  title: 'Rapport Personnalisé',
+                  sub: 'Configuration libre',
+                  className:
+                    'h-auto p-4 flex flex-col items-center space-y-2 border-[#ef4444] text-[#ef4444] hover:bg-[#ef4444] hover:text-white'
+                }
+              ] as const
+            ).map((item) => (
+              <AnalyticsExportFormatMenu
+                key={item.label}
+                reportType={resolveVendorReportExportType(item.label)}
+                onExport={onExportInsights}
+                disabled={isLoading || !analytics}
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading || !analytics}
+                  className={item.className}
+                >
+                  {item.icon}
+                  <span className="font-medium">{item.title}</span>
+                  <span className="text-xs text-gray-500">{item.sub}</span>
+                </Button>
+              </AnalyticsExportFormatMenu>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -452,36 +536,54 @@ export default function AdvancedAnalytics({
           <CardDescription>Exportez vos données et générez des rapports détaillés pour vos équipes</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowSummaryReportModal(true)}
-              className="flex-1 h-auto p-4 flex flex-col items-center space-y-2 border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white"
-            >
-              <FileText className="w-6 h-6" />
-              <span className="font-medium">Rapport Synthèse</span>
-              <span className="text-xs text-gray-500">Vue d'ensemble complète</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setShowDetailedDataModal(true)}
-              className="flex-1 h-auto p-4 flex flex-col items-center space-y-2 border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white"
-            >
-              <Download className="w-6 h-6" />
-              <span className="font-medium">Données Détaillées</span>
-              <span className="text-xs text-gray-500">Export complet des données</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={() => setShowAIInsightsModal(true)}
-              className="flex-1 h-auto p-4 flex flex-col items-center space-y-2 border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white"
-            >
-              <Lightbulb className="w-6 h-6" />
-              <span className="font-medium">Insights IA</span>
-              <span className="text-xs text-gray-500">Analyse prédictive avancée</span>
-            </Button>
+          <div className="flex flex-col sm:flex-row gap-4">
+            {(
+              [
+                {
+                  label: 'Synthèse',
+                  icon: <FileText className="w-6 h-6" />,
+                  title: 'Rapport Synthèse',
+                  sub: "Vue d'ensemble complète",
+                  className:
+                    'flex-1 h-auto p-4 flex flex-col items-center space-y-2 border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white'
+                },
+                {
+                  label: 'Données Détaillées',
+                  icon: <Download className="w-6 h-6" />,
+                  title: 'Données Détaillées',
+                  sub: 'Export complet des données',
+                  className:
+                    'flex-1 h-auto p-4 flex flex-col items-center space-y-2 border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white'
+                },
+                {
+                  label: 'Insights IA',
+                  icon: <Lightbulb className="w-6 h-6" />,
+                  title: 'Insights IA',
+                  sub: 'Analyse prédictive avancée',
+                  className:
+                    'flex-1 h-auto p-4 flex flex-col items-center space-y-2 border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white'
+                }
+              ] as const
+            ).map((item) => (
+              <AnalyticsExportFormatMenu
+                key={item.label}
+                reportType={resolveVendorReportExportType(item.label)}
+                onExport={onExportInsights}
+                disabled={isLoading || !analytics}
+                contentClassName="w-56"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading || !analytics}
+                  className={item.className}
+                >
+                  {item.icon}
+                  <span className="font-medium">{item.title}</span>
+                  <span className="text-xs text-gray-500">{item.sub}</span>
+                </Button>
+              </AnalyticsExportFormatMenu>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -625,10 +727,8 @@ export default function AdvancedAnalytics({
                 Annuler
               </Button>
               <Button 
-                onClick={() => {
-                  setShowFiltersModal(false)
-                  showSimpleNotification('success', 'Filtres appliqués', 'Les filtres avancés ont été configurés avec succès')
-                }}
+                onClick={() => void handleApplyFilters()}
+                disabled={isLoading}
                 className="bg-[#8b5cf6] hover:bg-[#8b5cf6]/90"
               >
                 Appliquer

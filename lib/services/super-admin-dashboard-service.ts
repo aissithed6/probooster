@@ -418,6 +418,10 @@ export interface SuperAdminUserSummary {
     loginNotifications: boolean
     sessionTimeout: number
   }
+  verification?: {
+    isVerified: boolean
+    documents: any[]
+  }
 }
 
 const EMPTY_OVERVIEW: SuperAdminOverviewStats = {

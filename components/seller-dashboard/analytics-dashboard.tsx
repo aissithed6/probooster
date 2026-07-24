@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   TrendingUp,
   TrendingDown,
@@ -65,7 +65,12 @@ interface SocialMediaStats {
   growth: number
 }
 
-import type { VendorAnalyticsData, VendorAnalyticsPeriod } from '@/lib/vendor-analytics'
+import {
+  downsampleSalesSeriesForDisplay,
+  type VendorAnalyticsData,
+  type VendorAnalyticsPeriod
+} from '@/lib/vendor-analytics'
+import { AnalyticsExportFormatMenu } from './analytics-export-format-menu'
 
 interface AnalyticsDashboardProps {
   analytics: VendorAnalyticsData | null
@@ -102,12 +107,16 @@ export default function AnalyticsDashboard({
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
 
-  const salesData: SalesData[] = (analytics?.salesSeries ?? []).map((row) => ({
-    period: row.period,
-    sales: row.sales,
-    revenue: row.revenue,
-    growth: row.growth
-  }))
+  const salesData: SalesData[] = useMemo(
+    () =>
+      downsampleSalesSeriesForDisplay(analytics?.salesSeries ?? [], 14).map((row) => ({
+        period: row.period,
+        sales: row.sales,
+        revenue: row.revenue,
+        growth: row.growth
+      })),
+    [analytics?.salesSeries]
+  )
 
   const productPerformance: ProductPerformance[] = (analytics?.topProducts ?? []).map((p) => ({
     id: p.id,
@@ -129,10 +138,13 @@ export default function AnalyticsDashboard({
 
   const overview = analytics?.overview
   const summary = analytics?.summary
-  const maxSales = Math.max(...salesData.map((item) => item.sales), 1)
+  const maxSales = useMemo(
+    () => Math.max(...salesData.map((item) => item.sales), 1),
+    [salesData]
+  )
+  const hasSalesChartData = salesData.some((item) => item.sales > 0 || item.revenue > 0)
   const customersSample = analytics?.customersSample ?? []
-  const revenueFromSeries = salesData.reduce((sum, item) => sum + (Number(item.revenue ?? 0) || 0), 0)
-  const displayedRevenue = Number(summary?.totalRevenue ?? 0) > 0 ? Number(summary?.totalRevenue ?? 0) : revenueFromSeries
+  const displayedRevenue = Number(summary?.totalRevenue ?? 0)
 
   const selectedCustomerData = customersSample.find((c) => c.id === selectedCustomer) ?? null
 
@@ -179,8 +191,7 @@ export default function AnalyticsDashboard({
   }
 
   const handlePeriodChange = (nextPeriod: string) => {
-    void onPeriodChange(nextPeriod as VendorAnalyticsPeriod)
-    showSimpleNotification('info', 'Changement de période', `Mise à jour des données pour la période: ${nextPeriod}`)
+    onPeriodChange(nextPeriod as VendorAnalyticsPeriod)
   }
 
   const handleMetricChange = (metric: string) => {
@@ -207,16 +218,6 @@ export default function AnalyticsDashboard({
     showSimpleNotification('info', 'Actualisation', 'Synchronisation avec la base de données...')
     await onRefresh()
     showSimpleNotification('success', 'Données actualisées', 'Les statistiques sont à jour.')
-  }
-
-  const handleGenerateReport = (type: string) => {
-    onExportData(type === 'ventes' ? 'summary' : 'detailed', 'json')
-    showSimpleNotification('success', 'Rapport généré', `Export JSON du rapport ${type}.`)
-  }
-
-  const handleExportDataLocal = (type: string, format: string) => {
-    onExportData(type, format === 'pdf' || format === 'excel' ? 'json' : format)
-    showSimpleNotification('success', 'Export lancé', `Export ${type} en cours.`)
   }
 
   return (
@@ -373,76 +374,114 @@ export default function AnalyticsDashboard({
       </div>
 
       {/* Graphiques et visualisations */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
         {/* Évolution des ventes */}
-        <Card className="hover:shadow-lg transition-all duration-300">
+        <Card className="hover:shadow-lg transition-all duration-300 min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <LineChart className="w-5 h-5 text-blue-600" />
+              <LineChart className="w-5 h-5 text-blue-600 shrink-0" />
               <span>Évolution des Ventes</span>
             </CardTitle>
-            <CardDescription>Progression mensuelle de vos ventes</CardDescription>
+            <CardDescription>Progression sur la période sélectionnée (commandes &amp; CA dashboard)</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-end justify-between space-x-2">
-              {salesData.map((item, index) => (
-                <div key={index} className="flex flex-col items-center space-y-2">
-                  <div
-                    className="w-8 bg-blue-500 rounded-t-sm transition-all duration-300 hover:scale-110 cursor-pointer"
-                    style={{ height: `${(item.sales / maxSales) * 200}px` }}
-                    onClick={() => productPerformance[0] && handleViewProductDetailsLocal(productPerformance[0].id)}
-                  />
-                  <span className="text-xs text-gray-600">{item.period}</span>
+          <CardContent className="min-w-0">
+            {!hasSalesChartData ? (
+              <div className="h-64 flex flex-col items-center justify-center text-center text-sm text-gray-500 px-4">
+                <BarChart3 className="w-10 h-10 text-gray-300 mb-2" />
+                <p>Aucune vente enregistrée sur cette période.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto pb-2 -mx-1 px-1">
+                <div
+                  className="h-64 flex items-end gap-1.5 min-w-full"
+                  style={{ minWidth: `${Math.max(salesData.length * 40, 280)}px` }}
+                >
+                  {salesData.map((item, index) => {
+                    const barHeight = Math.max(4, (item.sales / maxSales) * 200)
+                    return (
+                      <div
+                        key={`${item.period}-${index}`}
+                        className="flex flex-1 flex-col items-center justify-end gap-1 min-w-0 max-w-[56px]"
+                      >
+                        <span className="text-[10px] font-medium text-blue-800 tabular-nums">
+                          {item.sales > 0 ? formatNumber(item.sales) : ''}
+                        </span>
+                        <div
+                          className="w-full max-w-[40px] bg-blue-500 rounded-t-sm transition-all duration-300 hover:bg-blue-600"
+                          style={{ height: `${barHeight}px` }}
+                          title={`${item.period} — ${formatNumber(item.sales)} vente(s), ${displayAmountWithPoints(item.revenue)}`}
+                        />
+                        <span
+                          className="text-[10px] leading-tight text-gray-600 text-center w-full truncate px-0.5"
+                          title={item.period}
+                        >
+                          {item.period}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
             <div className="mt-4 flex items-center justify-center space-x-4 text-sm">
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                <span>Ventes</span>
+                <div className="w-3 h-3 bg-blue-500 rounded shrink-0"></div>
+                <span>Ventes (quantité)</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Performance des produits */}
-        <Card className="hover:shadow-lg transition-all duration-300">
+        <Card className="hover:shadow-lg transition-all duration-300 min-w-0 overflow-hidden">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="w-5 h-5 text-green-600" />
+              <BarChart3 className="w-5 h-5 text-green-600 shrink-0" />
               <span>Performance des Produits</span>
             </CardTitle>
-            <CardDescription>Top 3 des produits les plus performants</CardDescription>
+            <CardDescription>Top 3 des produits les plus performants (dashboard &amp; commandes)</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {productPerformance.map((product) => (
-                <div key={product.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Star className="w-4 h-4 text-green-600" />
+          <CardContent className="min-w-0">
+            {productPerformance.length === 0 ? (
+              <div className="h-64 flex flex-col items-center justify-center text-center text-sm text-gray-500 px-4">
+                <Star className="w-10 h-10 text-gray-300 mb-2" />
+                <p>Aucun produit vendu sur cette période.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
+                {productPerformance.map((product) => (
+                  <div
+                    key={product.id}
+                    className="flex items-center justify-between gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors min-w-0"
+                  >
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <div className="p-2 bg-green-100 rounded-lg shrink-0">
+                        <Star className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 truncate" title={product.name}>
+                          {product.name}
+                        </p>
+                        <p className="text-sm text-gray-500 truncate">{displayAmountWithPoints(product.revenue)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{product.name}</p>
-                      <p className="text-sm text-gray-500">{displayAmountWithPoints(product.revenue)}</p>
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900">{formatNumber(product.sales)}</p>
+                        <p className="text-xs text-gray-500">ventes</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewProductDetailsLocal(product.id)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">{formatNumber(product.sales)}</p>
-                      <p className="text-xs text-gray-500">ventes</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewProductDetailsLocal(product.id)}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -496,41 +535,65 @@ export default function AnalyticsDashboard({
               <p className="text-gray-600">Accédez rapidement aux fonctionnalités essentielles</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => handleGenerateReport('ventes')}
-                className="flex items-center space-x-2 border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white"
+              <AnalyticsExportFormatMenu
+                reportType="ventes"
+                onExport={onExportData}
+                disabled={isLoading || !analytics}
               >
-                <FileText className="w-4 h-4" />
-                <span>Rapport Ventes</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={() => handleGenerateReport('performance')}
-                className="flex items-center space-x-2 border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white"
+                <Button
+                  variant="outline"
+                  disabled={isLoading || !analytics}
+                  className="flex items-center space-x-2 border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Rapport Ventes</span>
+                </Button>
+              </AnalyticsExportFormatMenu>
+
+              <AnalyticsExportFormatMenu
+                reportType="performance"
+                onExport={onExportData}
+                disabled={isLoading || !analytics}
               >
-                <BarChart3 className="w-4 h-4" />
-                <span>Rapport Performance</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={() => handleExportDataLocal('summary', 'json')}
-                className="flex items-center space-x-2 border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white"
+                <Button
+                  variant="outline"
+                  disabled={isLoading || !analytics}
+                  className="flex items-center space-x-2 border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Rapport Performance</span>
+                </Button>
+              </AnalyticsExportFormatMenu>
+
+              <AnalyticsExportFormatMenu
+                reportType="summary"
+                onExport={onExportData}
+                disabled={isLoading || !analytics}
               >
-                <Download className="w-4 h-4" />
-                <span>Export PDF</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={() => handleExportDataLocal('detailed', 'json')}
-                className="flex items-center space-x-2 border-[#8b5cf6] text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white"
+                <Button
+                  variant="outline"
+                  disabled={isLoading || !analytics}
+                  className="flex items-center space-x-2 border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export Synthèse</span>
+                </Button>
+              </AnalyticsExportFormatMenu>
+
+              <AnalyticsExportFormatMenu
+                reportType="detailed"
+                onExport={onExportData}
+                disabled={isLoading || !analytics}
               >
-                <FileText className="w-4 h-4" />
-                <span>Export Excel</span>
-              </Button>
+                <Button
+                  variant="outline"
+                  disabled={isLoading || !analytics}
+                  className="flex items-center space-x-2 border-[#8b5cf6] text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Export Détaillé</span>
+                </Button>
+              </AnalyticsExportFormatMenu>
             </div>
           </div>
         </CardContent>

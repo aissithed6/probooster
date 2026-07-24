@@ -389,6 +389,11 @@ export class ChatService {
 
         const json = await resp.json().catch(() => null)
         if (!resp.ok) {
+          // Si c'est une erreur d'authentification (401), on reste discret car c'est attendu si non connecté
+          if (resp.status === 401) {
+            return null
+          }
+
           const apiError = typeof json?.error === 'string' && json.error.trim().length > 0 ? json.error : ''
           const details = json && typeof json === 'object' ? JSON.stringify(json) : String(json)
           const msg = apiError || `HTTP ${resp.status} - ${details}`
@@ -492,6 +497,84 @@ export class ChatService {
 
     subscription.subscribe()
     return subscription
+  }
+
+  /**
+   * Récupère un administrateur système pour le chat de support
+   */
+  static async getSystemAdmin(currentUserId?: string): Promise<ChatParticipant | null> {
+    try {
+      // 1. Chercher d'abord un super_admin ou admin
+      const { data: admin } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .in('role', ['super_admin', 'admin'])
+        .order('role', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (admin) {
+        return await this.buildParticipantFromUser(admin.id, admin.role as any)
+      }
+
+      // 2. Fallback: Chercher par email spécifique (asthedio@gmail.com)
+      const { data: fallbackByEmail } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .eq('email', 'asthedio@gmail.com')
+        .maybeSingle()
+
+      if (fallbackByEmail) {
+        return await this.buildParticipantFromUser(fallbackByEmail.id, fallbackByEmail.role as any)
+      }
+
+      // 3. Fallback: Chercher n'importe quel autre utilisateur
+      const { data: anyOtherUser } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .neq('id', currentUserId || '')
+        .limit(1)
+        .maybeSingle()
+
+      if (anyOtherUser) {
+        return await this.buildParticipantFromUser(anyOtherUser.id, 'admin')
+      }
+
+      // 4. Fallback ultime: Utiliser le currentUserId s'il est fourni (auto-chat)
+      if (currentUserId) {
+        return await this.buildParticipantFromUser(currentUserId, 'admin')
+      }
+
+      // 5. Hardcoded fallback ID (Si vraiment tout échoue)
+      // On utilise un ID de super admin probable ou système
+      const systemId = '00000000-0000-0000-0000-000000000000' // ID fictif
+      return {
+        id: systemId,
+        name: 'Support Probooster',
+        role: 'admin'
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'admin:', error)
+      return null
+    }
+  }
+
+  /**
+   * Helper pour construire un participant à partir d'un ID utilisateur
+   */
+  private static async buildParticipantFromUser(userId: string, role: any): Promise<ChatParticipant> {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('first_name, last_name, avatar_url')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    return {
+      id: userId,
+      name: profile ? `${profile.first_name} ${profile.last_name}`.trim() : 'Support Probooster',
+      avatar_url: profile?.avatar_url || undefined,
+      role: role || 'admin'
+    }
   }
 
   /**

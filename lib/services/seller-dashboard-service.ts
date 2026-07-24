@@ -105,6 +105,8 @@ export interface SellerStats {
   totalShares: number
   ranking: number
   totalVendors: number
+  responseRate: number
+  averageResponseTime: number
 }
 
 export interface SellerProduct {
@@ -272,6 +274,8 @@ export interface SellerProfile {
   preferences: {
     theme: 'auto' | 'light' | 'dark'
     language: string
+    currency: string
+    timezone: string
     notifications: {
       email: boolean
       sms: boolean
@@ -284,6 +288,7 @@ export interface SellerProfile {
     averageRating: number
     totalReviews: number
     responseRate: number
+    averageResponseTime: number
   }
 }
 
@@ -1082,6 +1087,144 @@ export class SellerDashboardService {
   }
 
   /**
+   * Construit le profil vendeur affiché dans Paramètres / Profil à partir du compte et de user_profiles.
+   */
+  static buildSellerProfileFromSources(params: {
+    vendorId: string
+    email?: string | null
+    userProfile?: Partial<UserProfile> | null
+    stats?: Partial<SellerStats> | null
+    isVerified?: boolean
+  }): SellerProfile {
+    const profile = params.userProfile
+    const firstName = String(profile?.first_name ?? '').trim()
+    const lastName = String(profile?.last_name ?? '').trim()
+    const fullName = `${firstName} ${lastName}`.trim()
+    const email = String(params.email ?? '').trim()
+    const name = fullName || email || 'Vendeur Pro'
+
+    const prefsRaw =
+      profile?.preferences && typeof profile.preferences === 'object' && !Array.isArray(profile.preferences)
+        ? (profile.preferences as Record<string, unknown>)
+        : {}
+    const uiPrefs =
+      prefsRaw.ui && typeof prefsRaw.ui === 'object' && !Array.isArray(prefsRaw.ui)
+        ? (prefsRaw.ui as Record<string, unknown>)
+        : prefsRaw
+    const themeRaw = String(uiPrefs.theme ?? prefsRaw.theme ?? 'auto')
+    const theme: SellerProfile['preferences']['theme'] =
+      themeRaw === 'dark' || themeRaw === 'light' ? themeRaw : 'auto'
+    const language = String(uiPrefs.language ?? prefsRaw.language ?? 'fr')
+    const currency = String(uiPrefs.currency ?? prefsRaw.currency ?? 'xof')
+    const timezone = String(uiPrefs.timezone ?? prefsRaw.timezone ?? 'africa_cotonou')
+    const notifRaw =
+      uiPrefs.notifications && typeof uiPrefs.notifications === 'object'
+        ? (uiPrefs.notifications as Record<string, unknown>)
+        : prefsRaw.notifications && typeof prefsRaw.notifications === 'object'
+          ? (prefsRaw.notifications as Record<string, unknown>)
+          : {}
+
+    const socialRaw =
+      profile?.social_media && typeof profile.social_media === 'object' && !Array.isArray(profile.social_media)
+        ? (profile.social_media as Record<string, unknown>)
+        : {}
+
+    const verificationRaw =
+      profile?.verification && typeof profile.verification === 'object' && !Array.isArray(profile.verification)
+        ? (profile.verification as Record<string, unknown>)
+        : {}
+
+    const stats = params.stats ?? {}
+
+    return {
+      id: String(profile?.id ?? params.vendorId),
+      name,
+      email: email || '—',
+      phone: String(profile?.phone ?? ''),
+      avatar: String(profile?.avatar_url ?? ''),
+      bio: String(profile?.bio ?? ''),
+      company: String(prefsRaw.company ?? prefsRaw.business_name ?? ''),
+      website: String(profile?.website ?? ''),
+      address: {
+        street: String(profile?.address ?? ''),
+        city: String(profile?.city ?? ''),
+        state: String(prefsRaw.address_state ?? ''),
+        country: String(profile?.country ?? ''),
+        postalCode: String(profile?.postal_code ?? '')
+      },
+      socialMedia: {
+        facebook: String(socialRaw.facebook ?? ''),
+        twitter: String(socialRaw.twitter ?? socialRaw.x ?? ''),
+        instagram: String(socialRaw.instagram ?? ''),
+        linkedin: String(socialRaw.linkedin ?? '')
+      },
+      verification: {
+        isVerified: Boolean(verificationRaw.isVerified ?? (verificationRaw.status === 'approved') ?? params.isVerified),
+        documents: Array.isArray(verificationRaw.documents) ? verificationRaw.documents : []
+      },
+      preferences: {
+        theme,
+        language,
+        currency,
+        timezone,
+        notifications: {
+          email: notifRaw.email !== false,
+          sms: Boolean(notifRaw.sms),
+          push: notifRaw.push !== false
+        }
+      },
+      statistics: {
+        totalSales: Number(stats.totalSales ?? 0),
+        totalOrders: Number(stats.totalOrders ?? 0),
+        averageRating: Number(stats.averageRating ?? 0),
+        totalReviews: Number(stats.totalReviews ?? 0),
+        responseRate: Number(stats.responseRate ?? prefsRaw.response_rate ?? uiPrefs.response_rate ?? 0) || 0,
+        averageResponseTime: Number(stats.averageResponseTime ?? 0)
+      }
+    }
+  }
+
+  /**
+   * Charge user_profiles + email pour alimenter la section Paramètres.
+   */
+  private static async resolveSellerProfileForVendor(
+    vendorId: string,
+    stats?: Partial<SellerStats> | null
+  ): Promise<SellerProfile | null> {
+    if (!vendorId) return null
+
+    try {
+      const { data: profileRow } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', vendorId)
+        .maybeSingle()
+
+      let email = ''
+      try {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('email, role')
+          .eq('id', vendorId)
+          .maybeSingle()
+        email = String(userRow?.email ?? '')
+      } catch {
+        // ignore
+      }
+
+      return this.buildSellerProfileFromSources({
+        vendorId,
+        email,
+        userProfile: (profileRow as UserProfile | null) ?? null,
+        stats,
+        isVerified: false // On laisse buildSellerProfileFromSources décider via le profil réel
+      })
+    } catch {
+      return null
+    }
+  }
+
+  /**
    * Récupère l'ensemble des données du tableau de bord vendeur depuis l'API centrale.
    */
   static async getSellerDashboardData(vendorId: string): Promise<SellerDashboardData> {
@@ -1182,7 +1325,9 @@ export class SellerDashboardService {
         totalReviews: 0,
         totalShares: 0,
         ranking: 0,
-        totalVendors: 0
+        totalVendors: 0,
+        responseRate: 0,
+        averageResponseTime: 0
       }
 
       const apiStats = (baseData.stats ?? {}) as Partial<SellerStats>
@@ -1190,6 +1335,9 @@ export class SellerDashboardService {
       const mergedStats: SellerStats = {
         ...computedStats,
         ...apiStats,
+        totalSales: Number.isFinite(Number(apiStats.totalSales)) && Number(apiStats.totalSales) > 0
+          ? Number(apiStats.totalSales)
+          : Math.max(computedStats.totalOrders, computedStats.totalSales),
         totalRevenue: Number.isFinite(Number((baseData.revenue as any)?.totalRevenue))
           ? Number((baseData.revenue as any)?.totalRevenue)
           : Number.isFinite(Number((baseData.revenue as any)?.totalRevenueAllTime))
@@ -1211,7 +1359,13 @@ export class SellerDashboardService {
         ranking: Number.isFinite(Number(apiStats.ranking)) ? Number(apiStats.ranking) : computedStats.ranking,
         totalVendors: Number.isFinite(Number(apiStats.totalVendors))
           ? Number(apiStats.totalVendors)
-          : computedStats.totalVendors
+          : computedStats.totalVendors,
+        responseRate: Number.isFinite(Number(apiStats.responseRate))
+          ? Number(apiStats.responseRate)
+          : computedStats.responseRate,
+        averageResponseTime: Number.isFinite(Number(apiStats.averageResponseTime))
+          ? Number(apiStats.averageResponseTime)
+          : computedStats.averageResponseTime
       }
 
       const notifications = await notificationsPromise
@@ -1241,8 +1395,13 @@ export class SellerDashboardService {
           : defaultRevenue.topProducts
       }
 
+      let sellerProfile = (baseData.sellerProfile as SellerProfile | null | undefined) ?? null
+      if (!sellerProfile) {
+        sellerProfile = await this.resolveSellerProfileForVendor(vendorId, mergedStats)
+      }
+
       return {
-        sellerProfile: baseData.sellerProfile ?? null,
+        sellerProfile,
         loyaltyPoints: resolvedLoyaltyPoints,
         products: baseData.products ?? [],
         orders,
@@ -3031,6 +3190,268 @@ export class SellerDashboardService {
 
     console.error(`❌ [SellerDashboardService:${context}] ${message}`, detailsPayload)
   }
+
+  /**
+   * Met à jour le profil du vendeur.
+   */
+  static async updateSellerProfile(vendorId: string, updates: Partial<SellerProfile>): Promise<void> {
+    try {
+      if (!vendorId) throw new Error('Identifiant vendeur manquant.')
+
+      const { data: current, error: loadError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', vendorId)
+        .maybeSingle()
+
+      if (loadError) throw loadError
+
+      const currentProfile = current as UserProfile
+      const currentPrefs = typeof currentProfile?.preferences === 'object' ? (currentProfile.preferences as any) : {}
+      const currentSocial = typeof currentProfile?.social_media === 'object' ? (currentProfile.social_media as any) : {}
+
+      // Préparer les mises à jour pour user_profiles
+      const profileUpdates: any = {}
+
+      if (updates.name) {
+        const names = updates.name.split(' ')
+        profileUpdates.first_name = names[0] || ''
+        profileUpdates.last_name = names.slice(1).join(' ') || ''
+      }
+
+      if (updates.phone !== undefined) profileUpdates.phone = updates.phone
+      if (updates.bio !== undefined) profileUpdates.bio = updates.bio
+      if (updates.website !== undefined) profileUpdates.website = updates.website
+      if (updates.avatar !== undefined) profileUpdates.avatar_url = updates.avatar
+
+      if (updates.address) {
+        if (updates.address.street !== undefined) profileUpdates.address = updates.address.street
+        if (updates.address.city !== undefined) profileUpdates.city = updates.address.city
+        if (updates.address.country !== undefined) profileUpdates.country = updates.address.country
+        if (updates.address.postalCode !== undefined) profileUpdates.postal_code = updates.address.postalCode
+        
+        // Stocker l'état/région dans les préférences car il n'y a pas de colonne dédiée
+        if (updates.address.state !== undefined) {
+          const nextPrefs = typeof profileUpdates.preferences === 'object' 
+            ? { ...profileUpdates.preferences } 
+            : typeof currentPrefs === 'object' ? { ...currentPrefs } : {}
+          nextPrefs.address_state = updates.address.state
+          profileUpdates.preferences = nextPrefs
+        }
+      }
+
+      // Fusionner les réseaux sociaux
+      if (updates.socialMedia) {
+        profileUpdates.social_media = {
+          ...currentSocial,
+          ...updates.socialMedia
+        }
+      }
+
+      // Fusionner les préférences
+      if (updates.preferences || updates.company) {
+        const nextPrefs = { ...currentPrefs }
+        
+        if (updates.company !== undefined) {
+          nextPrefs.company = updates.company
+          nextPrefs.business_name = updates.company
+        }
+
+        if (updates.preferences) {
+          const uiPrefs = typeof nextPrefs.ui === 'object' ? { ...nextPrefs.ui } : {}
+          
+          if (updates.preferences.theme) {
+            nextPrefs.theme = updates.preferences.theme
+            uiPrefs.theme = updates.preferences.theme
+          }
+          if (updates.preferences.language) {
+            nextPrefs.language = updates.preferences.language
+            uiPrefs.language = updates.preferences.language
+          }
+          if (updates.preferences.currency) {
+            nextPrefs.currency = updates.preferences.currency
+            uiPrefs.currency = updates.preferences.currency
+          }
+          if (updates.preferences.timezone) {
+            nextPrefs.timezone = updates.preferences.timezone
+            uiPrefs.timezone = updates.preferences.timezone
+          }
+          if (updates.preferences.notifications) {
+            nextPrefs.notifications = {
+              ...(nextPrefs.notifications || {}),
+              ...updates.preferences.notifications
+            }
+            uiPrefs.notifications = nextPrefs.notifications
+          }
+          
+          nextPrefs.ui = uiPrefs
+        }
+        
+        profileUpdates.preferences = nextPrefs
+      }
+
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update(profileUpdates)
+        .eq('user_id', vendorId)
+
+      if (updateError) throw updateError
+
+    } catch (error) {
+      this.handleSupabaseError(error, 'updateSellerProfile')
+      throw error
+    }
+  }
+
+  /**
+   * Change le mot de passe du vendeur.
+   */
+  static async changePassword(password: string): Promise<void> {
+    try {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw error
+    } catch (error) {
+      this.handleSupabaseError(error, 'changePassword')
+      throw error
+    }
+  }
+
+  /**
+   * Active ou désactive la double authentification.
+   */
+  static async toggleTwoFactor(vendorId: string, enabled: boolean): Promise<void> {
+    try {
+      // Pour l'instant on stocke ça dans les préférences si la table dédiée n'est pas dispo
+      const { data: current, error: loadError } = await supabase
+        .from('user_profiles')
+        .select('preferences')
+        .eq('user_id', vendorId)
+        .maybeSingle()
+
+      if (loadError) throw loadError
+
+      const prefs = typeof (current as any)?.preferences === 'object' ? { ...(current as any).preferences } : {}
+      const security = typeof prefs.security === 'object' ? { ...prefs.security } : {}
+      security.two_factor_enabled = enabled
+
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ preferences: { ...prefs, security } } as any)
+        .eq('user_id', vendorId)
+
+      if (updateError) throw updateError
+    } catch (error) {
+      this.handleSupabaseError(error, 'toggleTwoFactor')
+      throw error
+    }
+  }
+
+  /**
+   * Récupère les sessions actives du vendeur.
+   */
+  static async getActiveSessions(vendorId: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('user_id', vendorId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      this.handleSupabaseError(error, 'getActiveSessions')
+      return []
+    }
+  }
+
+  /**
+   * Termine une session spécifique.
+   */
+  static async terminateSession(sessionId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('user_sessions')
+        .update({ is_active: false } as any)
+        .eq('id', sessionId)
+
+      if (error) throw error
+    } catch (error) {
+      this.handleSupabaseError(error, 'terminateSession')
+      throw error
+    }
+  }
+
+  /**
+   * Termine toutes les sessions actives d'un vendeur sauf une éventuelle session spécifique.
+   */
+  static async terminateAllOtherSessions(vendorId: string, currentSessionId?: string): Promise<void> {
+    try {
+      let query = supabase
+        .from('user_sessions')
+        .update({ is_active: false } as any)
+        .eq('user_id', vendorId)
+      
+      if (currentSessionId) {
+        query = query.neq('id', currentSessionId)
+      }
+
+      const { error } = await query
+      if (error) throw error
+    } catch (error) {
+      this.handleSupabaseError(error, 'terminateAllOtherSessions')
+      throw error
+    }
+  }
+
+  /**
+   * Upload un avatar ou un document de vérification via l'API sécurisée.
+   */
+  static async uploadDocument(vendorId: string, file: File, type: string): Promise<string> {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', type)
+      
+      const response = await fetch('/api/vendor/upload', {
+        method: 'POST',
+        body: formData
+      })
+      
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result.error || 'Erreur lors du téléchargement du fichier.')
+      }
+      
+      return result.data.publicUrl
+    } catch (error) {
+      this.handleSupabaseError(error, 'uploadDocument')
+      throw error
+    }
+  }
+
+  /**
+   * Demande la suppression du compte.
+   */
+  static async deleteAccountRequest(vendorId: string, reason: string): Promise<void> {
+    try {
+      // Log l'action dans activity_logs
+      await supabase.from('activity_logs').insert({
+        user_id: vendorId,
+        action: 'account_deletion_request',
+        entity_type: 'user',
+        entity_id: vendorId,
+        details: { reason }
+      })
+
+      // On pourrait aussi marquer l'utilisateur comme "pending_deletion"
+      // ou envoyer un email à l'admin
+    } catch (error) {
+      this.handleSupabaseError(error, 'deleteAccountRequest')
+      throw error
+    }
+  }
 }
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -3158,6 +3579,16 @@ export const useSellerDashboardData = (vendorId: string | null, options?: { skip
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'point_operation_fees' },
+        scheduleRefresh
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        scheduleRefresh
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'order_items' },
         scheduleRefresh
       )
       .subscribe()

@@ -302,6 +302,26 @@ export const GlobalChat: React.FC = () => {
           </TabsList>
 
           <TabsContent value="conversations" className="flex-1 min-h-0 h-full data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
+            {/* Message d'absence automatique */}
+            {activeChatSession && messages.length === 0 && (
+              <div className="mx-4 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl animate-in fade-in slide-in-from-top duration-500">
+                <div className="flex items-start space-x-3">
+                  <div className="bg-blue-100 p-2 rounded-full">
+                    <Clock className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-900">Support en mode absence</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Nos conseillers sont actuellement hors ligne. Vous pouvez laisser votre message ici ou nous contacter par mail à <a href="mailto:support@probooster.online" className="underline font-bold">support@probooster.online</a>.
+                    </p>
+                    <p className="text-xs text-blue-600 mt-2 italic">
+                      Nous vous répondrons dès notre reconnexion.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Barre d'actions pour la sélection des messages */}
             {selectedMessageIds.length > 0 && (
               <div className="sticky top-0 z-10 bg-white border border-gray-200 rounded-lg p-3 mb-4 shadow-sm">

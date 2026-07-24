@@ -49,13 +49,18 @@ export function useMoney() {
       const minimumFractionDigits = options?.minimumFractionDigits ?? (isXof ? 0 : 2)
       const maximumFractionDigits = options?.maximumFractionDigits ?? (isXof ? 0 : 2)
 
-      return new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency: currencyCode,
-        minimumFractionDigits,
-        maximumFractionDigits,
-        useGrouping: options?.useGrouping ?? true
-      }).format(safe)
+      try {
+        return new Intl.NumberFormat(locale, {
+          style: "currency",
+          currency: currencyCode,
+          minimumFractionDigits,
+          maximumFractionDigits,
+          useGrouping: options?.useGrouping ?? true
+        }).format(safe)
+      } catch (e) {
+        console.error("[useMoney] Error formatting money:", e)
+        return `${safe.toLocaleString(locale)} ${currencyCode}`
+      }
     }
   }, [currencyCode, locale])
 

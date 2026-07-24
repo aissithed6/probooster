@@ -804,11 +804,13 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Ouvrir une session de chat
    */
   const openChatSession = (sessionId: string) => {
+    // Toujours ouvrir l'UI
+    setIsAnyChatOpen(true)
+
     const session = chatSessions.find(s => s.id === sessionId)
     if (session) {
       setActiveChatSession(session)
       setMessages(session.messages)
-      setIsAnyChatOpen(true)
       
       // Marquer les messages comme lus
       if (userId) {

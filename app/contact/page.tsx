@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,10 +19,15 @@ import {
   Users,
   Shield,
   Star,
-  Sparkles
+  Sparkles,
+  Loader2
 } from "lucide-react"
+import { HelpService } from "@/lib/services/help-service"
+import { useAuth } from "@/contexts/AuthContext"
+import { toast } from "react-hot-toast"
 
 export default function ContactPage() {
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -32,6 +37,16 @@ export default function ContactPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.email?.split('@')[0] || "",
+        email: user.email || ""
+      }))
+    }
+  }, [user])
 
   const departments = [
     { id: "general", name: "Général", icon: MessageCircle, color: "from-blue-500 to-cyan-500" },
@@ -46,28 +61,32 @@ export default function ContactPage() {
       value: "+229 91 50 57 57",
       description: "Lun-Ven 8h-18h",
       icon: Phone,
-      color: "from-green-500 to-emerald-500"
+      color: "from-green-500 to-emerald-500",
+      action: () => window.location.href = "tel:+22991505757"
     },
     {
       title: "Email",
       value: "contact@probooster.online",
       description: "Réponse sous 24h",
       icon: Mail,
-      color: "from-blue-500 to-cyan-500"
+      color: "from-blue-500 to-cyan-500",
+      action: () => window.location.href = "mailto:contact@probooster.online"
     },
     {
       title: "Adresse",
       value: "Abomey-Calavi, Bénin",
       description: "Siège social",
       icon: MapPin,
-      color: "from-orange-500 to-red-500"
+      color: "from-orange-500 to-red-500",
+      action: () => {}
     },
     {
       title: "Chat en ligne",
       value: "Disponible 24h/24",
       description: "Assistance instantanée",
       icon: MessageCircle,
-      color: "from-purple-500 to-violet-500"
+      color: "from-purple-500 to-violet-500",
+      action: () => toast.success("Le chat s'ouvre...")
     }
   ]
 
@@ -82,17 +101,26 @@ export default function ContactPage() {
     e.preventDefault()
     setIsSubmitting(true)
     
-    // Simulation d'envoi
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    setIsSubmitting(false)
-    setSubmitted(true)
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false)
-      setFormData({ name: "", email: "", subject: "", message: "", department: "general" })
-    }, 3000)
+    try {
+      const { error } = await HelpService.createTicket({
+        ...formData,
+        user_id: user?.id
+      })
+
+      if (error) throw error
+      
+      setSubmitted(true)
+      toast.success("Votre message a été envoyé avec succès !")
+      
+      setTimeout(() => {
+        setSubmitted(false)
+        setFormData({ ...formData, subject: "", message: "", department: "general" })
+      }, 3000)
+    } catch (error) {
+      toast.error("Erreur lors de l'envoi du message.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleInputChange = <K extends keyof typeof formData>(field: K, value: typeof formData[K]) => {
@@ -257,7 +285,11 @@ export default function ContactPage() {
 
             <div className="space-y-4">
               {contactInfo.map((info, index) => (
-                <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group">
+                <Card 
+                  key={index} 
+                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group"
+                  onClick={info.action}
+                >
                   <CardContent className="p-6">
                     <div className="flex items-center space-x-4">
                       <div className={`w-12 h-12 bg-gradient-to-r ${info.color} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300 animate-float`} style={{ animationDelay: `${index * 0.2}s` }}>

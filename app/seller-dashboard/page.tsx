@@ -91,7 +91,6 @@ const SELLER_TAB_SLUG_BY_ID: Record<string, string> = {
   reviews: 'avis',
   analytics: 'analyses',
   settings: 'parametres',
-  profile: 'profil',
   'currency-test': 'test-devises'
 }
 
@@ -204,12 +203,6 @@ const sellerDashboardSections = [
     description: 'Préférences (thème, langue, devise, fuseau horaire)'
   },
   {
-    id: 'profile',
-    label: 'Profil & Paramètres',
-    icon: User,
-    description: 'Gestion du profil et paramètres'
-  },
-  {
     id: 'currency-test',
     label: 'Test Devises',
     icon: DollarSign,
@@ -236,7 +229,7 @@ function SellerDashboardPageInner() {
   // Hook d'authentification pour obtenir l'utilisateur connecté
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loyaltyPoints } = useAuth()
+  const { user, userProfile, loyaltyPoints, loading: authLoading } = useAuth()
   const { formatMoney, currencyCode } = useMoney()
   const { formatTime } = useDateTime()
   const { toast } = useToast()
@@ -246,6 +239,9 @@ function SellerDashboardPageInner() {
   const [showChatModal, setShowChatModal] = useState(false)
   const [showProductModal, setShowProductModal] = useState(false)
   const [showRevenueModal, setShowRevenueModal] = useState(false)
+  
+  // États pour les sessions actives
+  const [activeSessions, setActiveSessions] = useState<any[]>([])
   
   // États pour les modales de l'en-tête
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
@@ -265,6 +261,10 @@ function SellerDashboardPageInner() {
   const [emailMessage, setEmailMessage] = useState('')
   const [emailCategory, setEmailCategory] = useState('general')
   const [isSendingEmail, setIsSendingEmail] = useState(false)
+
+  // États pour la section Test Devises
+  const [testBasePrice, setTestBasePrice] = useState(129900)
+  const [deferredInterestRate, setDeferredInterestRate] = useState(10) // 10% par défaut
 
   const [vendorNotifications, setVendorNotifications] = useState<any[]>([])
   const vendorUnreadNotifications = vendorNotifications.filter((n) => !(n?.is_read ?? n?.isRead ?? false)).length
@@ -599,9 +599,6 @@ function SellerDashboardPageInner() {
 
 
 
-  // Profil vendeur depuis le service (remplace les données mock)
-  const sellerProfile = dashboardData?.sellerProfile || null
-
     // Statistiques vendeur depuis le service (remplace les données mock)
   const sellerStats: SellerStats = dashboardData?.stats || {
     totalSales: 0,
@@ -615,8 +612,22 @@ function SellerDashboardPageInner() {
     totalReviews: 0,
     totalShares: 0,
     ranking: 0,
-    totalVendors: 0
+    totalVendors: 0,
+    responseRate: 0,
+    averageResponseTime: 0
   }
+
+  const sellerProfile = useMemo((): SellerProfile | null => {
+    if (dashboardData?.sellerProfile) return dashboardData.sellerProfile
+    if (!user?.id) return null
+    return SellerDashboardService.buildSellerProfileFromSources({
+      vendorId: user.id,
+      email: user.email,
+      userProfile: userProfile ?? null,
+      stats: sellerStats,
+      isVerified: user.role === 'vendor'
+    })
+  }, [dashboardData?.sellerProfile, user, userProfile, sellerStats])
 
   // Fonction utilitaire pour formater les dates
   const formatDate = (dateString: string) => {
@@ -1464,40 +1475,150 @@ function SellerDashboardPageInner() {
     })
   }
 
+  // Charger les sessions actives au chargement ou au changement d'onglet vers settings
+  useEffect(() => {
+    if (vendorId && (activeTab === 'settings' || activeTab === 'profile')) {
+      SellerDashboardService.getActiveSessions(vendorId)
+        .then(setActiveSessions)
+        .catch(console.error)
+    }
+  }, [vendorId, activeTab])
+
   // Fonctions de gestion du profil
-  const handleProfileUpdate = (profileData: any) => {
-    console.log('Mise à jour du profil:', profileData)
-    // Implémenter la logique de mise à jour du profil
+  const handleProfileUpdate = async (profileData: any) => {
+    if (!vendorId) return
+    try {
+      await SellerDashboardService.updateSellerProfile(vendorId, profileData)
+      toast({
+        title: 'Profil mis à jour',
+        description: 'Vos modifications ont été enregistrées avec succès.'
+      })
+      await refreshData()
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de mettre à jour le profil.',
+        variant: 'destructive'
+      })
+    }
   }
 
-  const handlePasswordChange = (oldPassword: string, newPassword: string) => {
-    console.log('Changement de mot de passe')
-    // Implémenter la logique de changement de mot de passe
+  const handlePasswordChange = async (oldPassword: string, newPassword: string) => {
+    try {
+      // Note: Supabase Auth.updateUser ne requiert pas l'ancien mot de passe 
+      // si l'utilisateur est déjà connecté.
+      await SellerDashboardService.changePassword(newPassword)
+      toast({
+        title: 'Mot de passe modifié',
+        description: 'Votre mot de passe a été mis à jour avec succès.'
+      })
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de modifier le mot de passe.',
+        variant: 'destructive'
+      })
+    }
   }
 
-  const handleTwoFactorToggle = (enabled: boolean) => {
-    console.log('Activation/désactivation 2FA:', enabled)
-    // Implémenter la logique de gestion 2FA
+  const handleTwoFactorToggle = async (enabled: boolean) => {
+    if (!vendorId) return
+    try {
+      await SellerDashboardService.toggleTwoFactor(vendorId, enabled)
+      toast({
+        title: enabled ? '2FA Activé' : '2FA Désactivé',
+        description: `La double authentification a été ${enabled ? 'activée' : 'désactivée'}.`
+      })
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de modifier le 2FA.',
+        variant: 'destructive'
+      })
+    }
   }
 
-  const handleSessionTerminate = (sessionId: string) => {
-    console.log('Termination de session:', sessionId)
-    // Implémenter la logique de termination de session
+  const handleSessionTerminate = async (sessionId: string) => {
+    try {
+      await SellerDashboardService.terminateSession(sessionId)
+      setActiveSessions(prev => prev.filter(s => s.id !== sessionId))
+      toast({
+        title: 'Session terminée',
+        description: 'La session a été fermée avec succès.'
+      })
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de fermer la session.',
+        variant: 'destructive'
+      })
+    }
   }
 
-  const handleDocumentUpload = (file: File, type: string) => {
-    console.log('Upload de document:', type, file.name)
-    // Implémenter la logique d'upload de document
+  const handleDocumentUpload = async (file: File, type: string) => {
+    if (!vendorId) return
+    try {
+      await SellerDashboardService.uploadDocument(vendorId, file, type)
+      toast({
+        title: 'Document envoyé',
+        description: 'Votre document a été téléchargé et est en attente de vérification.'
+      })
+      await refreshData()
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible d\'envoyer le document.',
+        variant: 'destructive'
+      })
+    }
   }
 
-  const handleAccountDelete = () => {
-    console.log('Suppression de compte demandée')
-    // Implémenter la logique de suppression de compte
+  const handleAccountDelete = async () => {
+    if (!vendorId) return
+    const reason = prompt('Veuillez indiquer la raison de la suppression de votre compte :')
+    if (reason === null) return // Annulé
+
+    try {
+      await SellerDashboardService.deleteAccountRequest(vendorId, reason)
+      toast({
+        title: 'Demande envoyée',
+        description: 'Votre demande de suppression de compte a été transmise à l\'administration.'
+      })
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible d\'envoyer la demande.',
+        variant: 'destructive'
+      })
+    }
   }
 
-  const handleLogout = () => {
-    console.log('Déconnexion')
-    // Implémenter la logique de déconnexion
+  const handleTerminateAllSessions = async () => {
+    if (!vendorId) return
+    try {
+      const currentSessionId = activeSessions.find(s => s.isCurrent)?.id
+      await SellerDashboardService.terminateAllOtherSessions(vendorId, currentSessionId)
+      setActiveSessions(prev => prev.filter(s => s.isCurrent))
+      toast({
+        title: 'Sessions fermées',
+        description: 'Toutes les autres sessions ont été déconnectées.'
+      })
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: err instanceof Error ? err.message : 'Impossible de fermer les sessions.',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/auth/login')
+    } catch (err) {
+      console.error('Erreur déconnexion:', err)
+    }
   }
 
   // Fonctions de gestion de l'en-tête
@@ -1513,11 +1634,14 @@ function SellerDashboardPageInner() {
     setShowLogoutModal(true)
   }
 
-  const handleConfirmLogout = () => {
+  const handleConfirmLogout = async () => {
     setShowLogoutModal(false)
-    // Ici on pourrait ajouter la logique de déconnexion réelle
-    console.log('Déconnexion confirmée')
-    // Redirection vers la page de connexion ou autre
+    try {
+      await supabase.auth.signOut()
+      router.push('/auth/login')
+    } catch (err) {
+      console.error('Erreur déconnexion:', err)
+    }
   }
 
   // Fonctions de gestion du chat support
@@ -2092,52 +2216,85 @@ function SellerDashboardPageInner() {
           {/* Section Test des Devises */}
           {activeTab === 'currency-test' && (
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Test des Devises et Points</CardTitle>
+              <Card className="border-[#ff6600]/20">
+                <CardHeader className="bg-gradient-to-r from-[#ff6600]/5 to-transparent">
+                  <CardTitle className="text-[#ff6600] flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Simulateur de Devises & Points
+                  </CardTitle>
                   <CardDescription>
-                    Vérifiez l'affichage des prix et points Probooster
+                    Configurez un prix de test pour vérifier la conversion en points et les paiements différés.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-6 pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="test-price">Prix de test ({currencyCode})</Label>
+                      <Input
+                        id="test-price"
+                        type="number"
+                        value={testBasePrice}
+                        onChange={(e) => setTestBasePrice(Number(e.target.value))}
+                        className="border-[#ff6600]/30 focus:border-[#ff6600]"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="interest-rate">Taux d'intérêt mensuel (%)</Label>
+                      <Input
+                        id="interest-rate"
+                        type="number"
+                        value={deferredInterestRate}
+                        onChange={(e) => setDeferredInterestRate(Number(e.target.value))}
+                        className="border-[#ff6600]/30 focus:border-[#ff6600]"
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-lg font-medium text-blue-800">Prix Standard</div>
-                      <div className="text-2xl font-bold text-blue-600">{formatCurrency(129900)}</div>
-                      <div className="text-sm text-blue-500">{standardPricePoints} points Probooster</div>
+                    <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+                      <div className="text-sm font-medium text-blue-800">Prix Standard</div>
+                      <div className="text-2xl font-bold text-blue-600">{formatCurrency(testBasePrice)}</div>
+                      <div className="text-xs text-blue-500 mt-1">
+                        {Math.round(testBasePrice / sellerConversionRateSafe).toLocaleString('fr-FR')} points Probooster
+                      </div>
                     </div>
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <div className="text-lg font-medium text-green-800">Prix Promo</div>
-                      <div className="text-2xl font-bold text-green-600">{formatCurrency(119900)}</div>
-                      <div className="text-sm text-green-500">{promoPricePoints} points Probooster</div>
-                      <Badge variant="outline" className="border-red-500 text-red-600 mt-2">
-                        -8%
-                      </Badge>
+                    <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+                      <div className="text-sm font-medium text-green-800">Prix Promo (-10%)</div>
+                      <div className="text-2xl font-bold text-green-600">{formatCurrency(testBasePrice * 0.9)}</div>
+                      <div className="text-xs text-green-500 mt-1">
+                        {Math.round((testBasePrice * 0.9) / sellerConversionRateSafe).toLocaleString('fr-FR')} points Probooster
+                      </div>
                     </div>
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-lg font-medium text-purple-800">Livraison</div>
-                      <div className="text-2xl font-bold text-purple-600">{formatCurrency(599)}</div>
-                      <div className="text-sm text-purple-500">{deliveryPricePoints} points Probooster</div>
+                    <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-100">
+                      <div className="text-sm font-medium text-purple-800">Frais de Livraison</div>
+                      <div className="text-2xl font-bold text-purple-600">{formatCurrency(testBasePrice * 0.05)}</div>
+                      <div className="text-xs text-purple-500 mt-1">
+                        {Math.round((testBasePrice * 0.05) / sellerConversionRateSafe).toLocaleString('fr-FR')} points Probooster
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium text-gray-900 mb-2">Configuration des Devises</h4>
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                      <Settings className="h-4 w-4 text-gray-500" />
+                      Configuration Actuelle
+                    </h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium">Devise:</span> {currencyCode}
+                      <div className="space-y-1">
+                        <span className="text-gray-500">Devise active:</span>
+                        <p className="font-semibold">{currencyCode}</p>
                       </div>
-                      <div>
-                        <span className="font-medium">Points:</span> 1 {currencyCode} = {sellerPointsPerCurrencyLabel} points
+                      <div className="space-y-1">
+                        <span className="text-gray-500">Taux de points:</span>
+                        <p className="font-semibold">1 {currencyCode} = {sellerPointsPerCurrencyLabel} pts</p>
                       </div>
-                      <div>
-                        <span className="font-medium">Conversion:</span> 1 point = {sellerCurrencyPerPointLabel} {currencyCode}
+                      <div className="space-y-1">
+                        <span className="text-gray-500">Valeur d'un point:</span>
+                        <p className="font-semibold">1 pt = {sellerCurrencyPerPointLabel} {currencyCode}</p>
                       </div>
-                      <div>
-                        <span className="font-medium">Locale:</span> Français
-                      </div>
-                      <div>
-                        <span className="font-medium">Format:</span> {formatMoney(129900)}
+                      <div className="space-y-1">
+                        <span className="text-gray-500">Format monétaire:</span>
+                        <p className="font-semibold">{formatMoney(testBasePrice)}</p>
                       </div>
                     </div>
                   </div>
@@ -2145,75 +2302,72 @@ function SellerDashboardPageInner() {
               </Card>
 
               {/* Test des Paiements Différés */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Test des Paiements Différés</CardTitle>
+              <Card className="border-[#535455]/20">
+                <CardHeader className="bg-gradient-to-r from-[#535455]/5 to-transparent">
+                  <CardTitle className="text-[#535455] flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Simulation de Crédit / Paiements Différés
+                  </CardTitle>
                   <CardDescription>
-                    Simulation des frais variables selon la période et la méthode
+                    Calcul des mensualités avec un taux d'intérêt de {deferredInterestRate}% par mois.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
-                        <h4 className="font-medium text-orange-800 mb-2">Exemple avec 10% par mois</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>1 mois:</span>
-                            <span className="font-medium">{formatMoney(142890)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>3 mois:</span>
-                            <span className="font-medium">{formatMoney(168870)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>6 mois:</span>
-                            <span className="font-medium">{formatMoney(207840)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>12 mois:</span>
-                            <span className="font-medium">{formatMoney(285780)}</span>
-                          </div>
+                <CardContent className="pt-6">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-5 bg-gradient-to-br from-orange-50 to-white rounded-xl border border-orange-100 shadow-sm">
+                        <h4 className="font-bold text-orange-800 mb-4 flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" />
+                          Option : Intérêts Simples
+                        </h4>
+                        <div className="space-y-3">
+                          {[1, 3, 6, 12].map((months) => {
+                            const totalInterest = (testBasePrice * (deferredInterestRate / 100)) * months
+                            const totalAmount = testBasePrice + totalInterest
+                            const monthlyPayment = totalAmount / months
+                            return (
+                              <div key={months} className="flex justify-between items-center py-2 border-b border-orange-50 last:border-0">
+                                <span className="text-gray-600 font-medium">{months} mois :</span>
+                                <div className="text-right">
+                                  <p className="font-bold text-orange-600">{formatMoney(totalAmount)}</p>
+                                  <p className="text-[10px] text-gray-400">soit {formatMoney(monthlyPayment)}/mois</p>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                       
-                      <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
-                        <h4 className="font-medium text-blue-800 mb-2">Exemple avec 100 {currencyCode} par jour</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>1 jour:</span>
-                            <span className="font-medium">{formatMoney(130000)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>7 jours:</span>
-                            <span className="font-medium">{formatMoney(130700)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>30 jours:</span>
-                            <span className="font-medium">{formatMoney(132900)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>90 jours:</span>
-                            <span className="font-medium">{formatMoney(138900)}</span>
-                          </div>
+                      <div className="p-5 bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-100 shadow-sm">
+                        <h4 className="font-bold text-blue-800 mb-4 flex items-center gap-2">
+                          <Activity className="h-4 w-4" />
+                          Option : Frais Fixes Journaliers
+                        </h4>
+                        <div className="space-y-3">
+                          {[1, 7, 30, 90].map((days) => {
+                            const dailyFee = 100 // Frais fixe de 100 par jour (exemple)
+                            const totalAmount = testBasePrice + (dailyFee * days)
+                            return (
+                              <div key={days} className="flex justify-between items-center py-2 border-b border-blue-50 last:border-0">
+                                <span className="text-gray-600 font-medium">{days} jour(s) :</span>
+                                <div className="text-right">
+                                  <p className="font-bold text-blue-600">{formatMoney(totalAmount)}</p>
+                                  <p className="text-[10px] text-gray-400">dont {formatMoney(dailyFee * days)} de frais</p>
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     </div>
                     
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
-                      <h4 className="font-medium text-green-800 mb-2">Configuration des Frais</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <span className="font-medium">Types:</span> Pourcentage ou Montant fixe
-                        </div>
-                        <div>
-                          <span className="font-medium">Périodes:</span> Jour, Mois, Trimestre
-                        </div>
-                        <div>
-                          <span className="font-medium">Méthodes:</span> Intérêts simples ou composés
-                        </div>
-                        <div>
-                          <span className="font-medium">Devise:</span> {currencyCode}
+                    <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+                        <div className="text-xs text-blue-700 leading-relaxed">
+                          <p className="font-bold mb-1">Note sur les calculs :</p>
+                          Ces simulations sont données à titre indicatif pour tester la réactivité de l'interface aux changements de devise et de taux. 
+                          Les frais réels appliqués lors d'un achat dépendent de la méthode de paiement choisie par le client et de la configuration du Super Admin.
                         </div>
                       </div>
                     </div>
@@ -2342,6 +2496,15 @@ function SellerDashboardPageInner() {
           {/* Section Statistiques et Analyses */}
           {activeTab === 'analytics' && (
             <StatisticsAnalyticsSection
+              vendorId={vendorId}
+              dashboardRevenue={revenue}
+              dashboardStats={sellerStats}
+              orders={orders}
+              reputation={{
+                overallRating: reviewsData.reputationData.overallRating,
+                totalReviews: reviewsData.reputationData.totalReviews
+              }}
+              products={products}
               onExportData={handleExportData}
               onViewProductDetails={handleViewProductDetails}
               onViewCustomerProfile={handleViewCustomerProfile}
@@ -2357,12 +2520,27 @@ function SellerDashboardPageInner() {
           {/* Section Paramètres */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
-              {!sellerProfile ? (
+              {!sellerProfile && (loading || authLoading) ? (
                 <Card className="shadow-sm">
                   <CardHeader>
                     <CardTitle>Paramètres</CardTitle>
                     <CardDescription>Chargement des préférences...</CardDescription>
                   </CardHeader>
+                </Card>
+              ) : !sellerProfile ? (
+                <Card className="shadow-sm border-amber-200 bg-amber-50">
+                  <CardHeader>
+                    <CardTitle>Paramètres</CardTitle>
+                    <CardDescription>
+                      Impossible de charger votre profil. Vérifiez votre connexion puis réessayez.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button variant="outline" onClick={() => void refreshData()}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Réessayer
+                    </Button>
+                  </CardContent>
                 </Card>
               ) : (
                 <Tabs value={settingsTab} onValueChange={(value) => setSettingsTab(value as any)} className="space-y-6">
@@ -2375,10 +2553,12 @@ function SellerDashboardPageInner() {
 
                   <ProfileSection
                     profile={sellerProfile}
+                    sessions={activeSessions}
                     onProfileUpdate={handleProfileUpdate}
                     onPasswordChange={handlePasswordChange}
                     onTwoFactorToggle={handleTwoFactorToggle}
                     onSessionTerminate={handleSessionTerminate}
+                    onTerminateAllSessions={handleTerminateAllSessions}
                     onDocumentUpload={handleDocumentUpload}
                     onAccountDelete={handleAccountDelete}
                     onLogout={handleLogout}
@@ -2388,31 +2568,6 @@ function SellerDashboardPageInner() {
                 </Tabs>
               )}
             </div>
-          )}
-
-          {/* Section Profil et Paramètres */}
-          {activeTab === 'profile' && (
-            <>
-              {!sellerProfile ? (
-                <Card className="shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Profil & Paramètres</CardTitle>
-                    <CardDescription>Chargement du profil...</CardDescription>
-                  </CardHeader>
-                </Card>
-              ) : (
-                <ProfileSection
-                  profile={sellerProfile}
-                  onProfileUpdate={handleProfileUpdate}
-                  onPasswordChange={handlePasswordChange}
-                  onTwoFactorToggle={handleTwoFactorToggle}
-                  onSessionTerminate={handleSessionTerminate}
-                  onDocumentUpload={handleDocumentUpload}
-                  onAccountDelete={handleAccountDelete}
-                  onLogout={handleLogout}
-                />
-              )}
-            </>
           )}
 
 

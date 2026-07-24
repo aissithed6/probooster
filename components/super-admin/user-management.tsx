@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { 
   Users, UserPlus, UserCheck, UserX, Shield, 
-  Search, Filter, MoreHorizontal, Eye, Edit,
+  Search, Filter, MoreHorizontal, Eye, Edit, FileText,
   Trash2, Clock, Star, Bell, Info, Loader2,
   Mail, Phone, MapPin, Calendar, Activity,
   Settings, Lock, Key, Plus, Download, Copy,
@@ -6101,6 +6101,96 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Documents de vérification */}
+              {selectedUser.role === 'vendor' && (
+                <Card className="border-[#ff6600]/20">
+                  <CardHeader className="bg-gradient-to-r from-[#ff6600]/5 to-transparent flex flex-row items-center justify-between">
+                    <CardTitle className="text-[#ff6600] flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Documents de Vérification
+                    </CardTitle>
+                    {selectedUser.verification?.documents && selectedUser.verification.documents.length > 0 && (
+                      <Badge variant="outline" className="border-[#ff6600] text-[#ff6600]">
+                        {selectedUser.verification.documents.length} document(s)
+                      </Badge>
+                    )}
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {selectedUser.verification?.documents && selectedUser.verification.documents.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedUser.verification.documents.map((doc: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border hover:border-[#ff6600]/30 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-white rounded shadow-sm">
+                                <FileText className="h-6 w-6 text-[#ff6600]" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900 truncate max-w-[150px]">
+                                  {doc.name || `Document ${idx + 1}`}
+                                </p>
+                                <p className="text-xs text-gray-500 capitalize">{doc.type || 'Inconnu'}</p>
+                                <p className="text-[10px] text-gray-400">Envoyé le {new Date(doc.uploadedAt).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 text-xs border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white"
+                                onClick={() => window.open(doc.url, '_blank')}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                Voir
+                              </Button>
+                              <Badge className={
+                                doc.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                doc.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }>
+                                {doc.status === 'approved' ? 'Approuvé' : 
+                                 doc.status === 'rejected' ? 'Rejeté' : 'En attente'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed">
+                        <FileText className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500">Aucun document de vérification n'a été soumis par ce vendeur.</p>
+                      </div>
+                    )}
+
+                    {selectedUser.role === 'vendor' && selectedUser.status === 'pending' && (
+                      <div className="mt-6 flex justify-center gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <div className="text-center">
+                          <p className="text-sm text-yellow-800 font-medium mb-3">
+                            Souhaitez-vous valider ce vendeur après avoir examiné ses documents ?
+                          </p>
+                          <div className="flex gap-3 justify-center">
+                            <Button 
+                              variant="outline" 
+                              className="border-red-500 text-red-600 hover:bg-red-50"
+                              onClick={() => handleStatusChange(selectedUser.id, 'suspended')}
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Rejeter
+                            </Button>
+                            <Button 
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => handleStatusChange(selectedUser.id, 'verified')}
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Approuver & Vérifier
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Historique des activités récentes */}
               <Card className="border-[#ff6600]/20">

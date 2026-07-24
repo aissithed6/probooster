@@ -5,7 +5,7 @@ import Header from "@/components/layout/header-modular"
 
 import Footer from "@/components/layout/footer"
 import { FloatingChatButton } from "@/components/chat/FloatingChatButton"
-import { GlobalChatEventListener } from "@/components/chat"
+import { GlobalChatEventListener, GlobalChatSystem } from "@/components/chat"
 import HotToastClient from "@/components/providers/hot-toast-client"
 import { ChatProviderWrapper } from "@/components/providers/ChatProviderWrapper"
 import { InternalMessagingProviderWrapper } from "@/components/providers/InternalMessagingProviderWrapper"
@@ -74,6 +74,7 @@ export default function AppClientProviders({
                     <Footer />
                     <NotificationContainer />
                     <GlobalChatEventListener />
+                    <GlobalChatSystem />
                     <Suspense fallback={null}>
                       <FloatingChatButton />
                     </Suspense>

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { 
   Download, 
   Target,
@@ -26,7 +26,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { useNotifications } from '@/components/ui/notification'
 
-import type { VendorAnalyticsData } from '@/lib/vendor-analytics'
+import type { VendorAnalyticsData, VendorAnalyticsOptimization } from '@/lib/vendor-analytics'
+import {
+  AnalyticsExportFormatMenu,
+  resolveAnalyticsExportFormat
+} from './analytics-export-format-menu'
+
+const OPTIMIZATION_STATUS_KEY = 'vendor-optimization-status'
+
+function loadOptimizationStatus(): Record<string, { status: VendorAnalyticsOptimization['status']; progress: number }> {
+  try {
+    const raw = sessionStorage.getItem(OPTIMIZATION_STATUS_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw) as Record<string, { status: VendorAnalyticsOptimization['status']; progress: number }>
+  } catch {
+    return {}
+  }
+}
+
+function saveOptimizationStatus(
+  id: string,
+  patch: { status: VendorAnalyticsOptimization['status']; progress: number }
+) {
+  try {
+    const current = loadOptimizationStatus()
+    current[id] = patch
+    sessionStorage.setItem(OPTIMIZATION_STATUS_KEY, JSON.stringify(current))
+  } catch {
+    // ignore
+  }
+}
+
+const EXPORT_TYPE_MAP: Record<string, string> = {
+  all: 'all',
+  sales: 'ventes',
+  analytics: 'detailed',
+  insights: 'insights'
+}
 
 interface AnalyticsActionsProps {
   analytics: VendorAnalyticsData | null
@@ -51,6 +87,8 @@ export default function AnalyticsActions({
   const [showExportModal, setShowExportModal] = useState(false)
   const [showProductModal, setShowProductModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
+  const [optimizationStatus, setOptimizationStatus] = useState(loadOptimizationStatus)
   
   // États pour les actions
   const [isExporting, setIsExporting] = useState(false)
@@ -86,17 +124,47 @@ export default function AnalyticsActions({
     return `${formatCurrency(amount)} (${formatNumber(points)} pts)`
   }
 
-  const optimizationActions = analytics?.optimizations ?? []
+  const topProduct = analytics?.topProducts?.[0] ?? null
+  const selectedProduct =
+    analytics?.topProducts?.find((p) => p.id === selectedProductId) ?? topProduct
+
+  useEffect(() => {
+    setOptimizationStatus(loadOptimizationStatus())
+  }, [analytics?.optimizations])
+
+  const optimizationActions = useMemo(() => {
+    const base = analytics?.optimizations ?? []
+    return base.map((action) => {
+      const stored = optimizationStatus[action.id]
+      if (!stored) return action
+      return { ...action, status: stored.status, progress: stored.progress }
+    })
+  }, [analytics?.optimizations, optimizationStatus])
+
+  const insightsList = analytics?.insights ?? []
 
   // FONCTIONS RÉELLES ET FONCTIONNELLES AVEC NOTIFICATIONS MODERNES
   const handleExport = async (type: string, format: string) => {
+    if (!analytics) {
+      showNotification({
+        type: 'warning',
+        title: 'Export impossible',
+        message: 'Les données ne sont pas encore chargées.',
+        duration: 4000
+      })
+      return
+    }
     setIsExporting(true)
     try {
-      onExport(type, format === 'pdf' ? 'json' : format)
+      const resolvedFormat = resolveAnalyticsExportFormat(format)
+      const exportType = EXPORT_TYPE_MAP[type] ?? type
+      onExport(exportType, resolvedFormat)
+      const formatLabel =
+        resolvedFormat === 'pdf' ? 'PDF' : resolvedFormat === 'csv' ? 'CSV' : 'JSON'
       showNotification({
         type: 'success',
         title: 'Export réussi !',
-        message: `Export ${type} (JSON) téléchargé depuis vos données réelles.`,
+        message: `Export ${exportType} (${formatLabel}) téléchargé depuis vos données synchronisées.`,
         duration: 5000
       })
       setShowExportModal(false)
@@ -116,14 +184,24 @@ export default function AnalyticsActions({
     setIsOptimizing(true)
     const action = optimizationActions.find((a) => a.id === actionId)
     try {
+      const nextStatus: VendorAnalyticsOptimization['status'] = 'in-progress'
+      const nextProgress = action?.status === 'in-progress' ? Math.min(100, (action.progress ?? 0) + 25) : 35
+      saveOptimizationStatus(actionId, { status: nextStatus, progress: nextProgress })
+      setOptimizationStatus(loadOptimizationStatus())
+
       showNotification({
         type: 'info',
-        title: 'Recommandation',
-        message: action?.description ?? 'Suivez cette action dans votre catalogue et vos campagnes.',
+        title: 'Action démarrée',
+        message: action?.description ?? 'Suivez cette recommandation dans votre catalogue.',
         duration: 5000
       })
-      if (action?.id === 'top-product' && analytics?.topProducts?.[0]) {
-        onViewProductDetails(analytics.topProducts[0].id)
+
+      if ((actionId === 'top-product' || actionId.includes('product')) && topProduct) {
+        handleViewProductDetails(topProduct.id)
+      } else if (actionId === 'boost-shares') {
+        onViewDetailedReport('Partages')
+      } else if (actionId === 'reviews-quality') {
+        onViewDetailedReport('Avis')
       } else {
         onViewDetailedReport(actionId)
       }
@@ -133,6 +211,16 @@ export default function AnalyticsActions({
   }
 
   const handleViewProductDetails = (productId: string) => {
+    if (!productId) {
+      showNotification({
+        type: 'warning',
+        title: 'Aucun produit',
+        message: 'Aucun produit vendu sur la période pour afficher les détails.',
+        duration: 4000
+      })
+      return
+    }
+    setSelectedProductId(productId)
     setShowProductModal(true)
     onViewProductDetails(productId)
     
@@ -156,10 +244,6 @@ export default function AnalyticsActions({
       message: `Affichage du rapport détaillé: ${metric}`,
       duration: 3000
     })
-  }
-
-  const handleQuickExport = (type: string = 'all', format: string = 'pdf') => {
-    handleExport(type, format)
   }
 
   const handleRefreshData = async () => {
@@ -187,12 +271,22 @@ export default function AnalyticsActions({
           <p className="text-gray-600">Optimisez vos performances avec l'intelligence artificielle</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowExportModal(true)}>
+          <AnalyticsExportFormatMenu
+            reportType="all"
+            onExport={(type, format) => void handleExport(type, format)}
+            disabled={isLoading || !analytics}
+            label="Export Rapide"
+          />
+          <Button
+            variant="outline"
+            disabled={isLoading || !analytics}
+            onClick={() => setShowExportModal(true)}
+          >
             <Download className="w-4 h-4 mr-2" />
             Configurer Export
           </Button>
-          <Button variant="outline" onClick={handleRefreshData}>
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <Button variant="outline" disabled={isLoading} onClick={() => void handleRefreshData()}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Actualiser
           </Button>
         </div>
@@ -265,16 +359,8 @@ export default function AnalyticsActions({
             <div className="flex flex-wrap gap-2">
               <Button 
                 variant="outline" 
-                onClick={() => handleQuickExport()}
-                className="flex items-center space-x-2 border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export Rapide</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                onClick={() => handleRefreshData()}
+                disabled={isLoading}
+                onClick={() => void handleRefreshData()}
                 className="flex items-center space-x-2 border-[#10b981] text-[#10b981] hover:bg-[#10b981] hover:text-white"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -283,21 +369,33 @@ export default function AnalyticsActions({
               
               <Button 
                 variant="outline" 
-                onClick={() => handleViewProductDetails('1')}
+                disabled={!topProduct}
+                onClick={() => topProduct && handleViewProductDetails(topProduct.id)}
                 className="flex items-center space-x-2 border-[#3b82f6] text-[#3b82f6] hover:bg-[#3b82f6] hover:text-white"
+                title={topProduct ? topProduct.name : 'Aucun produit vendu sur la période'}
               >
                 <Eye className="w-4 h-4" />
                 <span>Voir Produits</span>
               </Button>
               
-              <Button 
-                variant="outline" 
-                onClick={() => handleViewDetailedReport('performance')}
-                className="flex items-center space-x-2 border-[#8b5cf6] text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white"
+              <AnalyticsExportFormatMenu
+                reportType="predictive"
+                onExport={(type, format) => {
+                  void handleExport(type, format)
+                  setShowReportModal(true)
+                }}
+                disabled={isLoading || !analytics}
               >
-                <BarChart3 className="w-4 h-4" />
-                <span>Rapport IA</span>
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLoading || !analytics}
+                  className="flex items-center space-x-2 border-[#8b5cf6] text-[#8b5cf6] hover:bg-[#8b5cf6] hover:text-white"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Rapport IA</span>
+                </Button>
+              </AnalyticsExportFormatMenu>
             </div>
           </div>
         </CardContent>
@@ -336,8 +434,7 @@ export default function AnalyticsActions({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pdf">PDF</SelectItem>
-                    <SelectItem value="excel">Excel</SelectItem>
-                    <SelectItem value="csv">CSV</SelectItem>
+                    <SelectItem value="csv">CSV (Excel)</SelectItem>
                     <SelectItem value="json">JSON</SelectItem>
                   </SelectContent>
                 </Select>
@@ -348,7 +445,9 @@ export default function AnalyticsActions({
                 Annuler
               </Button>
               <Button 
-                onClick={() => handleExport(exportOptions.type, exportOptions.format)}
+                onClick={() =>
+                  handleExport(EXPORT_TYPE_MAP[exportOptions.type] ?? exportOptions.type, exportOptions.format)
+                }
                 disabled={isExporting}
               >
                 {isExporting ? (
@@ -378,21 +477,25 @@ export default function AnalyticsActions({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-2">Informations produit</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p><strong>Nom:</strong> Produit Premium</p>
-                  <p><strong>Prix:</strong> {displayAmountWithPoints(25000)}</p>
-                  <p><strong>Stock:</strong> 45 unités</p>
-                </div>
-                <div>
-                  <p><strong>Ventes:</strong> 23 ce mois</p>
-                  <p><strong>Note:</strong> 4.8/5</p>
-                  <p><strong>Catégorie:</strong> Électronique</p>
+            {selectedProduct ? (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-2">Informations produit (données réelles)</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p><strong>Nom:</strong> {selectedProduct.name}</p>
+                    <p><strong>ID:</strong> {selectedProduct.id}</p>
+                  </div>
+                  <div>
+                    <p><strong>Ventes (période):</strong> {formatNumber(selectedProduct.sales)}</p>
+                    <p><strong>CA:</strong> {displayAmountWithPoints(selectedProduct.revenue)}</p>
+                    <p><strong>Note:</strong> {selectedProduct.rating > 0 ? `${selectedProduct.rating}/5` : '—'}</p>
+                    <p><strong>Partages:</strong> {formatNumber(selectedProduct.shares)}</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <p className="text-sm text-gray-600">Aucun produit à afficher pour cette période.</p>
+            )}
             <div className="flex justify-end">
               <Button onClick={() => setShowProductModal(false)}>
                 Fermer
@@ -412,93 +515,44 @@ export default function AnalyticsActions({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
-            {/* Métriques IA */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Score IA */}
-              <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-[#ff6600] bg-gradient-to-br from-orange-50 to-orange-100/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-orange-700">Score IA</p>
-                      <p className="text-3xl font-bold text-orange-900">94.2</p>
-                    </div>
-                    <div className="p-3 bg-orange-100 rounded-full">
-                      <Zap className="w-6 h-6 text-[#ff6600]" />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-green-600">+2.1%</span>
-                    <span className="text-sm text-orange-600">vs mois dernier</span>
-                  </div>
+              <Card className="border-l-4 border-l-[#ff6600]">
+                <CardContent className="p-4">
+                  <p className="text-sm text-orange-700">Ventes (période)</p>
+                  <p className="text-2xl font-bold">{formatNumber(analytics?.summary?.totalSales ?? 0)}</p>
                 </CardContent>
               </Card>
-
-              {/* Précision prédictive */}
-              <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-[#3b82f6] bg-gradient-to-br from-blue-50 to-blue-100/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-blue-700">Précision IA</p>
-                      <p className="text-3xl font-bold text-blue-900">87.5%</p>
-                    </div>
-                    <div className="p-3 bg-blue-100 rounded-full">
-                      <Target className="w-6 h-6 text-[#3b82f6]" />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-green-600">+1.8%</span>
-                    <span className="text-sm text-blue-600">vs mois dernier</span>
-                  </div>
+              <Card className="border-l-4 border-l-[#3b82f6]">
+                <CardContent className="p-4">
+                  <p className="text-sm text-blue-700">Chiffre d&apos;affaires</p>
+                  <p className="text-lg font-bold">{displayAmountWithPoints(analytics?.summary?.totalRevenue ?? 0)}</p>
                 </CardContent>
               </Card>
-
-              {/* ROI IA */}
-              <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-[#8b5cf6] bg-gradient-to-br from-purple-50 to-purple-100/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-purple-700">ROI IA</p>
-                      <p className="text-3xl font-bold text-purple-900">{displayAmountWithPoints(125000)}</p>
-                    </div>
-                    <div className="p-3 bg-purple-100 rounded-full">
-                      <TrendingUp className="w-6 h-6 text-[#8b5cf6]" />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-green-600">+15.3%</span>
-                    <span className="text-sm text-purple-600">vs mois dernier</span>
-                  </div>
+              <Card className="border-l-4 border-l-[#8b5cf6]">
+                <CardContent className="p-4">
+                  <p className="text-sm text-purple-700">ROI estimé</p>
+                  <p className="text-2xl font-bold">{(analytics?.advanced?.roiPercent ?? 0).toFixed(1)}%</p>
                 </CardContent>
               </Card>
-
-              {/* Optimisations actives */}
-              <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-[#10b981] bg-gradient-to-br from-green-50 to-green-100/50">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="text-sm font-medium text-green-700">Optimisations</p>
-                      <p className="text-3xl font-bold text-green-900">12</p>
-                    </div>
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <RefreshCw className="w-6 h-6 text-[#10b981]" />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-green-600">+3</span>
-                    <span className="text-sm text-green-600">ce mois</span>
-                  </div>
+              <Card className="border-l-4 border-l-[#10b981]">
+                <CardContent className="p-4">
+                  <p className="text-sm text-green-700">Optimisations actives</p>
+                  <p className="text-2xl font-bold">{optimizationActions.length}</p>
                 </CardContent>
               </Card>
             </div>
-            
+
             <div className="p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-3">Recommandations IA</h4>
-              <div className="space-y-2 text-sm text-gray-700">
-                <p>• Augmenter le stock des produits les plus vendus</p>
-                <p>• Lancer une campagne de rétention pour les clients inactifs</p>
-                <p>• Optimiser les horaires de publication sur les réseaux sociaux</p>
-                <p>• Améliorer les descriptions produits pour le SEO</p>
-              </div>
+              <h4 className="font-semibold text-gray-900 mb-3">Recommandations IA (base réelle)</h4>
+              {insightsList.length === 0 ? (
+                <p className="text-sm text-gray-600">Aucun insight pour cette période.</p>
+              ) : (
+                <div className="space-y-2 text-sm text-gray-700">
+                  {insightsList.map((insight) => (
+                    <p key={insight.id}>• {insight.title} — {insight.description}</p>
+                  ))}
+                </div>
+              )}
             </div>
             
             <div className="flex justify-end">

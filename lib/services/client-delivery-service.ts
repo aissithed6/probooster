@@ -124,10 +124,41 @@ function hasAuthorizationHeader(headers: HeadersInit): boolean {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+export interface ClientDeliveryConfig {
+  shippingCostAggregationDefault: 'max' | 'sum'
+  allowCustomerShippingAggregationOverride: boolean
+  deliveryRules: any[]
+  deliveryGeo: any
+  freeShippingConfig: {
+    enabled: boolean
+    rules: any[]
+  }
+  pickupConfig: {
+    enabled: boolean
+    points: any[]
+  }
+}
+
 /**
  * Service client pour interagir avec les endpoints de suivi de livraison.
  */
 export class ClientDeliveryService {
+  /**
+   * Récupère la configuration de livraison publique.
+   */
+  static async getPublicConfig(): Promise<{ data: ClientDeliveryConfig }> {
+    const response = await fetch('/api/public/delivery-config', {
+      method: 'GET',
+      cache: 'no-store'
+    })
+
+    if (!response.ok) {
+      throw new Error("Impossible de récupérer la configuration de livraison.")
+    }
+
+    return (await response.json()) as { data: ClientDeliveryConfig }
+  }
+
   /**
    * Récupère la liste des livraisons du client courant.
    */
@@ -226,6 +257,31 @@ export class ClientDeliveryService {
     }
 
     return (await response.json()) as { data: ClientDeliveryPreferences }
+  }
+
+  /**
+   * Récupère le détail d'une livraison par son numéro de suivi (tracking number).
+   */
+  static async getByTrackingNumber(trackingNumber: string): Promise<{ data: ClientDelivery | null }> {
+    if (!trackingNumber) {
+      throw new Error('Numéro de suivi requis.')
+    }
+
+    const response = await fetch(`/api/public/tracking/${encodeURIComponent(trackingNumber)}`, {
+      method: 'GET',
+      cache: 'no-store'
+    })
+
+    if (response.status === 404) {
+      return { data: null }
+    }
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      throw new Error(payload?.error ?? "Impossible de récupérer les informations de suivi.")
+    }
+
+    return (await response.json()) as { data: ClientDelivery }
   }
 
   /**

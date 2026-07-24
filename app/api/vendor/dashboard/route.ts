@@ -331,7 +331,10 @@ export async function GET(request: NextRequest) {
         paidOrdersAllTime: paidOrdersAllTime.length,
         paidOrdersRecent: paidOrdersRecent.length,
         allTimeItemsRaw: allTimeItemsRaw.length,
-        recentItemsRaw: recentItemsRaw.length
+        recentItemsRaw: recentItemsRaw.length,
+        totalItemsSold,
+        totalOrdersCount,
+        resolvedTotalSales
       },
       errors: {
         allTimeItemsRaw: (allTimePaidItemsResult as any)?.error
@@ -878,6 +881,24 @@ export async function GET(request: NextRequest) {
       return s === 'approved' || s === 'paid' || s === 'completed'
     }).length
 
+    // Calcul direct des ventes totales (nombre d'articles vendus dans des commandes non annulées)
+    const { data: itemCounts } = await supabase
+      .from('order_items')
+      .select('quantity, orders!inner(vendor_id, status)')
+      .in('orders.vendor_id', vendorIds as any)
+      .not('orders.status', 'in', '("cancelled", "canceled")')
+
+    const totalItemsSold = (itemCounts ?? []).reduce((acc, it) => acc + (Number(it.quantity) || 0), 0)
+
+    const { count: totalOrdersCount } = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .in('vendor_id', vendorIds as any)
+      .not('status', 'in', '("cancelled", "canceled")')
+
+    // On prend le maximum entre le nombre d'articles soldés et le nombre de commandes
+    const resolvedTotalSales = Math.max(totalItemsSold, Number(totalOrdersCount ?? 0), paidOrdersAllTime.length)
+
     // paymentHistory: order_payments
     const fetchOrderPayments = async () => {
       if (orderIds.length === 0) return [] as any[]
@@ -1000,6 +1021,23 @@ export async function GET(request: NextRequest) {
     let reviews: any[] = []
 
     if (ids.length > 0) {
+      // Calcul global de la note moyenne sur TOUS les avis publics (pas seulement les 200 derniers)
+      const { data: ratingStats, error: ratingStatsErr } = await supabase
+        .from('product_reviews')
+        .select('rating')
+        .in('product_id', ids as any)
+        .in('status', ['approved', 'published'])
+
+      if (ratingStatsErr) {
+        console.warn('⚠️ GET /api/vendor/dashboard: rating stats lookup failed:', ratingStatsErr)
+      } else {
+        const ratings = (ratingStats ?? []).map(r => Number(r.rating)).filter(n => Number.isFinite(n))
+        totalReviews = ratings.length
+        averageRating = totalReviews > 0
+          ? Number((ratings.reduce((a, b) => a + b, 0) / totalReviews).toFixed(2))
+          : 0
+      }
+
       const { data: reviewRows, error: reviewErr } = await supabase
         .from('product_reviews')
         .select('id, product_id, user_id, rating, title, comment, is_verified_purchase, helpful_votes, created_at, updated_at, status, status_reason, moderated_at, moderated_by')
@@ -1100,17 +1138,6 @@ export async function GET(request: NextRequest) {
           flagsByReviewId,
           moderationByReviewId
         })
-
-        const publicReviews = reviews.filter((review) => isPublicReviewStatus(review.status))
-        const publicRatings = publicReviews
-          .map((review) => Number(review.rating))
-          .filter((value) => Number.isFinite(value))
-
-        totalReviews = publicRatings.length
-        averageRating =
-          totalReviews > 0
-            ? Number((publicRatings.reduce((acc, value) => acc + value, 0) / totalReviews).toFixed(2))
-            : 0
       }
     }
 
@@ -1125,15 +1152,87 @@ export async function GET(request: NextRequest) {
 
     const totalVendors = Number(totalVendorsCount ?? 0)
 
+    // Calcul du taux de réponse et temps de réponse
+    let responseRate = 0
+    let averageResponseTime = 0 // en minutes
+    try {
+      const { data: chats } = await supabase
+        .from('user_chats')
+        .select('id, participant1_id, participant2_id')
+        .or(`participant1_id.eq.${vendorId},participant2_id.eq.${vendorId}`)
+
+      if (chats && chats.length > 0) {
+        const chatIds = chats.map(c => c.id)
+        const { data: messages } = await supabase
+          .from('chat_messages')
+          .select('chat_id, sender_id, created_at')
+          .in('chat_id', chatIds)
+          .order('created_at', { ascending: true })
+
+        if (messages && messages.length > 0) {
+          const chatData = new Map<string, { 
+            clientMsgTime: number | null, 
+            responded: boolean,
+            responseTime: number | null
+          }>()
+          
+          messages.forEach(msg => {
+            const chatId = msg.chat_id
+            const isVendor = msg.sender_id === vendorId
+            const msgTime = new Date(msg.created_at).getTime()
+            
+            if (!chatData.has(chatId)) {
+              chatData.set(chatId, { 
+                clientMsgTime: !isVendor ? msgTime : null, 
+                responded: false,
+                responseTime: null
+              })
+            } else {
+              const current = chatData.get(chatId)!
+              // Si c'est le premier message du client qu'on voit
+              if (!isVendor && current.clientMsgTime === null) {
+                current.clientMsgTime = msgTime
+              }
+              // Si c'est une réponse du vendeur à un message client non encore répondu
+              if (isVendor && current.clientMsgTime !== null && !current.responded) {
+                current.responded = true
+                current.responseTime = (msgTime - current.clientMsgTime) / (1000 * 60) // minutes
+              }
+            }
+          })
+
+          const chatsWithClientMsg = Array.from(chatData.values()).filter(c => c.clientMsgTime !== null)
+          const respondedChats = chatsWithClientMsg.filter(c => c.responded)
+          
+          responseRate = chatsWithClientMsg.length > 0 
+            ? Math.round((respondedChats.length / chatsWithClientMsg.length) * 100)
+            : 100 // 100% par défaut si aucune sollicitation
+
+          const responseTimes = respondedChats
+            .map(c => c.responseTime)
+            .filter((t): t is number => t !== null)
+
+          averageResponseTime = responseTimes.length > 0
+            ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+            : 0
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Erreur calcul stats chat:', e)
+    }
+
     return NextResponse.json(
       {
         data: {
           debug,
           stats: {
+            totalSales: resolvedTotalSales,
             averageRating,
             totalReviews,
             ranking,
-            totalVendors
+            totalVendors,
+            responseRate,
+            averageResponseTime
           },
           revenue: {
             totalRevenueAllTime: Math.round(resolvedTotalRevenueAllTime),

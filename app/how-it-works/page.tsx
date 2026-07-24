@@ -34,9 +34,23 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useMoney } from "@/lib/hooks/use-money"
+import { useClientPoints } from "@/lib/hooks/use-client-points"
 
 export default function HowItWorksPage() {
-  const { currencyCode } = useMoney()
+  const { currencyCode, formatMoney } = useMoney()
+  const { configuration, adminPointsConfig } = useClientPoints()
+
+  // Configuration dynamique des gains
+  const withdrawalValue = configuration?.settings?.withdrawalValue ?? 2
+  const minWithdrawalPoints = configuration?.limits?.withdrawal?.min ?? 5000
+  const minWithdrawalAmount = minWithdrawalPoints * withdrawalValue
+  
+  // On utilise d'abord la config spécifique par réseau, sinon la valeur par défaut du système
+  const defaultSharePoints = configuration?.settings?.socialShareValue ?? 50
+  const fbPoints = adminPointsConfig?.socialSharePerNetwork?.facebook ?? defaultSharePoints
+  const twPoints = adminPointsConfig?.socialSharePerNetwork?.twitter ?? Math.round(defaultSharePoints * 0.8)
+  const waPoints = adminPointsConfig?.socialSharePerNetwork?.whatsapp ?? Math.round(defaultSharePoints * 0.6)
+  const igPoints = adminPointsConfig?.socialSharePerNetwork?.instagram ?? Math.round(defaultSharePoints * 0.9)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
@@ -141,11 +155,11 @@ export default function HowItWorksPage() {
               {
                 step: "04",
                 title: "Achat & Retrait",
-                description: "Utilisez vos points pour acheter ou convertissez-les en argent réel dès que vous atteignez le seuil.",
+                description: `Utilisez vos points pour acheter ou convertissez-les en argent réel dès que vous atteignez le seuil de ${formatMoney(minWithdrawalAmount)}.`,
                 icon: Coins,
                 color: "from-purple-500 to-pink-600",
                 delay: "0.6s",
-                features: ["Achat avec points", "Conversion en F CFA", "Retrait rapide"]
+                features: ["Achat avec points", `Conversion en ${currencyCode}`, "Retrait rapide"]
               },
             ].map((item, index) => (
               <Card 
@@ -228,10 +242,10 @@ export default function HowItWorksPage() {
                   <div>
                     <h4 className="font-semibold text-lg text-gray-900 mb-2 group-hover:text-[#ff6600] transition-colors duration-300">Gagnez en partageant</h4>
                     <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                      <div className="group-hover:text-gray-800 transition-colors duration-300">Facebook (+50 pts)</div>
-                      <div className="group-hover:text-gray-800 transition-colors duration-300">Twitter (+40 pts)</div>
-                      <div className="group-hover:text-gray-800 transition-colors duration-300">WhatsApp (+30 pts)</div>
-                      <div className="group-hover:text-gray-800 transition-colors duration-300">Instagram (+45 pts)</div>
+                      <div className="group-hover:text-gray-800 transition-colors duration-300">Facebook (+{fbPoints} pts)</div>
+                      <div className="group-hover:text-gray-800 transition-colors duration-300">Twitter (+{twPoints} pts)</div>
+                      <div className="group-hover:text-gray-800 transition-colors duration-300">WhatsApp (+{waPoints} pts)</div>
+                      <div className="group-hover:text-gray-800 transition-colors duration-300">Instagram (+{igPoints} pts)</div>
                     </div>
                   </div>
                 </div>
@@ -240,7 +254,7 @@ export default function HowItWorksPage() {
                   <CheckCircle className="h-6 w-6 text-blue-500 mt-1 flex-shrink-0 group-hover:animate-bounce" />
                   <div>
                     <h4 className="font-semibold text-lg text-gray-900 mb-2 group-hover:text-[#ff6600] transition-colors duration-300">Convertissez en argent</h4>
-                    <p className="text-gray-600 group-hover:text-gray-800 transition-colors duration-300">1 point = 2 {currencyCode}. Retirez dès 5,000 {currencyCode} atteints</p>
+                    <p className="text-gray-600 group-hover:text-gray-800 transition-colors duration-300">1 point = {withdrawalValue} {currencyCode}. Retirez dès {formatMoney(minWithdrawalAmount)} atteints</p>
                   </div>
                 </div>
                 
@@ -277,7 +291,7 @@ export default function HowItWorksPage() {
                     </div>
                   <span className="group-hover:text-yellow-300 transition-colors duration-300">10 partages Facebook</span>
                   </div>
-                  <span className="font-bold text-lg group-hover:scale-110 transition-transform duration-300">500 points</span>
+                  <span className="font-bold text-lg group-hover:scale-110 transition-transform duration-300">{10 * fbPoints} points</span>
                 </div>
                 
                 <div className="flex justify-between items-center p-3 bg-white/10 rounded-lg group hover:bg-white/20 transition-all duration-300">
@@ -287,7 +301,7 @@ export default function HowItWorksPage() {
                     </div>
                   <span className="group-hover:text-yellow-300 transition-colors duration-300">15 partages WhatsApp</span>
                   </div>
-                  <span className="font-bold text-lg group-hover:scale-110 transition-transform duration-300">450 points</span>
+                  <span className="font-bold text-lg group-hover:scale-110 transition-transform duration-300">{15 * waPoints} points</span>
                 </div>
                 
                 <div className="flex justify-between items-center p-3 bg-white/10 rounded-lg group hover:bg-white/20 transition-all duration-300">
@@ -297,7 +311,7 @@ export default function HowItWorksPage() {
                     </div>
                   <span className="group-hover:text-yellow-300 transition-colors duration-300">8 partages Instagram</span>
                   </div>
-                  <span className="font-bold text-lg group-hover:scale-110 transition-transform duration-300">360 points</span>
+                  <span className="font-bold text-lg group-hover:scale-110 transition-transform duration-300">{8 * igPoints} points</span>
                 </div>
                 
                 <hr className="border-orange-300" />
@@ -305,8 +319,8 @@ export default function HowItWorksPage() {
                 <div className="flex justify-between items-center p-4 bg-white/20 rounded-lg group hover:bg-white/30 transition-all duration-300">
                   <span className="text-xl font-bold group-hover:text-yellow-300 transition-colors duration-300">Total</span>
                   <div className="text-right">
-                    <div className="text-2xl font-bold group-hover:scale-110 transition-transform duration-300">1,310 points</div>
-                    <div className="text-orange-100 group-hover:text-white transition-colors duration-300">= 2,620 F CFA</div>
+                    <div className="text-2xl font-bold group-hover:scale-110 transition-transform duration-300">{(10 * fbPoints + 15 * waPoints + 8 * igPoints).toLocaleString()} points</div>
+                    <div className="text-orange-100 group-hover:text-white transition-colors duration-300">= {formatMoney((10 * fbPoints + 15 * waPoints + 8 * igPoints) * withdrawalValue)}</div>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useClientPoints } from "@/lib/hooks/use-client-points"
 import { useMoney } from "@/lib/hooks/use-money"
+import { supabase } from "@/lib/supabase"
+import { ClientPointsService, type ClientRewardOption } from "@/lib/services/client-points-service"
 import { 
   Coins, 
   TrendingUp, 
@@ -65,19 +67,87 @@ import {
   EyeOff
 } from "lucide-react"
 
+type LeaderboardEntry = {
+  rank: number
+  name: string
+  points: number
+  avatar: string
+  level: string
+}
+
 /**
  * Page marketing/infos du système de points, avec affichage de la valeur estimée dans la devise utilisateur.
  */
 export default function PointsSystemPage() {
   const [showPoints, setShowPoints] = useState(true)
   const [selectedLevel, setSelectedLevel] = useState("bronze")
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [dbRewards, setDbRewards] = useState<ClientRewardOption[]>([])
+  const [isDataLoading, setIsDataLoading] = useState(true)
 
-  const { balance, estimatedValue } = useClientPoints()
+  const { balance, estimatedValue, configuration } = useClientPoints()
   const { formatMoney, currencyCode } = useMoney()
+  
   const userPoints = balance
   const pointsValue = estimatedValue ?? 0
+  
+  // Niveaux (seuils dynamiques si possible, sinon statiques)
   const nextLevel = 5000
   const progressPercentage = Math.min((userPoints / nextLevel) * 100, 100)
+
+  // Configuration dynamique des gains
+  const conversionRate = configuration?.settings?.conversionRate ?? 1
+  const purchasePointsPer100 = configuration?.settings?.purchaseValue ?? 1
+  const socialSharePoints = configuration?.settings?.socialShareValue ?? 50
+  const withdrawalValue = configuration?.settings?.withdrawalValue ?? 1
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsDataLoading(true)
+      try {
+        // 1. Leaderboard
+        const { data: lpData, error: lpError } = await supabase
+          .from('loyalty_points')
+          .select('points_balance, user_profiles!inner(first_name, last_name, avatar_url)')
+          .order('points_balance', { ascending: false })
+          .limit(5)
+
+        if (!lpError && lpData) {
+          const formattedLeaderboard = lpData.map((row: any, idx: number) => {
+            const profile = row.user_profiles
+            const points = Number(row.points_balance || 0)
+            
+            // Déterminer le niveau basé sur les points
+            let level = "Bronze"
+            if (points >= 100000) level = "Diamant"
+            else if (points >= 50000) level = "Platine"
+            else if (points >= 20000) level = "Or"
+            else if (points >= 5000) level = "Argent"
+
+            return {
+              rank: idx + 1,
+              name: `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || 'Utilisateur',
+              points,
+              avatar: profile.avatar_url || "/placeholder-user.jpg",
+              level
+            }
+          })
+          setLeaderboard(formattedLeaderboard)
+        }
+
+        // 2. Récompenses
+        const rewards = await ClientPointsService.listAvailableRewards()
+        setDbRewards(rewards)
+
+      } catch (err) {
+        console.error("Erreur lors de la récupération des données de points:", err)
+      } finally {
+        setIsDataLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   const levels = [
     {
@@ -154,14 +224,14 @@ export default function PointsSystemPage() {
       icon: ShoppingBag,
       title: "Achats",
       description: "Gagnez des points sur chaque achat",
-      points: `1 point par 100 ${currencyCode}`,
+      points: `${purchasePointsPer100} point(s) par 100 ${currencyCode}`,
       color: "from-green-500 to-emerald-500"
     },
     {
       icon: Share2,
       title: "Partage Social",
       description: "Partagez et gagnez des points",
-      points: "30-50 points par partage",
+      points: `${socialSharePoints} points par partage`,
       color: "from-blue-500 to-cyan-500"
     },
     {
@@ -180,39 +250,36 @@ export default function PointsSystemPage() {
     }
   ]
 
-  const rewards = [
-    {
-      icon: Gift,
-      title: "Réductions",
-      description: "Échangez vos points contre des réductions",
-      examples: ["10% sur tout", "Livraison gratuite", "Produits exclusifs"]
-    },
-    {
-      icon: CreditCard,
-      title: "Retrait en Argent",
-      description: `Convertissez vos points en ${currencyCode}`,
-      examples: [`1 point = 2 ${currencyCode}`, `Retrait minimum 5000 ${currencyCode}`, "Paiement sécurisé"]
-    },
-    {
-      icon: Package,
-      title: "Produits Gratuits",
-      description: "Obtenez des produits sans dépenser",
-      examples: ["Produits sélectionnés", "Livraison incluse", `Valeur jusqu'à ${formatMoney(50000)}`]
-    },
-    {
-      icon: Crown,
-      title: "Avantages Premium",
-      description: "Accédez à des services exclusifs",
-      examples: ["Support VIP", "Livraison express", "Événements exclusifs"]
-    }
-  ]
+  // Fusionner les récompenses statiques avec celles de la DB
+  const rewards = useMemo(() => {
+    const baseRewards = [
+      {
+        icon: Gift,
+        title: "Réductions",
+        description: "Échangez vos points contre des réductions",
+        examples: ["10% sur tout", "Livraison gratuite", "Produits exclusifs"]
+      },
+      {
+        icon: CreditCard,
+        title: "Retrait en Argent",
+        description: `Convertissez vos points en ${currencyCode}`,
+        examples: [`1 point = ${withdrawalValue} ${currencyCode}`, `Retrait minimum ${configuration?.limits?.withdrawal?.min ?? 5000} pts`, "Paiement sécurisé"]
+      }
+    ]
 
-  const leaderboard = [
-    { rank: 1, name: "Fatou D.", points: 125000, avatar: "/placeholder-user.jpg", level: "Diamant" },
-    { rank: 2, name: "Kouassi J.", points: 89000, avatar: "/placeholder-user.jpg", level: "Platine" },
-    { rank: 3, name: "Aminata T.", points: 67000, avatar: "/placeholder-user.jpg", level: "Platine" },
-    { rank: 4, name: "David O.", points: 45000, avatar: "/placeholder-user.jpg", level: "Or" },
-    { rank: 5, name: "Sarah K.", points: 32000, avatar: "/placeholder-user.jpg", level: "Or" }
+    // Ajouter les récompenses de la DB
+    const dbMapped = dbRewards.slice(0, 4).map(r => ({
+      icon: Package,
+      title: r.name,
+      description: r.description || "Offre exclusive",
+      examples: [`Coût: ${r.pointsCost} pts`, `Type: ${r.rewardType}`, `Valeur: ${r.value} ${r.valueType === 'percentage' ? '%' : currencyCode}`]
+    }))
+
+    return [...baseRewards, ...dbMapped].slice(0, 4)
+  }, [dbRewards, withdrawalValue, currencyCode, configuration])
+
+  const leaderboardToDisplay = leaderboard.length > 0 ? leaderboard : [
+    { rank: 1, name: "Chargement...", points: 0, avatar: "/placeholder-user.jpg", level: "..." },
   ]
 
   const tips = [
@@ -456,7 +523,7 @@ export default function PointsSystemPage() {
             <Card className="border-0 shadow-xl">
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  {leaderboard.map((user, index) => (
+                  {leaderboardToDisplay.map((user, index) => (
                     <div key={index} className="flex items-center space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors group">
                       <div className="flex items-center space-x-4">
                         <div className="relative">
@@ -479,7 +546,7 @@ export default function PointsSystemPage() {
                       <div className="ml-auto text-right">
                         <div className="font-bold text-[#ff6600] group-hover:scale-110 transition-transform duration-300">{user.points.toLocaleString()} pts</div>
                         <div className="text-sm text-gray-500 group-hover:text-gray-700 transition-colors duration-300">
-                          {formatMoney(Math.floor(user.points * 2))}
+                          {formatMoney(Math.floor(user.points * withdrawalValue))}
                         </div>
                       </div>
                     </div>

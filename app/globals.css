@@ -1196,13 +1196,23 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 50;
+  z-index: 50 !important; /* Réduit pour laisser la place aux modals (z-100) */
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  pointer-events: auto !important;
+}
+
+/* Styles pour le pied de page */
+.fixed-footer-bottom {
+  position: relative;
+  z-index: 50 !important; /* Cohérent avec le header */
+  pointer-events: auto !important;
 }
 
 /* Ajustement du contenu principal pour compenser l'en-tête fixe */
 .main-content {
   padding-top: 12rem; /* 192px - ajustez selon la hauteur de votre en-tête */
+  position: relative;
+  z-index: 1; /* Reste sous le header et le footer */
 }
 
 /* Responsive pour l'en-tête fixe */

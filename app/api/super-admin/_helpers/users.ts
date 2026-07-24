@@ -353,6 +353,7 @@ const USER_SELECT = `
           website,
           social_media,
           preferences,
+          verification,
           short_code
         ),
         user_role_assignments!user_role_assignments_user_id_fkey(
@@ -1173,9 +1174,45 @@ export async function deleteUserAdmin(userId: string): Promise<void> {
  */
 export async function updateUserStatusAdmin(userId: string, status: SuperAdminUserStatus): Promise<void> {
   const supabase = getSupabaseAdmin()
-  const { error } = await supabase.from('users').update({ status }).eq('id', userId)
+  
+  // Update user status
+  const { error } = await supabase.from('users').update({ 
+    status,
+    is_verified: status === 'verified' ? true : undefined
+  }).eq('id', userId)
+  
   if (error) {
     throw new Error(`Mise à jour du statut échouée: ${error.message}`)
+  }
+
+  // If status is verified, also update verification info in profile
+  if (status === 'verified') {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('verification')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (profile) {
+      const verification = typeof (profile as any).verification === 'object' ? { ...(profile as any).verification } : { documents: [] }
+      const documents = Array.isArray(verification.documents) 
+        ? verification.documents.map((doc: any) => ({ ...doc, status: 'approved' }))
+        : []
+      
+      await supabase.from('user_profiles').update({
+        verification: { ...verification, isVerified: true, documents },
+        updated_at: new Date().toISOString()
+      } as any).eq('user_id', userId)
+    }
+
+    // Log activity
+    await supabase.from('activity_logs').insert({
+      user_id: userId,
+      action: 'user_verified_by_admin',
+      entity_type: 'user',
+      entity_id: userId,
+      details: { status: 'verified' }
+    })
   }
 }
 

@@ -79,10 +79,12 @@ interface SellerProfile {
 
 interface ProfileSectionProps {
   profile: SellerProfile
+  sessions?: any[]
   onProfileUpdate: (updates: Partial<SellerProfile>) => void
   onPasswordChange: (currentPassword: string, newPassword: string) => void
   onTwoFactorToggle: (enabled: boolean) => void
   onSessionTerminate: (sessionId: string) => void
+  onTerminateAllSessions?: () => void
   onDocumentUpload: (file: File, type: string) => void
   onAccountDelete: (reason: string) => void
   onLogout: () => void
@@ -92,10 +94,12 @@ interface ProfileSectionProps {
 
 export default function ProfileSection({
   profile,
+  sessions: externalSessions,
   onProfileUpdate,
   onPasswordChange,
   onTwoFactorToggle,
   onSessionTerminate,
+  onTerminateAllSessions,
   onDocumentUpload,
   onAccountDelete,
   onLogout,
@@ -119,7 +123,6 @@ export default function ProfileSection({
   const [showSessionsModal, setShowSessionsModal] = useState(false)
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   
-  // Form states
   const [formData, setFormData] = useState({
     name: profile.name,
     email: profile.email,
@@ -130,6 +133,20 @@ export default function ProfileSection({
     address: { ...profile.address },
     socialMedia: { ...profile.socialMedia }
   })
+
+  // Synchroniser formData avec le profil quand il change
+  useEffect(() => {
+    setFormData({
+      name: profile.name,
+      email: profile.email,
+      phone: profile.phone,
+      bio: profile.bio,
+      company: profile.company,
+      website: profile.website,
+      address: { ...profile.address },
+      socialMedia: { ...profile.socialMedia }
+    })
+  }, [profile])
   
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -150,26 +167,13 @@ export default function ProfileSection({
     preview: null as string | null
   })
 
-  const [uploadedDocuments, setUploadedDocuments] = useState([
-    {
-      id: '1',
-      type: 'Pièce d\'identité',
-      name: 'CNI_Jean_Dupont.pdf',
-      status: 'pending' as 'pending' | 'approved' | 'rejected',
-      uploadedAt: new Date().toISOString(),
-      fileSize: '2.5 MB',
-      preview: null as string | null
-    },
-    {
-      id: '2',
-      type: 'Justificatif d\'adresse',
-      name: 'EDF_Janvier_2024.pdf',
-      status: 'approved' as 'pending' | 'approved' | 'rejected',
-      uploadedAt: new Date(Date.now() - 86400000).toISOString(),
-      fileSize: '1.8 MB',
-      preview: null as string | null
+  const [uploadedDocuments, setUploadedDocuments] = useState(profile.verification.documents || [])
+
+  useEffect(() => {
+    if (profile.verification.documents) {
+      setUploadedDocuments(profile.verification.documents)
     }
-  ])
+  }, [profile.verification.documents])
 
   const [socialMediaData, setSocialMediaData] = useState({
     facebook: profile.socialMedia.facebook,
@@ -179,40 +183,41 @@ export default function ProfileSection({
   })
 
   const [preferencesData, setPreferencesData] = useState({
-    language: systemPrefs.language,
-    currency: systemPrefs.currency,
-    timezone: systemPrefs.timezone,
-    theme: systemPrefs.theme,
+    language: profile.preferences.language || systemPrefs.language,
+    currency: profile.preferences.currency || systemPrefs.currency,
+    timezone: profile.preferences.timezone || systemPrefs.timezone,
+    theme: profile.preferences.theme || systemPrefs.theme,
     notifications: { ...profile.preferences.notifications }
   })
 
   useEffect(() => {
     setPreferencesData((prev) => ({
       ...prev,
-      language: systemPrefs.language,
-      currency: systemPrefs.currency,
-      timezone: systemPrefs.timezone,
-      theme: systemPrefs.theme
+      language: profile.preferences.language || systemPrefs.language,
+      currency: profile.preferences.currency || systemPrefs.currency,
+      timezone: profile.preferences.timezone || systemPrefs.timezone,
+      theme: profile.preferences.theme || systemPrefs.theme,
+      notifications: { ...profile.preferences.notifications }
     }))
-  }, [systemPrefs.currency, systemPrefs.language, systemPrefs.theme, systemPrefs.timezone])
+  }, [profile.preferences, systemPrefs.currency, systemPrefs.language, systemPrefs.theme, systemPrefs.timezone])
 
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
-  const [sessions] = useState([
+
+  useEffect(() => {
+    if ((profile?.preferences as any)?.security?.two_factor_enabled !== undefined) {
+      setTwoFactorEnabled((profile.preferences as any).security.two_factor_enabled)
+    }
+  }, [profile.preferences])
+
+  const sessions = (externalSessions && externalSessions.length > 0) ? externalSessions : [
     {
-      id: '1',
-      device: 'Chrome sur Windows',
-      location: 'Paris, France',
+      id: 'current',
+      device: 'Session actuelle (Navigateur)',
+      location: 'Locale',
       lastActivity: new Date().toISOString(),
       isCurrent: true
-    },
-    {
-      id: '2',
-      device: 'Safari sur iPhone',
-      location: 'Lyon, France',
-      lastActivity: new Date(Date.now() - 3600000).toISOString(),
-      isCurrent: false
     }
-  ])
+  ]
 
   const handleSave = () => {
     onProfileUpdate(formData)
@@ -234,16 +239,26 @@ export default function ProfileSection({
   }
 
   const handlePasswordChange = () => {
-    if (passwordData.newPassword === passwordData.confirmPassword) {
-      onPasswordChange(passwordData.currentPassword, passwordData.newPassword)
-      setShowPasswordModal(false)
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    if (!passwordData.newPassword || !passwordData.confirmPassword) {
+      alert('Veuillez remplir tous les champs du mot de passe.')
+      return
     }
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('Les nouveaux mots de passe ne correspondent pas.')
+      return
+    }
+    if (passwordData.newPassword.length < 6) {
+      alert('Le nouveau mot de passe doit contenir au moins 6 caractères.')
+      return
+    }
+    onPasswordChange(passwordData.currentPassword, passwordData.newPassword)
+    setShowPasswordModal(false)
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
   }
 
   const handleDocumentUpload = () => {
-    if (uploadData.file && uploadData.type) {
-      onDocumentUpload(uploadData.file, uploadData.type)
+    if (uploadData.file) {
+      onDocumentUpload(uploadData.file, uploadData.type || 'avatar')
       setShowUploadModal(false)
       setUploadData({ file: null, type: '' })
     }
@@ -331,9 +346,18 @@ export default function ProfileSection({
   }
 
   const handleVerificationRequest = () => {
-    // Simuler une demande de vérification
-    console.log('Demande de vérification envoyée')
-    setShowVerificationModal(false)
+    if (uploadData.file && uploadData.type) {
+      onDocumentUpload(uploadData.file, uploadData.type)
+      setShowVerificationModal(false)
+      setUploadData({ file: null, type: '' })
+    }
+  }
+
+  const handleAccountDeleteRequest = () => {
+    const reason = prompt('Veuillez indiquer la raison de la suppression de votre compte :')
+    if (reason) {
+      onAccountDelete(reason)
+    }
   }
 
   const handleTwoFactorToggle = (enabled: boolean) => {
@@ -345,21 +369,27 @@ export default function ProfileSection({
   const handleLanguageChange = (language: string) => {
     setPreferencesData({ ...preferencesData, language })
     setLanguage(language as any)
+    onProfileUpdate({ preferences: { ...profile.preferences, language } })
   }
 
   const handleThemeChange = (theme: 'light' | 'dark' | 'auto') => {
     setPreferencesData({ ...preferencesData, theme })
     setTheme(theme)
+    onProfileUpdate({ preferences: { ...profile.preferences, theme } })
   }
 
   const handleCurrencyChange = (currency: 'xof' | 'eur' | 'usd' | 'gbp') => {
     setPreferencesData({ ...preferencesData, currency })
     setCurrency(currency)
+    // Persist currency in preferences
+    onProfileUpdate({ preferences: { ...profile.preferences, currency } })
   }
 
   const handleTimezoneChange = (timezone: 'africa_cotonou' | 'europe_paris' | 'america_new_york' | 'asia_tokyo') => {
     setPreferencesData({ ...preferencesData, timezone })
     setTimezone(timezone)
+    // Persist timezone in preferences
+    onProfileUpdate({ preferences: { ...profile.preferences, timezone } })
   }
 
   const handleNotificationToggle = (type: 'email' | 'sms' | 'push', enabled: boolean) => {
@@ -369,8 +399,15 @@ export default function ProfileSection({
   }
 
   const handleSessionTerminate = (sessionId: string) => {
-    onSessionTerminate(sessionId)
-    console.log('Session terminée:', sessionId)
+    if (window.confirm('Êtes-vous sûr de vouloir fermer cette session ? Si elle est suspecte, nous vous recommandons de changer également votre mot de passe.')) {
+      onSessionTerminate(sessionId)
+    }
+  }
+
+  const handleTerminateAllSessions = () => {
+    if (window.confirm('Voulez-vous fermer TOUTES les autres sessions actives ? Cela déconnectera votre compte de tous les autres appareils.')) {
+      onTerminateAllSessions?.()
+    }
   }
 
   const handlePreferencesSave = () => {
@@ -429,21 +466,41 @@ export default function ProfileSection({
             
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
-                <h2 className="text-2xl font-bold text-gray-900">{profile.name}</h2>
-                                 {profile.verification.isVerified && (
-                   <Badge className="bg-[#ff6600]/10 text-[#ff6600] border-[#ff6600]/20">
-                     <CheckCircle className="w-3 h-3 mr-1" />
-                     Vérifié
-                   </Badge>
-                 )}
-                                 <Badge className="bg-[#ff6600]/10 text-[#ff6600] border-[#ff6600]/20">
-                   Vendeur Pro
-                 </Badge>
+                {isEditing ? (
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="text-2xl font-bold h-10 bg-white/50 border-[#ff6600]/30"
+                    placeholder="Votre nom"
+                  />
+                ) : (
+                  <h2 className="text-2xl font-bold text-gray-900">{profile.name}</h2>
+                )}
+                {!isEditing && profile.verification.isVerified && (
+                  <Badge className="bg-[#ff6600]/10 text-[#ff6600] border-[#ff6600]/20">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Vérifié
+                  </Badge>
+                )}
+                {!isEditing && (
+                  <Badge className="bg-[#ff6600]/10 text-[#ff6600] border-[#ff6600]/20">
+                    Vendeur Pro
+                  </Badge>
+                )}
               </div>
               
-              <p className="text-gray-600 mb-4">{profile.bio || 'Aucune bio renseignée'}</p>
+              {isEditing ? (
+                <Textarea
+                  value={formData.bio}
+                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                  className="text-gray-600 mb-4 bg-white/50 border-[#ff6600]/30 min-h-[60px]"
+                  placeholder="Votre bio..."
+                />
+              ) : (
+                <p className="text-gray-600 mb-4">{profile.bio || 'Aucune bio renseignée'}</p>
+              )}
               
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                  <div className="text-center">
                    <p className="text-2xl font-bold text-[#ff6600]">{profile.statistics.totalSales}</p>
                    <p className="text-sm text-gray-600">Ventes totales</p>
@@ -558,8 +615,10 @@ export default function ProfileSection({
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    disabled={!isEditing}
+                    disabled={true}
+                    className="bg-gray-50 cursor-not-allowed"
                   />
+                  <p className="text-[10px] text-gray-500 mt-1">L'email ne peut pas être modifié ici pour des raisons de sécurité.</p>
                 </div>
                 <div>
                   <Label htmlFor="phone">Téléphone</Label>
@@ -655,6 +714,18 @@ export default function ProfileSection({
                     onChange={(e) => setFormData({
                       ...formData,
                       address: { ...formData.address, postalCode: e.target.value }
+                    })}
+                    disabled={!isEditing}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="country">Pays</Label>
+                  <Input
+                    id="country"
+                    value={formData.address.country}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      address: { ...formData.address, country: e.target.value }
                     })}
                     disabled={!isEditing}
                   />
@@ -783,7 +854,7 @@ export default function ProfileSection({
                    <Key className="w-5 h-5 text-[#ff6600]" />
                    <div>
                     <p className="font-medium">Mot de passe</p>
-                    <p className="text-sm text-gray-500">Dernière modification: {formatDate(profile.verification.verificationDate || new Date().toISOString())}</p>
+                    <p className="text-sm text-gray-500">Sécurisez votre compte avec un mot de passe fort</p>
                   </div>
                 </div>
                 <Button onClick={() => setShowPasswordModal(true)} variant="outline">
@@ -835,6 +906,23 @@ export default function ProfileSection({
                 <Button variant="outline" onClick={() => setShowSessionsModal(true)}>
                   <Eye className="w-4 h-4 mr-2" />
                   Voir
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div className="pt-4">
+                <h4 className="text-sm font-medium text-red-600 mb-2">Zone de danger</h4>
+                <p className="text-sm text-gray-500 mb-4">
+                  Une fois votre compte supprimé, toutes vos données seront définitivement effacées. Cette action est irréversible.
+                </p>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={handleAccountDeleteRequest}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer mon compte vendeur
                 </Button>
               </div>
             </CardContent>
@@ -1192,37 +1280,61 @@ export default function ProfileSection({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {sessions.map((session) => (
-              <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                                     <div className="w-3 h-3 rounded-full bg-[#ff6600]"></div>
-                  <div>
-                    <p className="font-medium">{session.device}</p>
-                    <p className="text-sm text-gray-500">{session.location} • {formatDate(session.lastActivity)}</p>
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start space-x-3 mb-4">
+              <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+              <p className="text-sm text-blue-700">
+                Si vous remarquez une activité inhabituelle, fermez la session concernée et changez immédiatement votre mot de passe.
+              </p>
+            </div>
+
+            {sessions.length > 0 ? (
+              sessions.map((session) => (
+                <div key={session.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-3">
+                                       <div className={`w-3 h-3 rounded-full ${session.isCurrent ? 'bg-green-500' : 'bg-[#ff6600]'}`}></div>
+                    <div>
+                      <p className="font-medium">{session.device}</p>
+                      <p className="text-sm text-gray-500">{session.location} • {formatDate(session.lastActivity)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                                       {session.isCurrent && (
+                       <Badge className="bg-green-100 text-green-700 border-green-200">
+                         Actuelle
+                       </Badge>
+                     )}
+                    {!session.isCurrent && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleSessionTerminate(session.id)}
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Terminer
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                                     {session.isCurrent && (
-                     <Badge className="bg-[#ff6600]/10 text-[#ff6600] border-[#ff6600]/20">
-                       Actuelle
-                     </Badge>
-                   )}
-                  {!session.isCurrent && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleSessionTerminate(session.id)}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Terminer
-                    </Button>
-                  )}
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Aucune session active trouvée.
               </div>
-            ))}
+            )}
           </div>
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-between items-center pt-4 border-t mt-4">
+            {sessions.filter(s => !s.isCurrent).length > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleTerminateAllSessions}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Fermer toutes les autres sessions
+              </Button>
+            )}
             <Button onClick={() => setShowSessionsModal(false)}>
               Fermer
             </Button>

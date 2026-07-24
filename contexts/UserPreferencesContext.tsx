@@ -44,15 +44,44 @@ type UserPreferencesContextValue = {
   refreshFromProfile: () => void
 }
 
-const UserPreferencesContext = createContext<UserPreferencesContextValue | undefined>(undefined)
+export const UserPreferencesContext = createContext<UserPreferencesContextValue | undefined>(undefined)
 
 /**
  * Accès au contexte des préférences utilisateur.
+ * Note: Retourne des valeurs par défaut si utilisé hors provider (ex: durant le SSR).
  */
 export const useUserPreferences = () => {
   const ctx = useContext(UserPreferencesContext)
   if (!ctx) {
-    throw new Error('useUserPreferences must be used within a UserPreferencesProvider')
+    // Fallback pour éviter les erreurs fatales durant le SSR ou si le provider est manquant
+    return {
+      systemPrefs: {
+        language: 'fr',
+        currency: 'xof',
+        timezone: 'africa_cotonou',
+        theme: 'light'
+      },
+      privacyPrefs: {
+        profilePublic: true,
+        sharePurchaseHistory: false,
+        shareStats: true,
+        analyticsEnabled: true,
+        personalizedRecommendations: true
+      },
+      privacyPolicy: {} as any,
+      setSystemPrefs: () => {},
+      setTheme: () => {},
+      setLanguage: () => {},
+      setTimezone: () => {},
+      setCurrency: () => {},
+      setPrivacyPrefs: () => {},
+      setProfilePublic: () => {},
+      setSharePurchaseHistory: () => {},
+      setShareStats: () => {},
+      setAnalyticsEnabled: () => {},
+      setPersonalizedRecommendations: () => {},
+      refreshFromProfile: () => {}
+    } as UserPreferencesContextValue
   }
   return ctx
 }

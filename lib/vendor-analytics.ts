@@ -266,6 +266,870 @@ function countNonCancelledOrdersInclusiveEnd(rows: any[], startIso: string, endI
   return n
 }
 
+export type OrderForPeriodMetrics = {
+  orderDate?: string
+  status?: string
+  totalAmount?: number
+  products?: Array<{ id?: string; name?: string; price?: number; quantity?: number }>
+  customerEmail?: string
+  customerId?: string
+  customerName?: string
+}
+
+export type DashboardTopProductRow = {
+  id?: string
+  productId?: string
+  name?: string
+  sales?: number
+  revenue?: number
+  shares?: number
+  image?: string
+}
+
+/** CA + ventes sur la période à partir des commandes vendeur (même source que Commandes & Ventes). */
+export function computePeriodMetricsFromOrders(
+  orders: OrderForPeriodMetrics[],
+  period: VendorAnalyticsPeriod
+): { totalRevenue: number; totalSales: number } {
+  const days = periodToDays(period)
+  const now = new Date()
+  const start = new Date(now)
+  start.setDate(start.getDate() - (days - 1))
+  start.setHours(0, 0, 0, 0)
+
+  let totalRevenue = 0
+  let totalSales = 0
+
+  for (const order of orders) {
+    const createdAt = String(order.orderDate ?? '')
+    if (!createdAt) continue
+    const dt = new Date(createdAt)
+    if (Number.isNaN(dt.getTime()) || dt < start) continue
+    const status = String(order.status ?? '').trim().toLowerCase()
+    if (status === 'cancelled' || status === 'canceled') continue
+
+    totalRevenue += Number(order.totalAmount ?? 0) || 0
+    const items = Array.isArray(order.products) ? order.products : []
+    const qty = items.reduce((sum, line) => sum + (Number(line?.quantity ?? 0) || 0), 0)
+    totalSales += qty > 0 ? qty : 1
+  }
+
+  return {
+    totalRevenue: Math.round(totalRevenue),
+    totalSales: Math.round(totalSales)
+  }
+}
+
+export type SyncedTopCardSummary = {
+  totalRevenue: number
+  totalSales: number
+  growthRate: number
+  revenueGrowthRate: number
+  marketPosition: number
+  totalVendors: number
+  averageRating: number
+  totalReviews: number
+  activeCustomers: number
+  conversionRate: number
+}
+
+const ADVANCED_MARKETING_COST_RATE = 0.12
+
+function computeRoiPercent(revenue: number): number {
+  if (revenue <= 0) return 0
+  const cost = revenue * ADVANCED_MARKETING_COST_RATE
+  return Number((((revenue - cost) / Math.max(cost, 1)) * 100).toFixed(1))
+}
+
+/**
+ * ROI, LTV, CAC, rétention — calculés depuis les commandes vendeur (aligné dashboard / Commandes).
+ */
+export function computeAdvancedMetricsFromOrders(
+  orders: OrderForPeriodMetrics[],
+  period: VendorAnalyticsPeriod,
+  syncedRevenue?: number,
+  syncedActiveCustomers?: number
+): VendorAnalyticsData['advanced'] {
+  const days = periodToDays(period)
+  const currentStart = periodStartDate(period)
+  const previousStart = new Date(currentStart)
+  previousStart.setDate(previousStart.getDate() - days)
+
+  let currentRevenue = 0
+  let previousRevenue = 0
+  const customerOrdersCurrent = new Map<string, number>()
+  const customerOrdersPrevious = new Map<string, number>()
+
+  for (const order of orders) {
+    const createdAt = String(order.orderDate ?? '')
+    if (!createdAt) continue
+    const dt = new Date(createdAt)
+    if (Number.isNaN(dt.getTime())) continue
+    const status = String(order.status ?? '').trim().toLowerCase()
+    if (status === 'cancelled' || status === 'canceled') continue
+
+    const amt = Number(order.totalAmount ?? 0) || 0
+    const email = String(order.customerEmail ?? '').trim().toLowerCase()
+    const id = String(order.customerId ?? '').trim()
+    const name = String(order.customerName ?? '').trim()
+    const key = email || id || (name ? `name:${name}` : '')
+
+    if (dt >= currentStart) {
+      currentRevenue += amt
+      if (key) customerOrdersCurrent.set(key, (customerOrdersCurrent.get(key) ?? 0) + 1)
+    } else if (dt >= previousStart && dt < currentStart) {
+      previousRevenue += amt
+      if (key) customerOrdersPrevious.set(key, (customerOrdersPrevious.get(key) ?? 0) + 1)
+    }
+  }
+
+  if (Number(syncedRevenue ?? 0) > currentRevenue) {
+    currentRevenue = Number(syncedRevenue)
+  }
+
+  const customersCurrent =
+    Number(syncedActiveCustomers ?? 0) > 0
+      ? Number(syncedActiveCustomers)
+      : customerOrdersCurrent.size
+
+  const repeatCustomers = Array.from(customerOrdersCurrent.values()).filter((n) => n > 1).length
+  const retentionRate =
+    customersCurrent > 0 ? Number(((repeatCustomers / customersCurrent) * 100).toFixed(1)) : 0
+
+  const previousRepeat = Array.from(customerOrdersPrevious.values()).filter((n) => n > 1).length
+  const previousCustomers = customerOrdersPrevious.size
+  const previousRetention =
+    previousCustomers > 0 ? Number(((previousRepeat / previousCustomers) * 100).toFixed(1)) : 0
+
+  const ltv = customersCurrent > 0 ? Math.round(currentRevenue / customersCurrent) : 0
+  const previousLtv = previousCustomers > 0 ? Math.round(previousRevenue / previousCustomers) : 0
+
+  const cac = customersCurrent > 0 ? Math.round((currentRevenue * 0.05) / customersCurrent) : 0
+  const previousCac = previousCustomers > 0 ? Math.round((previousRevenue * 0.05) / previousCustomers) : 0
+
+  const roiPercent = computeRoiPercent(currentRevenue)
+  const previousRoi = computeRoiPercent(previousRevenue)
+
+  return {
+    roiPercent,
+    roiChangePercent: computeChangePercent(roiPercent, previousRoi),
+    ltv,
+    ltvChangePercent: computeChangePercent(ltv, previousLtv),
+    cac,
+    cacChangePercent: computeChangePercent(cac, previousCac),
+    retentionRate,
+    retentionChangePercent: computeChangePercent(retentionRate, previousRetention)
+  }
+}
+
+/** Insights IA dérivés des métriques synchronisées (si l’API n’en renvoie pas). */
+export function buildSyncedInsights(params: {
+  summary?: VendorAnalyticsData['summary'] | null
+  apiInsights?: VendorAnalyticsInsight[]
+  growthRate?: number
+}): VendorAnalyticsInsight[] {
+  const existing = params.apiInsights ?? []
+  if (existing.length > 0) return existing
+
+  const out: VendorAnalyticsInsight[] = []
+  const growth = Number(params.growthRate ?? params.summary?.growthRate ?? 0)
+  const revenue = Number(params.summary?.totalRevenue ?? 0)
+  const sales = Number(params.summary?.totalSales ?? 0)
+  const shares = Number(params.summary?.totalShares ?? 0)
+  const conversion = Number(params.summary?.conversionRate ?? 0)
+
+  if (sales > 0) {
+    out.push({
+      id: 'sales-active',
+      type: 'positive',
+      title: 'Activité commerciale',
+      description: `${sales} vente(s) et ${revenue.toLocaleString('fr-FR')} F CFA de CA sur la période.`,
+      confidence: 85
+    })
+  }
+  if (growth > 5) {
+    out.push({
+      id: 'sales-up-sync',
+      type: 'positive',
+      title: 'Croissance des ventes',
+      description: `Progression de ${growth}% par rapport à la période précédente.`,
+      confidence: Math.min(95, 60 + Math.abs(growth))
+    })
+  }
+  if (growth < -5) {
+    out.push({
+      id: 'sales-down-sync',
+      type: 'negative',
+      title: 'Baisse des ventes',
+      description: `Recul de ${Math.abs(growth)}% — renforcez promotions et visibilité.`,
+      confidence: Math.min(95, 60 + Math.abs(growth))
+    })
+  }
+  if (shares > 0) {
+    out.push({
+      id: 'shares-active',
+      type: 'positive',
+      title: 'Engagement partages',
+      description: `${shares} partage(s) enregistré(s) sur la période.`,
+      confidence: 75
+    })
+  }
+  if (conversion > 0 && conversion < 3 && sales > 0) {
+    out.push({
+      id: 'conversion-low',
+      type: 'warning',
+      title: 'Conversion à optimiser',
+      description: `Taux de conversion à ${conversion.toFixed(2)}% — améliorez fiches produits et visibilité.`,
+      confidence: 70
+    })
+  }
+
+  return out
+}
+
+/** Recommandations d’optimisation basées sur ventes, avis, partages (données synchronisées). */
+export function buildSyncedOptimizations(params: {
+  summary?: VendorAnalyticsData['summary'] | null
+  topProducts?: VendorAnalyticsProductRow[]
+  apiOptimizations?: VendorAnalyticsOptimization[]
+}): VendorAnalyticsOptimization[] {
+  const merged = [...(params.apiOptimizations ?? [])]
+  const has = (id: string) => merged.some((o) => o.id === id)
+
+  const summary = params.summary
+  const totalSales = Number(summary?.totalSales ?? 0)
+  const totalRevenue = Number(summary?.totalRevenue ?? 0)
+  const totalShares = Number(summary?.totalShares ?? 0)
+  const averageRating = Number(summary?.averageRating ?? 0)
+  const conversion = Number(summary?.conversionRate ?? 0)
+  const top = params.topProducts?.[0]
+
+  if (top && top.sales > 0 && !has('top-product')) {
+    merged.push({
+      id: 'top-product',
+      title: `Capitaliser sur « ${top.name} »`,
+      description: `${top.sales} vente(s), ${top.revenue.toLocaleString('fr-FR')} F CFA — mettez ce produit en avant.`,
+      status: 'pending',
+      progress: 0
+    })
+  }
+  if (totalSales > 0 && totalShares < 5 && !has('boost-shares')) {
+    merged.push({
+      id: 'boost-shares',
+      title: 'Booster les partages',
+      description: 'Encouragez vos clients à partager vos produits (WhatsApp, réseaux sociaux).',
+      status: 'pending',
+      progress: 0
+    })
+  }
+  if (averageRating > 0 && averageRating < 4 && !has('reviews-quality')) {
+    merged.push({
+      id: 'reviews-quality',
+      title: 'Améliorer la satisfaction',
+      description: `Note moyenne ${averageRating.toFixed(1)}/5 — répondez aux avis et enrichissez vos fiches produits.`,
+      status: 'pending',
+      progress: 0
+    })
+  }
+  if (totalRevenue > 0 && conversion > 0 && conversion < 5 && !has('conversion-boost')) {
+    merged.push({
+      id: 'conversion-boost',
+      title: 'Augmenter la conversion',
+      description: `Taux actuel ${conversion.toFixed(2)}% — optimisez images, prix et descriptions.`,
+      status: 'pending',
+      progress: 0
+    })
+  }
+  if (totalSales >= 3 && !has('retention-campaign')) {
+    merged.push({
+      id: 'retention-campaign',
+      title: 'Fidéliser vos acheteurs',
+      description: 'Proposez une offre aux clients ayant déjà commandé sur la période.',
+      status: 'pending',
+      progress: 0
+    })
+  }
+
+  return merged
+}
+
+/** Fusionne métriques avancées API + commandes / cartes synchronisées. */
+export function buildSyncedAdvancedMetrics(params: {
+  period: VendorAnalyticsPeriod
+  apiAdvanced?: VendorAnalyticsData['advanced'] | null
+  orders?: OrderForPeriodMetrics[]
+  totalRevenue?: number
+  activeCustomers?: number
+}): VendorAnalyticsData['advanced'] {
+  const fromOrders = computeAdvancedMetricsFromOrders(
+    params.orders ?? [],
+    params.period,
+    params.totalRevenue,
+    params.activeCustomers
+  )
+  const api = params.apiAdvanced
+
+  const pickMain = (orderVal: number, apiVal: number) => {
+    if (orderVal > 0 && apiVal <= 0) return orderVal
+    if (apiVal > 0 && orderVal <= 0) return apiVal
+    return Math.max(orderVal, apiVal)
+  }
+
+  const roiPercent = pickMain(fromOrders.roiPercent, Number(api?.roiPercent ?? 0))
+  const ltv = pickMain(fromOrders.ltv, Number(api?.ltv ?? 0))
+  const cac = pickMain(fromOrders.cac, Number(api?.cac ?? 0))
+  const retentionRate = pickMain(fromOrders.retentionRate, Number(api?.retentionRate ?? 0))
+
+  const useOrderDeltas = fromOrders.ltv > 0 || fromOrders.roiPercent > 0
+
+  return {
+    roiPercent,
+    roiChangePercent: useOrderDeltas ? fromOrders.roiChangePercent : Number(api?.roiChangePercent ?? 0),
+    ltv,
+    ltvChangePercent: useOrderDeltas ? fromOrders.ltvChangePercent : Number(api?.ltvChangePercent ?? 0),
+    cac,
+    cacChangePercent: useOrderDeltas ? fromOrders.cacChangePercent : Number(api?.cacChangePercent ?? 0),
+    retentionRate,
+    retentionChangePercent: useOrderDeltas
+      ? fromOrders.retentionChangePercent
+      : Number(api?.retentionChangePercent ?? 0)
+  }
+}
+
+/** Clients uniques ayant commandé sur la période (même logique que Commandes & Ventes). */
+export function computeActiveCustomersFromOrders(
+  orders: OrderForPeriodMetrics[],
+  period: VendorAnalyticsPeriod
+): number {
+  const days = periodToDays(period)
+  const now = new Date()
+  const start = new Date(now)
+  start.setDate(start.getDate() - (days - 1))
+  start.setHours(0, 0, 0, 0)
+
+  const keys = new Set<string>()
+  for (const order of orders) {
+    const createdAt = String(order.orderDate ?? '')
+    if (!createdAt) continue
+    const dt = new Date(createdAt)
+    if (Number.isNaN(dt.getTime()) || dt < start) continue
+    const status = String(order.status ?? '').trim().toLowerCase()
+    if (status === 'cancelled' || status === 'canceled') continue
+
+    const email = String(order.customerEmail ?? '').trim().toLowerCase()
+    const id = String(order.customerId ?? '').trim()
+    const name = String(order.customerName ?? '').trim()
+    const key = email || id || (name ? `name:${name}` : '')
+    if (key) keys.add(key)
+  }
+  return keys.size
+}
+
+export function computeConversionRate(params: {
+  periodSales: number
+  totalProductViews: number
+  apiConversionRate?: number
+}): number {
+  const sales = Number(params.periodSales ?? 0) || 0
+  const views = Number(params.totalProductViews ?? 0) || 0
+  if (views > 0) {
+    return Number(((sales / views) * 100).toFixed(2))
+  }
+  if (sales > 0) {
+    return Number(params.apiConversionRate ?? 0) > 0 ? Number(params.apiConversionRate) : 100
+  }
+  return Number(params.apiConversionRate ?? 0) || 0
+}
+
+/**
+ * Valeurs des 4 cartes du haut — priorité : commandes réelles > CA dashboard > analytics API.
+ */
+export function buildSyncedTopCardSummary(params: {
+  period: VendorAnalyticsPeriod
+  analyticsSummary?: VendorAnalyticsData['summary'] | null
+  revenue?:
+    | {
+        totalRevenue?: number
+        totalRevenue30Days?: number
+        salesEvolution?: Array<{ date?: string; revenue?: number; ordersCount?: number; orders?: number }>
+      }
+    | null
+  stats?: {
+    ranking?: number
+    totalVendors?: number
+    averageRating?: number
+    totalReviews?: number
+  } | null
+  orders?: OrderForPeriodMetrics[]
+  reputation?: { overallRating?: number; totalReviews?: number } | null
+  rankingSnapshot?: { position?: number; totalVendors?: number } | null
+  totalProductViews?: number
+  trustApi?: boolean
+}): SyncedTopCardSummary {
+  const trustApi = params.trustApi !== false
+  const fromOrders = computePeriodMetricsFromOrders(params.orders ?? [], params.period)
+  const fromDashboard = revenueMetricsFromDashboard(params.revenue, params.period)
+  const api = params.analyticsSummary
+  const localRevenue = Math.max(fromOrders.totalRevenue, fromDashboard.totalRevenue)
+  const localSales = Math.max(fromOrders.totalSales, fromDashboard.totalSales)
+
+  const totalRevenue = pickPeriodMetric(localRevenue, Number(api?.totalRevenue ?? 0) || 0, trustApi)
+  const totalSales = pickPeriodMetric(localSales, Number(api?.totalSales ?? 0) || 0, trustApi)
+
+  const activeCustomersLocal = computeActiveCustomersFromOrders(params.orders ?? [], params.period)
+  const activeCustomers = pickPeriodMetric(
+    activeCustomersLocal,
+    Number(api?.totalCustomers ?? 0) || 0,
+    trustApi
+  )
+
+  const conversionRate = computeConversionRate({
+    periodSales: totalSales,
+    totalProductViews: Number(params.totalProductViews ?? 0) || 0,
+    apiConversionRate: Number(api?.conversionRate ?? 0) || 0
+  })
+
+  const marketPosition = Math.max(
+    Number(params.rankingSnapshot?.position ?? 0) || 0,
+    Number(params.stats?.ranking ?? 0) || 0,
+    Number(api?.marketPosition ?? 0) || 0
+  )
+
+  const totalVendors = Math.max(
+    Number(params.rankingSnapshot?.totalVendors ?? 0) || 0,
+    Number(params.stats?.totalVendors ?? 0) || 0,
+    Number(api?.totalVendors ?? 0) || 0
+  )
+
+  const averageRating = Math.max(
+    Number(params.reputation?.overallRating ?? 0) || 0,
+    Number(params.stats?.averageRating ?? 0) || 0,
+    Number(api?.averageRating ?? 0) || 0
+  )
+
+  const totalReviews = Math.max(
+    Number(params.reputation?.totalReviews ?? 0) || 0,
+    Number(params.stats?.totalReviews ?? 0) || 0,
+    Number(api?.totalReviews ?? 0) || 0
+  )
+
+  return {
+    totalRevenue,
+    totalSales,
+    growthRate: Number(api?.growthRate ?? 0) || 0,
+    revenueGrowthRate: Number(api?.revenueGrowthRate ?? 0) || 0,
+    marketPosition,
+    totalVendors,
+    averageRating,
+    totalReviews,
+    activeCustomers,
+    conversionRate
+  }
+}
+
+/** Métriques CA/ventes depuis `GET /api/vendor/dashboard` — même source que l’onglet Chiffre d’affaires. */
+export function revenueMetricsFromDashboard(
+  revenue:
+    | {
+        totalRevenue?: number
+        totalRevenue30Days?: number
+        salesEvolution?: Array<{ date?: string; revenue?: number; ordersCount?: number; orders?: number }>
+      }
+    | null
+    | undefined,
+  period: VendorAnalyticsPeriod
+): { totalRevenue: number; totalSales: number } {
+  if (!revenue) return { totalRevenue: 0, totalSales: 0 }
+
+  const days = periodToDays(period)
+  const evolution = Array.isArray(revenue.salesEvolution) ? revenue.salesEvolution : []
+
+  const now = new Date()
+  const start = new Date(now)
+  start.setDate(start.getDate() - (days - 1))
+  start.setHours(0, 0, 0, 0)
+
+  let totalRevenue = 0
+  let totalSales = 0
+
+  for (const row of evolution) {
+    const rawDate = String(row?.date ?? '')
+    if (!rawDate) continue
+    const dt = new Date(rawDate)
+    if (Number.isNaN(dt.getTime()) || dt < start) continue
+    totalRevenue += Number(row?.revenue ?? 0) || 0
+    totalSales += Number(row?.ordersCount ?? row?.orders ?? 0) || 0
+  }
+
+  if (period === '30d') {
+    const t30 = Number(revenue.totalRevenue30Days ?? 0)
+    if (t30 > 0) totalRevenue = t30
+  }
+
+  if (totalRevenue <= 0) {
+    totalRevenue = Number(revenue.totalRevenue30Days ?? revenue.totalRevenue ?? 0) || 0
+  }
+
+  return {
+    totalRevenue: Math.round(totalRevenue),
+    totalSales: Math.round(totalSales)
+  }
+}
+
+function periodStartDate(period: VendorAnalyticsPeriod): Date {
+  const days = periodToDays(period)
+  const now = new Date()
+  const start = new Date(now)
+  start.setDate(start.getDate() - (days - 1))
+  start.setHours(0, 0, 0, 0)
+  return start
+}
+
+function applyGrowthToSalesSeries(series: VendorAnalyticsSalesPoint[]): VendorAnalyticsSalesPoint[] {
+  for (let i = 1; i < series.length; i++) {
+    series[i].growth = computeChangePercent(series[i].sales, series[i - 1].sales)
+  }
+  return series
+}
+
+function sumSeriesSales(series: VendorAnalyticsSalesPoint[]): number {
+  return series.reduce((acc, row) => acc + (Number(row.sales) || 0), 0)
+}
+
+function sumTopProductsSales(rows: VendorAnalyticsProductRow[]): number {
+  return rows.reduce((acc, row) => acc + (Number(row.sales) || 0), 0)
+}
+
+/** Série journalière depuis `salesEvolution` du dashboard (GET /api/vendor/dashboard). */
+export function buildSalesSeriesFromEvolution(
+  evolution: Array<{ date?: string; revenue?: number; ordersCount?: number; orders?: number }>,
+  period: VendorAnalyticsPeriod
+): VendorAnalyticsSalesPoint[] {
+  const days = periodToDays(period)
+  const currentStart = periodStartDate(period)
+  const byDay = new Map<string, { sales: number; revenue: number }>()
+
+  for (const row of evolution) {
+    const rawDate = String(row?.date ?? '').slice(0, 10)
+    if (!rawDate) continue
+    const dt = new Date(rawDate)
+    if (Number.isNaN(dt.getTime()) || dt < currentStart) continue
+    const bucket = byDay.get(rawDate) ?? { sales: 0, revenue: 0 }
+    bucket.sales += Number(row?.ordersCount ?? row?.orders ?? 0) || 0
+    bucket.revenue += Number(row?.revenue ?? 0) || 0
+    byDay.set(rawDate, bucket)
+  }
+
+  const salesSeries: VendorAnalyticsSalesPoint[] = []
+  for (let i = 0; i < days; i++) {
+    const d = new Date(currentStart)
+    d.setDate(currentStart.getDate() + i)
+    const key = d.toISOString().slice(0, 10)
+    const bucket = byDay.get(key) ?? { sales: 0, revenue: 0 }
+    salesSeries.push({
+      period: formatSeriesLabel(d, period),
+      sales: bucket.sales,
+      revenue: Math.round(bucket.revenue),
+      growth: 0
+    })
+  }
+
+  return applyGrowthToSalesSeries(salesSeries)
+}
+
+/** Série journalière depuis les commandes vendeur (onglet Commandes & Ventes). */
+export function buildSalesSeriesFromOrders(
+  orders: OrderForPeriodMetrics[],
+  period: VendorAnalyticsPeriod
+): VendorAnalyticsSalesPoint[] {
+  const days = periodToDays(period)
+  const currentStart = periodStartDate(period)
+  const byDay = new Map<string, { sales: number; revenue: number }>()
+
+  for (const order of orders) {
+    const createdAt = String(order.orderDate ?? '')
+    if (!createdAt) continue
+    const dt = new Date(createdAt)
+    if (Number.isNaN(dt.getTime()) || dt < currentStart) continue
+    const status = String(order.status ?? '').trim().toLowerCase()
+    if (status === 'cancelled' || status === 'canceled') continue
+
+    const dayKey = createdAt.slice(0, 10)
+    const bucket = byDay.get(dayKey) ?? { sales: 0, revenue: 0 }
+    const items = Array.isArray(order.products) ? order.products : []
+    const qty = items.reduce((sum, line) => sum + (Number(line?.quantity ?? 0) || 0), 0)
+    bucket.sales += qty > 0 ? qty : 1
+    bucket.revenue += Number(order.totalAmount ?? 0) || 0
+    byDay.set(dayKey, bucket)
+  }
+
+  const salesSeries: VendorAnalyticsSalesPoint[] = []
+  for (let i = 0; i < days; i++) {
+    const d = new Date(currentStart)
+    d.setDate(currentStart.getDate() + i)
+    const key = d.toISOString().slice(0, 10)
+    const bucket = byDay.get(key) ?? { sales: 0, revenue: 0 }
+    salesSeries.push({
+      period: formatSeriesLabel(d, period),
+      sales: bucket.sales,
+      revenue: Math.round(bucket.revenue),
+      growth: 0
+    })
+  }
+
+  return applyGrowthToSalesSeries(salesSeries)
+}
+
+export function buildTopProductsFromRevenue(
+  rows: DashboardTopProductRow[] | undefined,
+  limit = 3
+): VendorAnalyticsProductRow[] {
+  return (rows ?? [])
+    .map((row) => {
+      const id = String(row?.id ?? row?.productId ?? '').trim()
+      if (!id) return null
+      return {
+        id,
+        name: String(row?.name ?? 'Produit'),
+        sales: Number(row?.sales ?? 0) || 0,
+        revenue: Math.round(Number(row?.revenue ?? 0) || 0),
+        rating: 0,
+        shares: Number(row?.shares ?? 0) || 0,
+        growth: 0,
+        image: String(row?.image ?? '')
+      }
+    })
+    .filter((row): row is VendorAnalyticsProductRow => row !== null)
+    .sort((a, b) => {
+      if (b.sales !== a.sales) return b.sales - a.sales
+      return b.revenue - a.revenue
+    })
+    .slice(0, limit)
+}
+
+export function buildTopProductsFromOrders(
+  orders: OrderForPeriodMetrics[],
+  catalog: Array<{ id?: string; name?: string }> | undefined,
+  period: VendorAnalyticsPeriod,
+  limit = 3
+): VendorAnalyticsProductRow[] {
+  const currentStart = periodStartDate(period)
+  const byProduct = new Map<string, { name: string; sales: number; revenue: number }>()
+  const catalogByName = new Map<string, string>()
+  for (const p of catalog ?? []) {
+    const name = String(p?.name ?? '').trim().toLowerCase()
+    const id = String(p?.id ?? '').trim()
+    if (name && id) catalogByName.set(name, id)
+  }
+
+  for (const order of orders) {
+    const createdAt = String(order.orderDate ?? '')
+    if (!createdAt) continue
+    const dt = new Date(createdAt)
+    if (Number.isNaN(dt.getTime()) || dt < currentStart) continue
+    const status = String(order.status ?? '').trim().toLowerCase()
+    if (status === 'cancelled' || status === 'canceled') continue
+
+    for (const line of order.products ?? []) {
+      const name = String(line?.name ?? 'Produit').trim()
+      const nameKey = name.toLowerCase()
+      const productId =
+        String(line?.id ?? '').trim() ||
+        catalogByName.get(nameKey) ||
+        (nameKey ? `name:${nameKey}` : '')
+      if (!productId) continue
+
+      const qty = Number(line?.quantity ?? 0) || 0
+      const unit = Number(line?.price ?? 0) || 0
+      const lineRevenue = unit * (qty > 0 ? qty : 1)
+
+      const current = byProduct.get(productId) ?? { name, sales: 0, revenue: 0 }
+      current.sales += qty > 0 ? qty : 1
+      current.revenue += lineRevenue
+      if (!current.name && name) current.name = name
+      byProduct.set(productId, current)
+    }
+  }
+
+  return Array.from(byProduct.entries())
+    .map(([id, stats]) => ({
+      id,
+      name: stats.name,
+      sales: stats.sales,
+      revenue: Math.round(stats.revenue),
+      rating: 0,
+      shares: 0,
+      growth: 0
+    }))
+    .sort((a, b) => {
+      if (b.sales !== a.sales) return b.sales - a.sales
+      return b.revenue - a.revenue
+    })
+    .slice(0, limit)
+}
+
+/** Regroupe les points pour l’affichage (évite le débordement des libellés). */
+export function downsampleSalesSeriesForDisplay(
+  series: VendorAnalyticsSalesPoint[],
+  maxBars = 14
+): VendorAnalyticsSalesPoint[] {
+  if (series.length <= maxBars) return series
+  const bucketSize = Math.ceil(series.length / maxBars)
+  const out: VendorAnalyticsSalesPoint[] = []
+
+  for (let i = 0; i < series.length; i += bucketSize) {
+    const chunk = series.slice(i, i + bucketSize)
+    const sales = chunk.reduce((sum, row) => sum + (Number(row.sales) || 0), 0)
+    const revenue = chunk.reduce((sum, row) => sum + (Number(row.revenue) || 0), 0)
+    const first = chunk[0]
+    const last = chunk[chunk.length - 1]
+    const period =
+      chunk.length === 1
+        ? first.period
+        : first.period === last.period
+          ? first.period
+          : `${first.period} – ${last.period}`
+
+    out.push({
+      period,
+      sales,
+      revenue: Math.round(revenue),
+      growth: 0
+    })
+  }
+
+  return applyGrowthToSalesSeries(out)
+}
+
+/** CA / ventes : commandes ou dashboard d’abord ; API seulement si données déjà chargées pour cette période. */
+function pickPeriodMetric(local: number, api: number, trustApi: boolean): number {
+  const localN = Number(local) || 0
+  const apiN = Number(api) || 0
+  if (localN > 0) return localN
+  if (!trustApi) return 0
+  return apiN
+}
+
+/**
+ * Graphiques : priorité dashboard (`salesEvolution`, `topProducts`) > commandes > API analytics.
+ */
+export function mergeAnalyticsCharts(
+  analytics: VendorAnalyticsData,
+  params: {
+    period: VendorAnalyticsPeriod
+    /** false pendant un changement de période avant réponse API (évite d’afficher l’ancienne période). */
+    trustApi?: boolean
+    revenue?:
+      | {
+          salesEvolution?: Array<{ date?: string; revenue?: number; ordersCount?: number; orders?: number }>
+          topProducts?: DashboardTopProductRow[]
+        }
+      | null
+    orders?: OrderForPeriodMetrics[]
+    products?: Array<{ id?: string; name?: string }>
+  }
+): VendorAnalyticsData {
+  const evolution = Array.isArray(params.revenue?.salesEvolution) ? params.revenue!.salesEvolution! : []
+  const fromEvolution = evolution.length > 0 ? buildSalesSeriesFromEvolution(evolution, params.period) : []
+  const fromOrders = buildSalesSeriesFromOrders(params.orders ?? [], params.period)
+
+  const trustApi = params.trustApi !== false
+  const evolutionSum = sumSeriesSales(fromEvolution)
+  const ordersSum = sumSeriesSales(fromOrders)
+  const apiSum = trustApi ? sumSeriesSales(analytics.salesSeries) : 0
+
+  let salesSeries = trustApi ? analytics.salesSeries : []
+  if (!trustApi) {
+    if (ordersSum > 0) salesSeries = fromOrders
+    else if (evolutionSum > 0) salesSeries = fromEvolution
+  } else if (ordersSum >= evolutionSum && ordersSum >= apiSum && ordersSum > 0) {
+    salesSeries = fromOrders
+  } else if (evolutionSum >= apiSum && evolutionSum > 0) {
+    salesSeries = fromEvolution
+  } else if (apiSum > 0) {
+    salesSeries = analytics.salesSeries
+  } else if (ordersSum > 0) {
+    salesSeries = fromOrders
+  } else if (evolutionSum > 0) {
+    salesSeries = fromEvolution
+  }
+
+  const dashTop = buildTopProductsFromRevenue(params.revenue?.topProducts, 3)
+  const ordersTop = buildTopProductsFromOrders(params.orders ?? [], params.products, params.period, 3)
+  const dashTopSum = sumTopProductsSales(dashTop)
+  const ordersTopSum = sumTopProductsSales(ordersTop)
+  const apiTopSum = trustApi ? sumTopProductsSales(analytics.topProducts.slice(0, 3)) : 0
+
+  let topProducts = trustApi ? analytics.topProducts : []
+  if (!trustApi) {
+    if (dashTopSum > 0) topProducts = dashTop
+    else if (ordersTopSum > 0) topProducts = ordersTop
+  } else if (dashTopSum >= ordersTopSum && dashTopSum >= apiTopSum && dashTopSum > 0) {
+    topProducts = dashTop
+  } else if (ordersTopSum >= apiTopSum && ordersTopSum > 0) {
+    topProducts = ordersTop
+  } else if (apiTopSum > 0) {
+    topProducts = analytics.topProducts.slice(0, 3)
+  } else if (dashTopSum > 0) {
+    topProducts = dashTop
+  } else if (ordersTopSum > 0) {
+    topProducts = ordersTop
+  }
+
+  return {
+    ...analytics,
+    salesSeries,
+    topProducts
+  }
+}
+
+export function mergeAnalyticsWithDashboardRevenue(
+  analytics: VendorAnalyticsData,
+  revenue:
+    | {
+        totalRevenue?: number
+        totalRevenue30Days?: number
+        salesEvolution?: Array<{ date?: string; revenue?: number; ordersCount?: number; orders?: number }>
+        topProducts?: DashboardTopProductRow[]
+      }
+    | null
+    | undefined,
+  period: VendorAnalyticsPeriod,
+  extras?: {
+    orders?: OrderForPeriodMetrics[]
+    products?: Array<{ id?: string; name?: string }>
+    trustApi?: boolean
+  }
+): VendorAnalyticsData {
+  const trustApi = extras?.trustApi !== false
+  const fromDashboard = revenueMetricsFromDashboard(revenue, period)
+  const fromOrders = computePeriodMetricsFromOrders(extras?.orders ?? [], period)
+  const apiRevenue = Number(analytics.summary?.totalRevenue ?? 0)
+  const apiSales = Number(analytics.summary?.totalSales ?? 0)
+  const localRevenue = Math.max(fromDashboard.totalRevenue, fromOrders.totalRevenue)
+  const localSales = Math.max(fromDashboard.totalSales, fromOrders.totalSales)
+
+  const totalRevenue = pickPeriodMetric(localRevenue, apiRevenue, trustApi)
+  const totalSales = pickPeriodMetric(localSales, apiSales, trustApi)
+
+  const withCharts = mergeAnalyticsCharts(analytics, {
+    period,
+    trustApi,
+    revenue,
+    orders: extras?.orders,
+    products: extras?.products
+  })
+
+  return {
+    ...withCharts,
+    summary: {
+      ...withCharts.summary,
+      totalRevenue,
+      totalSales
+    }
+  }
+}
+
 function fillSalesByDayFromNonCancelledOrders(
   rows: any[],
   startIso: string,
@@ -316,18 +1180,28 @@ export async function buildVendorAnalytics(
   const productIds = productRows.map((p: any) => String(p?.id ?? '')).filter(Boolean)
   const productById = new Map(productRows.map((p: any) => [String(p.id), p]))
 
+  /**
+   * Comme le dashboard : charger les commandes vendeur sans filtre SQL sur la date,
+   * puis découper en mémoire (évite les commandes manquantes si jointure / dates incohérentes).
+   */
   const { data: orderRows } = await supabase
     .from('orders')
     .select(
       'id, user_id, customer_id, vendor_id, created_at, status, delivery_status, payment_status, total_amount, final_total'
     )
     .in('vendor_id', vendorIds as any)
-    .gte('created_at', previousStartIso)
     .order('created_at', { ascending: false })
     .limit(20000)
 
   const orderRowsRaw = Array.isArray(orderRows) ? orderRows : []
-  const orders = orderRowsRaw.filter(isEligibleForRevenue)
+  const orderRowsInWindow = orderRowsRaw.filter((row: any) => {
+    const createdAt = String(row?.created_at ?? '')
+    return createdAt && createdAt >= previousStartIso
+  })
+  const orders = orderRowsInWindow.filter(isEligibleForRevenue)
+  const paidOrderIdSet = new Set<string>(
+    orders.map((o: any) => String(o?.id ?? '')).filter(Boolean)
+  )
 
   const currentOrderIds = new Set<string>()
   const previousOrderIds = new Set<string>()
@@ -377,14 +1251,17 @@ export async function buildVendorAnalytics(
 
   /** Si la jointure échoue ou est vide, repli sur order_id (même logique que le dashboard). */
   const orderIdsForItems = Array.from(new Set([...currentOrderIds, ...previousOrderIds]))
+  const paidOrderIds = Array.from(paidOrderIdSet).slice(0, 5000)
+
   if (orderItems.length === 0 || itemsJoinErr) {
-    if (orderIdsForItems.length > 0) {
+    const idsForFallback = paidOrderIds.length > 0 ? paidOrderIds : orderIdsForItems
+    if (idsForFallback.length > 0) {
       const { data: itemRows } = await supabase
         .from('order_items')
         .select(
           'product_id, quantity, unit_price, total_price, order_id, orders!inner(id, created_at, status, delivery_status, payment_status, vendor_id)'
         )
-        .in('order_id', orderIdsForItems as any)
+        .in('order_id', idsForFallback as any)
         .limit(20000)
 
       orderItems = (itemRows ?? []).filter((row: any) => {
@@ -395,12 +1272,12 @@ export async function buildVendorAnalytics(
     }
   }
 
-  if (orderIdsForItems.length > 0 && orderItems.length === 0) {
+  if (paidOrderIds.length > 0 && orderItems.length === 0) {
     const orderById = new Map<string, any>(orders.map((o: any) => [String(o?.id ?? ''), o]))
     const { data: fallbackItems } = await supabase
       .from('order_items')
       .select('product_id, quantity, unit_price, total_price, order_id')
-      .in('order_id', orderIdsForItems as any)
+      .in('order_id', paidOrderIds as any)
       .limit(20000)
 
     orderItems = (fallbackItems ?? [])
@@ -415,14 +1292,14 @@ export async function buildVendorAnalytics(
       })
   }
 
-  if (orderIdsForItems.length > 0 && orderItems.length === 0) {
+  if (paidOrderIds.length > 0 && orderItems.length === 0) {
     const { data: ordersWithItems } = await supabase
       .from('orders')
       .select(
         'id, created_at, status, delivery_status, payment_status, order_items (product_id, quantity, unit_price, total_price)'
       )
       .in('vendor_id', vendorIds as any)
-      .in('id', orderIdsForItems.slice(0, 4000) as any)
+      .in('id', paidOrderIds.slice(0, 4000) as any)
 
     const flat: any[] = []
     for (const o of ordersWithItems ?? []) {
@@ -530,11 +1407,11 @@ export async function buildVendorAnalytics(
    * non annulées sur la période si le CA issu des lignes / commandes « éligibles » reste à 0.
    */
   if (currentRevenue <= 0) {
-    const headerSum = nonCancelledHeaderRevenueInclusiveEnd(orderRowsRaw, currentStartIso, nowIso)
+    const headerSum = nonCancelledHeaderRevenueInclusiveEnd(orderRowsInWindow, currentStartIso, nowIso)
     if (headerSum > 0) {
       currentRevenue = headerSum
       if (currentSales <= 0) {
-        currentSales = countNonCancelledOrdersInclusiveEnd(orderRowsRaw, currentStartIso, nowIso)
+        currentSales = countNonCancelledOrdersInclusiveEnd(orderRowsInWindow, currentStartIso, nowIso)
       }
       for (let i = 0; i < days; i++) {
         const d = new Date(currentStart)
@@ -542,7 +1419,7 @@ export async function buildVendorAnalytics(
         const key = d.toISOString().slice(0, 10)
         salesByDay.set(key, { sales: 0, revenue: 0 })
       }
-      fillSalesByDayFromNonCancelledOrders(orderRowsRaw, currentStartIso, nowIso, salesByDay)
+      fillSalesByDayFromNonCancelledOrders(orderRowsInWindow, currentStartIso, nowIso, salesByDay)
     }
   }
   if (previousRevenue <= 0 && previousOrders.length > 0) {
@@ -550,11 +1427,11 @@ export async function buildVendorAnalytics(
     if (previousSales <= 0) previousSales = previousOrders.length
   }
   if (previousRevenue <= 0) {
-    const prevHeader = nonCancelledHeaderRevenueHalfOpen(orderRowsRaw, previousStartIso, currentStartIso)
+    const prevHeader = nonCancelledHeaderRevenueHalfOpen(orderRowsInWindow, previousStartIso, currentStartIso)
     if (prevHeader > 0) {
       previousRevenue = prevHeader
       if (previousSales <= 0) {
-        previousSales = countNonCancelledOrdersHalfOpen(orderRowsRaw, previousStartIso, currentStartIso)
+        previousSales = countNonCancelledOrdersHalfOpen(orderRowsInWindow, previousStartIso, currentStartIso)
       }
     }
   }
@@ -562,6 +1439,15 @@ export async function buildVendorAnalytics(
   const customerIdsCurrent = new Set<string>()
   const customerIdsPrevious = new Set<string>()
   const customerSpend = new Map<string, { total: number; orders: number; lastAt: string }>()
+
+  /** Clients actifs : toutes commandes non annulées de la période (pas seulement « éligibles » au CA). */
+  for (const o of orderRowsInWindow) {
+    const createdAt = String(o?.created_at ?? '')
+    if (!createdAt || createdAt < currentStartIso) continue
+    if (isOrderCancelled(o)) continue
+    const cid = String(o?.user_id ?? o?.customer_id ?? '').trim()
+    if (cid) customerIdsCurrent.add(cid)
+  }
 
   currentOrderById.forEach((order: any) => {
     const cid = String(order?.user_id ?? order?.customer_id ?? '').trim()
@@ -721,6 +1607,22 @@ export async function buildVendorAnalytics(
     .select('id', { count: 'exact', head: true })
 
   totalVendors = Number(vendorCount ?? 0)
+
+  if (totalVendors <= 0) {
+    const { count: usersVendorCount } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'vendor')
+    totalVendors = Number(usersVendorCount ?? 0)
+  }
+
+  if (totalVendors <= 0) {
+    const { data: rankingPeers } = await supabase.from('rankings').select('user_id').limit(5000)
+    const peerIds = new Set(
+      (rankingPeers ?? []).map((r: any) => String(r?.user_id ?? '').trim()).filter(Boolean)
+    )
+    totalVendors = peerIds.size
+  }
 
   const growthRate = computeChangePercent(currentSales, previousSales)
   const revenueGrowthRate = computeChangePercent(currentRevenue, previousRevenue)
@@ -962,16 +1864,370 @@ export async function buildVendorAnalytics(
   }
 }
 
-/**
- * Exporte les analytics vendeur au format JSON téléchargeable.
- */
-export function buildVendorAnalyticsExportBlob(data: VendorAnalyticsData, type: string): Blob {
-  const payload =
-    type === 'summary'
-      ? { summary: data.summary, period: data.period, generatedAt: data.generatedAt }
-      : type === 'insights'
-        ? { insights: data.insights, optimizations: data.optimizations }
-        : data
+export type VendorAnalyticsExportFormat = 'json' | 'csv'
 
+/** Libellé UI → clé d’export (données synchronisées `analyticsForUi`). */
+export function resolveVendorReportExportType(reportLabel: string): string {
+  const map: Record<string, string> = {
+    Performance: 'performance',
+    Clients: 'clients',
+    Revenus: 'revenue',
+    Comparatif: 'comparative',
+    Prédictif: 'predictive',
+    Personnalisé: 'all',
+    'Insights IA': 'insights',
+    Synthèse: 'summary',
+    'Données Détaillées': 'detailed'
+  }
+  return map[reportLabel] ?? 'detailed'
+}
+
+function escapeCsvCell(value: unknown): string {
+  const s = String(value ?? '')
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes(';')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function salesSeriesToCsv(data: VendorAnalyticsData): string {
+  const lines = ['period;ventes;ca_fcfa;croissance_pct']
+  for (const row of data.salesSeries) {
+    lines.push(
+      [row.period, row.sales, row.revenue, row.growth].map(escapeCsvCell).join(';')
+    )
+  }
+  return lines.join('\n')
+}
+
+function topProductsToCsv(data: VendorAnalyticsData): string {
+  const lines = ['produit_id;nom;ventes;ca_fcfa;partages;note']
+  for (const p of data.topProducts) {
+    lines.push(
+      [p.id, p.name, p.sales, p.revenue, p.shares, p.rating].map(escapeCsvCell).join(';')
+    )
+  }
+  return lines.join('\n')
+}
+
+function customersToCsv(data: VendorAnalyticsData): string {
+  const lines = ['client_id;nom;commandes;total_fcfa;derniere_commande;client_fidele']
+  for (const c of data.customersSample) {
+    lines.push(
+      [c.id, c.name, c.ordersCount, c.totalSpent, c.lastOrderAt ?? '', c.isRepeat ? 'oui' : 'non']
+        .map(escapeCsvCell)
+        .join(';')
+    )
+  }
+  return lines.join('\n')
+}
+
+/**
+ * Contenu d’export aligné sur les données synchronisées affichées à l’écran.
+ */
+export function buildVendorAnalyticsExportPayload(
+  data: VendorAnalyticsData,
+  type: string
+): unknown {
+  const base = { period: data.period, generatedAt: data.generatedAt }
+
+  if (type === 'summary') {
+    return { ...base, summary: data.summary, overview: data.overview }
+  }
+  if (type === 'ventes') {
+    return {
+      ...base,
+      summary: data.summary,
+      overview: data.overview,
+      salesSeries: data.salesSeries
+    }
+  }
+  if (type === 'performance') {
+    return {
+      ...base,
+      summary: data.summary,
+      topProducts: data.topProducts,
+      advanced: data.advanced,
+      revenueByCategory: data.revenueByCategory
+    }
+  }
+  if (type === 'clients') {
+    return {
+      ...base,
+      summary: data.summary,
+      overview: data.overview,
+      customersSample: data.customersSample,
+      advanced: {
+        ltv: data.advanced.ltv,
+        cac: data.advanced.cac,
+        retentionRate: data.advanced.retentionRate
+      }
+    }
+  }
+  if (type === 'revenue' || type === 'revenus') {
+    return {
+      ...base,
+      summary: data.summary,
+      overview: data.overview,
+      salesSeries: data.salesSeries,
+      revenueByCategory: data.revenueByCategory,
+      advanced: data.advanced
+    }
+  }
+  if (type === 'comparative' || type === 'comparatif') {
+    return {
+      ...base,
+      summary: data.summary,
+      overview: data.overview,
+      salesSeries: data.salesSeries
+    }
+  }
+  if (type === 'predictive' || type === 'predictif') {
+    return {
+      ...base,
+      summary: data.summary,
+      insights: data.insights,
+      optimizations: data.optimizations,
+      salesSeries: data.salesSeries,
+      advanced: data.advanced
+    }
+  }
+  if (type === 'detailed') {
+    return {
+      ...base,
+      summary: data.summary,
+      overview: data.overview,
+      advanced: data.advanced,
+      salesSeries: data.salesSeries,
+      topProducts: data.topProducts,
+      sharePlatforms: data.sharePlatforms,
+      revenueByCategory: data.revenueByCategory,
+      customersSample: data.customersSample
+    }
+  }
+  if (type === 'insights') {
+    return { ...base, insights: data.insights, optimizations: data.optimizations }
+  }
+  return data
+}
+
+/**
+ * Exporte les analytics vendeur (JSON ou CSV) — données déjà fusionnées dashboard + commandes.
+ */
+export function buildVendorAnalyticsExportBlob(
+  data: VendorAnalyticsData,
+  type: string,
+  format: VendorAnalyticsExportFormat = 'json'
+): Blob {
+  if (format === 'csv') {
+    const sections: string[] = []
+    const wantsSales =
+      type === 'ventes' ||
+      type === 'summary' ||
+      type === 'revenue' ||
+      type === 'revenus' ||
+      type === 'comparative' ||
+      type === 'comparatif' ||
+      type === 'predictive' ||
+      type === 'predictif' ||
+      type === 'detailed' ||
+      type === 'all'
+    const wantsProducts =
+      type === 'performance' || type === 'detailed' || type === 'all'
+    const wantsClients = type === 'clients' || type === 'detailed' || type === 'all'
+
+    if (wantsSales) {
+      sections.push('=== Evolution des ventes ===', salesSeriesToCsv(data))
+    }
+    if (wantsProducts) {
+      sections.push('=== Performance produits ===', topProductsToCsv(data))
+    }
+    if (wantsClients) {
+      sections.push('=== Clients ===', customersToCsv(data))
+    }
+    const csv = sections.length > 0 ? sections.join('\n') : 'Aucune donnée à exporter'
+    return new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
+  }
+
+  const payload = buildVendorAnalyticsExportPayload(data, type)
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+}
+
+/**
+ * Rapport PDF (jsPDF) — mêmes données synchronisées que l’écran Statistiques & Analyses.
+ */
+export async function buildVendorAnalyticsExportPdf(
+  data: VendorAnalyticsData,
+  type: string = 'all'
+): Promise<Blob> {
+  const [{ jsPDF }, autoTableModule] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable')
+  ])
+  const autoTable = (autoTableModule as any).default ?? autoTableModule
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+
+  const generatedLabel = data.generatedAt
+    ? new Date(data.generatedAt).toLocaleString('fr-FR')
+    : new Date().toLocaleString('fr-FR')
+
+  const titleByType: Record<string, string> = {
+    all: 'Rapport complet',
+    summary: 'Rapport synthèse',
+    detailed: 'Données détaillées',
+    insights: 'Insights IA',
+    ventes: 'Rapport ventes',
+    performance: 'Rapport performance',
+    clients: 'Rapport clients',
+    revenue: 'Rapport revenus',
+    revenus: 'Rapport revenus',
+    comparative: 'Rapport comparatif',
+    comparatif: 'Rapport comparatif',
+    predictive: 'Rapport prédictif',
+    predictif: 'Rapport prédictif'
+  }
+  const reportTitle = titleByType[type] ?? 'Rapport analytics'
+
+  doc.setFontSize(16)
+  doc.text(`${reportTitle} — Statistiques & Analyses`, 40, 40)
+  doc.setFontSize(10)
+  doc.text(`Période: ${data.period} | Généré le: ${generatedLabel}`, 40, 56)
+
+  const s = data.summary
+  const adv = data.advanced
+  const showSummary =
+    type !== 'insights' || data.insights.length === 0
+
+  let cursorY = 68
+  if (showSummary) {
+    autoTable(doc, {
+      startY: cursorY,
+      head: [['Indicateur', 'Valeur']],
+      body: [
+        ['Ventes (période)', String(s.totalSales)],
+        ['Chiffre d affaires (F CFA)', String(s.totalRevenue)],
+        ['Clients actifs', String(s.totalCustomers)],
+        ['Note moyenne', `${s.averageRating}/5`],
+        ['Avis approuvés', String(s.totalReviews)],
+        ['Partages', String(s.totalShares)],
+        ['Taux de conversion', `${s.conversionRate}%`],
+        ['Position marché', String(s.marketPosition)],
+        ['Vendeurs (classement)', String(s.totalVendors)],
+        ['ROI', `${adv.roiPercent}%`],
+        ['LTV client (F CFA)', String(adv.ltv)],
+        ['CAC (F CFA)', String(adv.cac)],
+        ['Rétention', `${adv.retentionRate}%`]
+      ],
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: [255, 102, 0] }
+    })
+    cursorY = ((doc as any).lastAutoTable?.finalY as number) ?? cursorY
+  }
+
+  const includeSales =
+    type === 'all' ||
+    type === 'detailed' ||
+    type === 'ventes' ||
+    type === 'comparative' ||
+    type === 'comparatif' ||
+    type === 'revenue' ||
+    type === 'revenus'
+  if (includeSales && data.salesSeries.length > 0) {
+    doc.setFontSize(12)
+    doc.text('Évolution des ventes', 40, cursorY + 18)
+    autoTable(doc, {
+      startY: cursorY + 24,
+      head: [['Période', 'Ventes', 'CA (F CFA)', 'Croissance %']],
+      body: data.salesSeries.map((row) => [
+        row.period,
+        String(row.sales),
+        String(row.revenue),
+        String(row.growth)
+      ]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [59, 130, 246] }
+    })
+    cursorY = (doc as any).lastAutoTable?.finalY ?? cursorY
+  }
+
+  const includeProducts = type === 'all' || type === 'detailed' || type === 'performance'
+  if (includeProducts && data.topProducts.length > 0) {
+    doc.setFontSize(12)
+    doc.text('Performance produits', 40, cursorY + 18)
+    autoTable(doc, {
+      startY: cursorY + 24,
+      head: [['Produit', 'Ventes', 'CA (F CFA)']],
+      body: data.topProducts.slice(0, 15).map((p) => [p.name, String(p.sales), String(p.revenue)]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [16, 185, 129] }
+    })
+    cursorY = (doc as any).lastAutoTable?.finalY ?? cursorY
+  }
+
+  const includeClients = type === 'all' || type === 'detailed' || type === 'clients'
+  if (includeClients && data.customersSample.length > 0) {
+    doc.setFontSize(12)
+    doc.text('Clients', 40, cursorY + 18)
+    autoTable(doc, {
+      startY: cursorY + 24,
+      head: [['Client', 'Commandes', 'Total (F CFA)', 'Fidèle']],
+      body: data.customersSample.map((c) => [
+        c.name,
+        String(c.ordersCount),
+        String(c.totalSpent),
+        c.isRepeat ? 'Oui' : 'Non'
+      ]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [59, 130, 246] }
+    })
+    cursorY = (doc as any).lastAutoTable?.finalY ?? cursorY
+  }
+
+  const includeInsights =
+    type === 'all' || type === 'insights' || type === 'predictive' || type === 'predictif'
+  if (includeInsights && data.insights.length > 0) {
+    doc.setFontSize(12)
+    doc.text('Insights IA', 40, cursorY + 18)
+    autoTable(doc, {
+      startY: cursorY + 24,
+      head: [['Titre', 'Description', 'Confiance %']],
+      body: data.insights.map((i) => [i.title, i.description, String(i.confidence)]),
+      styles: { fontSize: 7, cellPadding: 3 },
+      headStyles: { fillColor: [139, 92, 246] }
+    })
+    cursorY = (doc as any).lastAutoTable?.finalY ?? cursorY
+  }
+
+  const includeOptimizations = type === 'all' || type === 'predictive' || type === 'predictif'
+  if (includeOptimizations && data.optimizations.length > 0) {
+    doc.setFontSize(12)
+    doc.text('Optimisations recommandées', 40, cursorY + 18)
+    autoTable(doc, {
+      startY: cursorY + 24,
+      head: [['Action', 'Description', 'Statut']],
+      body: data.optimizations.map((o) => [o.title, o.description, o.status]),
+      styles: { fontSize: 7, cellPadding: 3 },
+      headStyles: { fillColor: [245, 158, 11] }
+    })
+  }
+
+  const arrayBuffer = doc.output('arraybuffer')
+  return new Blob([arrayBuffer], { type: 'application/pdf' })
+}
+
+export type VendorAnalyticsExportFileFormat = 'json' | 'csv' | 'pdf'
+
+export async function buildVendorAnalyticsExportFile(
+  data: VendorAnalyticsData,
+  type: string,
+  format: VendorAnalyticsExportFileFormat
+): Promise<{ blob: Blob; extension: string }> {
+  if (format === 'pdf') {
+    return { blob: await buildVendorAnalyticsExportPdf(data, type), extension: 'pdf' }
+  }
+  const normalized = format === 'csv' ? 'csv' : 'json'
+  return {
+    blob: buildVendorAnalyticsExportBlob(data, type, normalized),
+    extension: normalized
+  }
 }

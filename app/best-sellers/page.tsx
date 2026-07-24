@@ -190,7 +190,11 @@ export default async function BestSellersPage() {
     const vendorId = rawVendorId ? (vendorUserIdByProfileId.get(rawVendorId) ?? rawVendorId) : ''
     const sellerName = vendorId ? String(vendorProfileByVendorId.get(vendorId)?.name ?? '').trim() : ''
 
-    const totalSales = Number((row as any)?.product_statistics?.total_sales ?? 0) || 0
+    const stats = (row as any)?.product_statistics
+    const totalSales = Number(stats?.total_sales ?? 0) || 0
+    const productRating = Number(stats?.average_rating ?? 0) || 0
+    const productReviewCount = Number(stats?.review_count ?? 0) || 0
+
     const discount =
       regularPrice > 0 && salePrice !== null && salePrice > 0 && salePrice < regularPrice
         ? Math.round(((regularPrice - salePrice) / regularPrice) * 100)

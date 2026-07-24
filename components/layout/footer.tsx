@@ -123,7 +123,7 @@ Probooster Dashboard
   // Afficher un état de chargement si le client n'est pas encore prêt
   if (!isClient) {
     return (
-      <footer className="bg-[#535455] text-white">
+      <footer className="fixed-footer-bottom bg-[#535455] text-white">
         <div className="container mx-auto px-4 py-12">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Skeletons de chargement */}
@@ -144,12 +144,12 @@ Probooster Dashboard
   }
 
   return (
-    <footer className="bg-[#535455] text-white">
-      <div className="container mx-auto px-4 py-12">
+    <footer className="fixed-footer-bottom bg-[#535455] text-white">
+      <div className="container mx-auto px-4 py-12 relative z-20">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
-            <div className="flex items-center group">
+            <div className="flex items-center group relative z-30">
               <div className="w-20 h-20 group-hover:scale-110 transition-transform duration-300 animate-pulse animate-float">
                 {canUseNextImageForLogo ? (
                   <Image 

@@ -103,6 +103,7 @@ export interface DashboardData {
 type UserOrderWithItems = {
   id: string
   user_id: string
+  vendor_id?: string | null
   order_number: string
   status: string
   total_amount: number
@@ -123,65 +124,6 @@ type UserOrderWithItems = {
   order_items: OrderItem[]
   return_info?: UserOrderReturnInfo
   dispute_info?: UserOrderDisputeInfo
-}
-
-type ClientOrderRecord = {
-  id: string
-  customer_id: string
-  order_number: string | null
-  status: string | null
-  total_amount: number | null
-  currency?: string | null
-  final_total?: number | null
-  points_used?: number | null
-  points_discount?: number | null
-  payment_option?: string | null
-  delivery_option?: string | null
-  shipping_address?: any | null
-  billing_address?: any | null
-  payment_method?: string | null
-  payment_status?: string | null
-  notes?: string | null
-  vendor_id?: string | null
-  metadata?: Record<string, any> | null
-  created_at?: string | null
-  updated_at?: string | null
-  order_items?: ClientOrderItemRecord[]
-  order_returns?: ClientOrderReturnRecord[]
-  order_disputes?: ClientOrderDisputeRecord[]
-}
-
-type ClientOrderItemRecord = {
-  id: string
-  order_id: string
-  product_id: string | null
-  quantity: number
-  product_name: string | null
-  unit_price: number
-  total_price: number
-  metadata: any
-}
-
-type ClientOrderReturnRecord = {
-  id: string
-  order_id: string
-  status: string | null
-  reason: string | null
-  processed_at: string | null
-  created_at: string | null
-}
-
-type ClientOrderDisputeRecord = {
-  id: string
-  order_id: string
-  status: string | null
-  priority: string | null
-  assigned_to: string | null
-  subject: string | null
-  description: string | null
-  opened_at: string | null
-  updated_at: string | null
-  resolved_at: string | null
 }
 
 type UserOrderReturnInfo = {
@@ -426,32 +368,39 @@ export class DashboardService {
     return { preferences: data?.preferences ?? null }
   }
 
-  // Récupérer les commandes de l'utilisateur
+  // Récupérer les commandes de l'utilisateur via Supabase directement
   static async getUserOrders(userId: string): Promise<UserOrderWithItems[]> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/client/orders`, {
-        method: 'GET',
-        headers: await ClientAuthService.buildAuthHeaders(),
-        credentials: 'include',
-        cache: 'no-store'
-      })
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*),
+          order_returns (*),
+          order_disputes (*)
+        `)
+        .eq('customer_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(200)
 
-      if (!response.ok) {
-        console.error('❌ Erreur HTTP lors de la récupération des commandes utilisateur:', response.statusText)
-// ...
+      if (error) {
+        console.error('❌ Erreur lors de la récupération des commandes via Supabase:', error)
         return []
       }
 
-      const body = (await response.json()) as ClientOrderApiResponse
-      const orders = body.data ?? []
-
-      return orders.map(order => ({
+      return (orders || []).map(order => ({
         id: order.id,
         user_id: order.customer_id ?? userId,
+        vendor_id: order.vendor_id,
         order_number: order.order_number ?? `ORDER-${order.id.slice(0, 8)}`,
         status: order.status ?? 'pending',
         total_amount: order.total_amount ?? 0,
         currency: order.currency ?? 'XOF',
+        final_total: order.final_total,
+        points_used: order.points_used,
+        points_discount: order.points_discount,
+        payment_option: order.payment_option,
+        delivery_option: order.delivery_option,
         shipping_address: order.shipping_address ?? null,
         billing_address: order.billing_address ?? null,
         payment_method: order.payment_method ?? 'unknown',
@@ -460,9 +409,31 @@ export class DashboardService {
         created_at: order.created_at ?? new Date().toISOString(),
         updated_at: order.updated_at ?? order.created_at ?? new Date().toISOString(),
         metadata: order.metadata ?? null,
-        order_items: this.mapClientOrderItems(order.order_items ?? []),
-        return_info: this.mapClientOrderReturn(order.order_returns ?? []),
-        dispute_info: this.mapClientOrderDispute(order.order_disputes ?? [])
+        order_items: (order.order_items || []).map((item: any) => ({
+          id: item.id,
+          order_id: item.order_id,
+          product_id: item.product_id,
+          quantity: item.quantity ?? 0,
+          product_name: item.product_name ?? 'Produit',
+          unit_price: item.unit_price ?? 0,
+          total_price: item.total_price ?? (item.quantity ?? 0) * (item.unit_price ?? 0),
+          metadata: item.metadata ?? null
+        })),
+        return_info: order.order_returns && order.order_returns.length > 0 ? {
+          status: order.order_returns[0].status,
+          reason: order.order_returns[0].reason,
+          processedAt: order.order_returns[0].processed_at,
+          createdAt: order.order_returns[0].created_at
+        } : undefined,
+        dispute_info: order.order_disputes && order.order_disputes.length > 0 ? {
+          status: order.order_disputes[0].status,
+          priority: order.order_disputes[0].priority,
+          assignedTo: order.order_disputes[0].assigned_to,
+          subject: order.order_disputes[0].subject,
+          description: order.order_disputes[0].description,
+          openedAt: order.order_disputes[0].opened_at,
+          updatedAt: order.order_disputes[0].updated_at
+        } : undefined
       }))
     } catch (error) {
       console.error('❌ Erreur inattendue lors de la récupération des commandes:', error)
@@ -470,51 +441,45 @@ export class DashboardService {
     }
   }
 
-  private static mapClientOrderItems(items: ClientOrderItemRecord[]): OrderItem[] {
-    return items.map(item => ({
-      id: item.id,
-      order_id: item.order_id,
-      product_id: item.product_id,
-      quantity: item.quantity ?? 0,
-      product_name: item.product_name ?? 'Produit',
-      unit_price: item.unit_price ?? 0,
-      total_price: item.total_price ?? (item.quantity ?? 0) * (item.unit_price ?? 0),
-      metadata: item.metadata ?? null
-    }))
-  }
+  /**
+   * Crée une demande de retour pour une commande.
+   */
+  static async createReturnRequest(params: {
+    orderId: string
+    userId: string
+    vendorId: string
+    reason: string
+    description: string
+    refundCurrency: string
+  }): Promise<{ data: any; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('order_returns')
+        .insert({
+          order_id: params.orderId,
+          customer_id: params.userId,
+          vendor_id: params.vendorId,
+          status: 'pending',
+          reason: params.reason,
+          metadata: {
+            description: params.description,
+            requested_by: 'customer'
+          },
+          refund_currency: params.refundCurrency,
+          requested_at: new Date().toISOString()
+        })
+        .select()
+        .single()
 
-  private static mapClientOrderReturn(returns: ClientOrderReturnRecord[]): UserOrderReturnInfo | undefined {
-    const [latestReturn] = [...returns]
-      .sort((a, b) => new Date(b.updated_at ?? b.created_at ?? '').getTime() - new Date(a.updated_at ?? a.created_at ?? '').getTime())
+      if (error) {
+        console.error('❌ Erreur lors de la création de la demande de retour:', error)
+        return { data: null, error }
+      }
 
-    if (!latestReturn) {
-      return undefined
-    }
-
-    return {
-      status: latestReturn.status ?? undefined,
-      reason: latestReturn.reason ?? undefined,
-      processedAt: latestReturn.processed_at ?? undefined,
-      createdAt: latestReturn.created_at ?? undefined
-    }
-  }
-
-  private static mapClientOrderDispute(disputes: ClientOrderDisputeRecord[]): UserOrderDisputeInfo | undefined {
-    const [latestDispute] = [...disputes]
-      .sort((a, b) => new Date(b.updated_at ?? b.opened_at ?? '').getTime() - new Date(a.updated_at ?? a.opened_at ?? '').getTime())
-
-    if (!latestDispute) {
-      return undefined
-    }
-
-    return {
-      status: latestDispute.status ?? undefined,
-      priority: latestDispute.priority ?? undefined,
-      assignedTo: latestDispute.assigned_to ?? undefined,
-      subject: latestDispute.subject ?? undefined,
-      description: latestDispute.description ?? undefined,
-      openedAt: latestDispute.opened_at ?? undefined,
-      updatedAt: latestDispute.updated_at ?? latestDispute.resolved_at ?? undefined
+      return { data, error: null }
+    } catch (error) {
+      console.error('❌ Erreur inattendue lors de la création de la demande de retour:', error)
+      return { data: null, error }
     }
   }
 
