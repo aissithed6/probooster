@@ -759,6 +759,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
     }
   }, [user?.id])
 
+  /**
+   * Synchronise automatiquement le profil (user_profiles) de l'utilisateur connecté.
+   * Objectif: refléter immédiatement les modifs du profil (super-admin, autre onglet,
+   * préférences, avatar) sans reconnexion ni rafraîchissement manuel.
+   */
+  useEffect(() => {
+    if (!user?.id) return
+
+    let disposed = false
+
+    const channel = supabase
+      .channel(`user_profiles:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `user_id=eq.${user.id}`
+        },
+        async (payload) => {
+          const next = (payload as any)?.new as UserProfile | null | undefined
+          if (disposed) return
+          if (next) {
+            setUserProfile(next)
+            return
+          }
+          try {
+            const refreshed = await fetchUserProfile(user.id)
+            if (!disposed) setUserProfile(refreshed)
+          } catch {
+            // best-effort
+          }
+        }
+      )
+
+    channel.subscribe()
+
+    return () => {
+      disposed = true
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id])
+
   const value: AuthContextType = {
     user,
     userProfile,
