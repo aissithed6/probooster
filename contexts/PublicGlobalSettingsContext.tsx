@@ -319,19 +319,41 @@ export function PublicGlobalSettingsProvider({
     let channel: ReturnType<typeof supabase.channel> | null = null
     let cancelled = false
 
-    /**
-     * Démarre un polling de secours pour garantir l'actualisation sans refresh.
+        /**
+     * Polling de secours UNIQUEMENT utilisé si la Realtime est indisponible.
+     *
+     * Avant : 2 000 ms (0,5 req/s) lancé SYSTÉMATIQUEMENT au montage, sur
+     * TOUTES les routes (PublicGlobalSettingsProvider est dans le root layout).
+     * Résultat : ~43 200 req/jour/onglet -> saturation serveur -> 503 -> retry
+     * -> 429. Ce polling est la cause du "tout plante en même temps" des 5
+     * sections quand la Realtime n'est pas active.
+     *
+     * Après : 60 000 ms, démarré UNIQUEMENT si la Realtime échoue ET si
+     * l'onglet est visible (pause en background / onglet caché). La Realtime
+     * SUBSCRIBED arrête ce fallback; CLOSED/CHANNEL_ERROR le relance.
      */
     const startPolling = () => {
       if (pollingId) return
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
       pollingId = window.setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
         refresh({ background: true })
-      }, 2000)
+      }, 60_000)
+    }
+
+    const stopPolling = () => {
+      if (pollingId) {
+        window.clearInterval(pollingId)
+        pollingId = null
+      }
     }
 
     /**
-     * Tentative d'abonnement Realtime sur la table super_admin_settings.
-     * Si la policy/RLS empêche l'écoute, le polling assure le fallback.
+     * Abonnement Realtime sur super_admin_settings.
+     * - SUBSCRIBED  -> on arrête le polling (plus besoin du fallback).
+     * - CLOSED / CHANNEL_ERROR / BROKEN -> on relance le fallback 60 s.
+     * Le polling n'est donc JAMAIS démarré automatiquement au montage : il ne
+     * sert que si la Realtime est morte/désactivée.
      */
     const startRealtime = async () => {
       try {
@@ -347,23 +369,30 @@ export function PublicGlobalSettingsProvider({
             },
             () => {
               hasReceivedRealtimeEventRef.current = true
+              // Realtime en marche: le fallback 60 s devient inutile.
+              stopPolling()
               refresh({ background: true })
             }
           )
-          .subscribe()
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              stopPolling()
+            } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'BROKEN') {
+              stopPolling()
+              startPolling()
+            }
+          })
       } catch {
-        // silencieux: fallback polling
+        // fallback polling uniquement en cas d'erreur de création du canal
+        startPolling()
       }
 
-      // Si Realtime ne push rien (RLS/disabled), on garde un polling actif.
-      startPolling()
-
-      // Optionnel: si on reçoit des events, on peut réduire le polling.
+      // Si la Realtime ne push rien dans les 10 s (RLS/désactivée), on active
+      // le fallback 60 s — mais seulement si aucun SUBSCRIBED + event reçu.
       window.setTimeout(() => {
         if (cancelled) return
-        if (hasReceivedRealtimeEventRef.current && pollingId) {
-          window.clearInterval(pollingId)
-          pollingId = null
+        if (!hasReceivedRealtimeEventRef.current) {
+          startPolling()
         }
       }, 10_000)
     }
