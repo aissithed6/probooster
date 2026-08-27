@@ -836,6 +836,145 @@ export default function ReviewsSection({
         </DialogContent>
       </Dialog>
       </TabsContent>
+{/* ================= Avis sur le vendeur ================= */}
+        <TabsContent value="vendor" className="space-y-6">
+          {/* Cartes de réputation vendeur */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Star className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Note vendeur</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {reputationData?.overallRating ? reputationData.overallRating.toFixed(1) : '—'}
+                      <span className="text-sm font-normal text-gray-500"> /5</span>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <MessageCircle className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Avis reçus</p>
+                    <p className="text-2xl font-bold text-gray-900">{reputationData?.totalReviews ?? reviews.length}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Reply className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Taux de réponse</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {reputationData?.responseRate != null ? `${reputationData.responseRate.toFixed(0)}%` : '—'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Réponse moy.</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {reputationData?.averageResponseTime != null ? reputationData.averageResponseTime : '—'}
+                      <span className="text-sm text-gray-400"> h</span>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+{/* Distribution & fiabilité */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Distribution des notes</CardTitle>
+                <CardDescription>Répartition des notes laissées sur votre vente</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {([5, 4, 3, 2, 1] as const).map((star) => {
+                  const count = reputationData?.ratingDistribution?.[String(star) as '5'] ?? 0
+                  const total = reputationData?.totalReviews
+                    ? Math.max(reputationData.totalReviews, 1)
+                    : Math.max(reviews.length, 1)
+                  const pct = (count / total) * 100
+                  return (
+                    <div key={star} className="flex items-center space-x-3">
+                      <span className="w-10 text-sm font-medium text-gray-700 shrink-0">{star} ★</span>
+                      <Progress value={pct} className="h-2 flex-1" />
+                      <span className="w-8 text-right text-sm text-gray-500">{Math.round(pct)}%</span>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Fiabilité du vendeur</CardTitle>
+                <CardDescription>Indicateurs de confiance sur votre activité</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Avis vérifiés</span>
+                    <span className="font-medium text-gray-900">
+                      {reputationData?.verifiedReviewsPercentage != null
+                        ? `${reputationData.verifiedReviewsPercentage.toFixed(0)}%`
+                        : '—'}
+                    </span>
+                  </div>
+                  <Progress value={reputationData?.verifiedReviewsPercentage ?? 0} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Avis jugés utiles</span>
+                    <span className="font-medium text-gray-900">
+                      {reputationData?.helpfulReviewsPercentage != null
+                        ? `${reputationData.helpfulReviewsPercentage.toFixed(0)}%`
+                        : '—'}
+                    </span>
+                  </div>
+                  <Progress value={reputationData?.helpfulReviewsPercentage ?? 0} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">Taux de réponse</span>
+                    <span className="font-medium text-gray-900">
+                      {reputationData?.responseRate != null ? `${reputationData.responseRate.toFixed(0)}%` : '—'}
+                    </span>
+                  </div>
+                  <Progress value={reputationData?.responseRate ?? 0} className="h-2" />
+                </div>
+                <Separator />
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <BarChart3 className="w-4 h-4 text-gray-400" />
+                  <span>Votre note globale est calculée à partir des {reputationData?.totalReviews ?? reviews.length} avis reçus.</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   )
