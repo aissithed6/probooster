@@ -70,7 +70,7 @@ export default function RevenueManagement({
     notificationMethod?: string
     reminderFrequency?: string
   } | null>(null)
-  const [selectedPeriod, setSelectedPeriod] = useState('month')
+  const [chartWindow, setChartWindow] = useState<'3m' | '6m' | '1y' | '2y'>('6m')
   const [isLoading, setIsLoading] = useState(false)
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'warning' } | null>(null)
 
@@ -593,7 +593,7 @@ export default function RevenueManagement({
       const key = monthKeys[i] ?? ''
       const parsed = key && /^\d{4}-\d{2}$/.test(key) ? new Date(`${key}-01T00:00:00.000Z`) : null
       const monthLabel = parsed && !Number.isNaN(parsed.getTime())
-        ? parsed.toLocaleDateString('fr-FR', { month: 'short' })
+        ? parsed.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
         : key || `M${i + 1}`
 
       out.push({
@@ -605,6 +605,13 @@ export default function RevenueManagement({
 
     return out
   }, [monthKeys, monthlyOrders, monthlyRevenue])
+
+  // Fenêtre sélectionnable pour « Évolution des Revenus » (3 mois → 2 ans).
+  const visibleMonthlyData = useMemo(() => {
+    const count = chartWindow === '3m' ? 3 : chartWindow === '6m' ? 6 : chartWindow === '1y' ? 12 : 24
+    if (monthlyData.length <= count) return monthlyData
+    return monthlyData.slice(monthlyData.length - count)
+  }, [chartWindow, monthlyData])
 
   const categoryData = useMemo(() => {
     const rows = Array.isArray((revenue as any)?.revenueByCategory)
@@ -727,16 +734,19 @@ export default function RevenueManagement({
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Évolution des Revenus</CardTitle>
-                <CardDescription>Performance des 6 derniers mois</CardDescription>
+                <CardDescription>
+                  Performance sur {chartWindow === '3m' ? 'les 3 derniers mois' : chartWindow === '6m' ? 'les 6 derniers mois' : chartWindow === '1y' ? 'les 12 derniers mois (1 an)' : 'les 24 derniers mois (2 ans)'}
+                </CardDescription>
               </div>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-32">
+              <Select value={chartWindow} onValueChange={(v) => setChartWindow(v as typeof chartWindow)}>
+                <SelectTrigger className="w-36">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="week">Semaine</SelectItem>
-                  <SelectItem value="month">Mois</SelectItem>
-                  <SelectItem value="quarter">Trimestre</SelectItem>
+                  <SelectItem value="3m">3 mois</SelectItem>
+                  <SelectItem value="6m">6 mois</SelectItem>
+                  <SelectItem value="1y">1 an</SelectItem>
+                  <SelectItem value="2y">2 ans</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -747,7 +757,7 @@ export default function RevenueManagement({
                 <BarChart className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-gray-500">Graphique d'évolution des revenus</p>
                 <div className="mt-4 space-y-2">
-                  {monthlyData.map((data, index) => (
+                  {visibleMonthlyData.map((data, index) => (
                     <div key={index} className="flex items-center justify-between text-sm">
                       <span>{data.month}</span>
                       <span className="font-medium">{formatCurrency(data.revenue)}</span>
@@ -1018,7 +1028,7 @@ export default function RevenueManagement({
 
             <TabsContent value="periods" className="mt-6">
               <div className="space-y-4">
-                {monthlyData.map((data, index) => (
+                {visibleMonthlyData.map((data, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <p className="font-medium">{data.month}</p>

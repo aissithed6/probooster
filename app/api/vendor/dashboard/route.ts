@@ -677,10 +677,11 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // monthlyRevenue/monthlyOrders (6 mois, all-time payés)
+    // monthlyRevenue/monthlyOrders (historique jusqu'à 24 mois, all-time payés)
     const nowMonth = new Date()
+    const revenueMonthsSpan = 24
     const monthKeys: string[] = []
-    for (let i = 5; i >= 0; i--) {
+    for (let i = revenueMonthsSpan - 1; i >= 0; i--) {
       const d = new Date(nowMonth)
       d.setMonth(d.getMonth() - i)
       monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
