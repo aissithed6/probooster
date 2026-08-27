@@ -331,10 +331,7 @@ export async function GET(request: NextRequest) {
         paidOrdersAllTime: paidOrdersAllTime.length,
         paidOrdersRecent: paidOrdersRecent.length,
         allTimeItemsRaw: allTimeItemsRaw.length,
-        recentItemsRaw: recentItemsRaw.length,
-        totalItemsSold,
-        totalOrdersCount,
-        resolvedTotalSales
+        recentItemsRaw: recentItemsRaw.length
       },
       errors: {
         allTimeItemsRaw: (allTimePaidItemsResult as any)?.error
