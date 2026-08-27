@@ -19,7 +19,7 @@ const inflight = new Map<string, Promise<VendorSummary | null>>()
 async function fetchVendorSummary(vendorId: string): Promise<VendorSummary | null> {
   const res = await fetch(`/api/public/vendors/summary?vendorId=${encodeURIComponent(vendorId)}`, {
     method: 'GET',
-    cache: 'force-cache'
+    cache: 'no-store'
   }).catch(() => null)
   const json = await res?.json().catch(() => null)
   if (!res || !res.ok) return null
@@ -90,8 +90,35 @@ export function useVendorSummary(vendorId: string) {
       }
     })()
 
+    // Revalidation au retour sur l'onglet / visibilité : permet aux notes des
+    // cartes vendeurs et pages publiques de refléter une nouvelle approbation
+    // d'avis sans attendre l'expiration du cache (fraîcheur « synchronization »).
+    const forceRefetch = () => {
+      summaryCache.delete(normalized)
+      const promise = fetchVendorSummary(normalized)
+      inflight.set(normalized, promise)
+      promise
+        .then((value) => {
+          if (cancelled) return
+          if (value) summaryCache.set(normalized, { value, expiresAt: Date.now() + CACHE_TTL_MS })
+          else summaryCache.delete(normalized)
+          setSummary(value)
+        })
+        .catch(() => {})
+        .finally(() => inflight.delete(normalized))
+    }
+
+    const onFocus = () => forceRefetch()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') forceRefetch()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+
     return () => {
       cancelled = true
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [vendorId])
 
