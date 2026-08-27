@@ -26,7 +26,8 @@ import {
   Trash2,
   X,
   ShoppingCart,
-  Coins
+  Coins,
+  Clock
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 

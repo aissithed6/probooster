@@ -1953,11 +1953,15 @@ export class SellerDashboardService {
         .filter(item => item.type === 'transferred')
         .reduce((sum, item) => sum + item.amount, 0)
 
-      const { data: withdrawalRequestRows } = await supabase
+      const { data: withdrawalRequestRows, error: withdrawalReqErr } = await supabase
         .from('point_withdrawal_requests')
-        .select('id, status, created_at, points_amount, amount, method, metadata')
+        .select('id, status, created_at, points_amount, payout_amount, fee_amount, method_id, metadata')
         .eq('user_id', vendorId)
         .order('created_at', { ascending: false })
+
+      if (withdrawalReqErr) {
+        console.warn('⚠️ point_withdrawal_requests lookup failed:', withdrawalReqErr)
+      }
 
       const withdrawalRequests = (withdrawalRequestRows || [])
         .filter((row: any) => row && row.id)
@@ -1998,11 +2002,15 @@ export class SellerDashboardService {
         .eq('vendor_id', vendorId)
         .single()
 
-      const { data: shareInteractions } = await supabase
-        .from('share_interaction_stats')
-        .select('*')
-        .eq('vendor_id', vendorId)
-        .single()
+      // NB: share_interaction_stats est une vue protégée (406 côté client anonyme).
+      // On passe par la fonction RPC sécurisée dédiée (auth.uid() = vendeur).
+      const { data: shareInteractions, error: shareInteractionsErr } = await supabase
+        .rpc('share_interaction_stats_for', { p_vendor: vendorId })
+        .maybeSingle()
+
+      if (shareInteractionsErr) {
+        console.warn('⚠️ share_interaction_stats_for RPC failed:', shareInteractionsErr)
+      }
 
       const fromDate = new Date()
       fromDate.setMonth(fromDate.getMonth() - 1)
