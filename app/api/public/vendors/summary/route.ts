@@ -28,7 +28,16 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // 1) Produits du vendeur
+    // 0) Lecture rapide O(1) depuis le snapshot (maintenu par triggers).
+    //    S'il est absent (snapshot pas encore backfillé), on retombe sur le
+    //    calcul à la volée ci-dessous pour rester robuste.
+    const { data: snapshot } = await supabase
+      .from('vendor_rating_snapshot')
+      .select('vendor_id, average_rating, review_count')
+      .eq('vendor_id', vendorId)
+      .maybeSingle()
+
+    // 1) Produits du vendeur (fallback / calcul explicite)
     const { data: products, error: productsError } = await supabase
       .from('user_products')
       .select('id')
@@ -46,7 +55,13 @@ export async function GET(request: NextRequest) {
     let averageRating = 0
     let reviewCount = 0
 
-    if (productIds.length > 0) {
+    // Snapshot disponible → on l'utilise (déjà synchronisé par triggers, O(1)).
+    if (snapshot) {
+      const snapAvg = Number(snapshot?.average_rating ?? 0)
+      const snapCount = Number(snapshot?.review_count ?? 0)
+      averageRating = Number.isFinite(snapAvg) ? snapAvg : 0
+      reviewCount = Number.isFinite(snapCount) ? snapCount : 0
+    } else if (productIds.length > 0) {
       const aggregates = await fetchApprovedReviewAggregates(supabase, productIds)
       let weightedSum = 0
       let approvedCount = 0
