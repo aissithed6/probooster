@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/contexts/AuthContext"
 import { DashboardService } from "@/lib/services/dashboard-service"
+import { supabase } from "@/lib/supabase"
 import type { Tables } from "@/lib/supabase"
 
 export default function HeaderNotification() {
@@ -48,6 +49,47 @@ export default function HeaderNotification() {
   useEffect(() => {
     loadNotifications()
   }, [loadNotifications])
+
+  /**
+   * Realtime : nouvelle notification / mise à jour / suppression → badge et
+   * liste du header mis à jour instantanément, sur toutes les pages.
+   */
+  useEffect(() => {
+    if (!user?.id) return
+
+    let debounceId: number | undefined
+    const debouncedReload = () => {
+      if (debounceId) window.clearTimeout(debounceId)
+      debounceId = window.setTimeout(loadNotifications, 250)
+    }
+
+    const channel = supabase
+      .channel(`realtime:header-notifications:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${user.id}` },
+        () => debouncedReload()
+      )
+      .subscribe()
+
+    const onFocus = () => debouncedReload()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') debouncedReload()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      if (debounceId) window.clearTimeout(debounceId)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+      try {
+        supabase.removeChannel(channel)
+      } catch {
+        // ignore
+      }
+    }
+  }, [loadNotifications, user?.id])
 
   /**
    * Marque une notification comme lue en DB puis rafraîchit l'UI.
