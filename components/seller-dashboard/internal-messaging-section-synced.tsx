@@ -296,13 +296,18 @@ export default function InternalMessagingSectionSynced() {
   }
 
   // Filtrer les messages
+  const safeMessages = Array.isArray(messages) ? messages : []
+  const sentMessagesCount = safeMessages.filter(m => m?.sender_id === user?.id).length
+  const importantMessagesCount = safeMessages.filter(m => Boolean(m.is_important)).length
+
   const filteredMessages = receivedMessages
     .filter(msg => {
       const matchesSearch = searchTerm === '' || 
         msg.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
         msg.content.toLowerCase().includes(searchTerm.toLowerCase())
       
-      const matchesCategory = categoryFilter === 'all'
+      const matchesCategory = categoryFilter === 'all' ||
+        String(msg.category ?? '').toLowerCase() === String(categoryFilter).toLowerCase()
       const matchesPriority = priorityFilter === 'all' || msg.priority === priorityFilter
       const matchesStatus = statusFilter === 'all' || 
         (statusFilter === 'unread' && !msg.is_read) ||
@@ -392,27 +397,27 @@ export default function InternalMessagingSectionSynced() {
 
         <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-purple-700">Réponse Moyenne</CardTitle>
+            <CardTitle className="text-sm font-medium text-purple-700">Messages Envoyés</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold text-purple-900">2.3h</div>
-              <Clock className="w-8 h-8 text-purple-600" />
+              <div className="text-2xl font-bold text-purple-900">{sentMessagesCount}</div>
+              <Send className="w-8 h-8 text-purple-600" />
             </div>
-            <p className="text-xs text-purple-600 mt-2">Temps de réponse</p>
+            <p className="text-xs text-purple-600 mt-2">Vers l'administration</p>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-orange-700">Satisfaction</CardTitle>
+            <CardTitle className="text-sm font-medium text-orange-700">Importants</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold text-orange-900">4.8/5</div>
+              <div className="text-2xl font-bold text-orange-900">{importantMessagesCount}</div>
               <Star className="w-8 h-8 text-orange-600" />
             </div>
-            <p className="text-xs text-orange-600 mt-2">Note globale</p>
+            <p className="text-xs text-orange-600 mt-2">Messages marqués importants</p>
           </CardContent>
         </Card>
       </div>
