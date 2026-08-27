@@ -1384,9 +1384,34 @@ export class SellerDashboardService {
         paymentHistory: []
       }
 
+      // ── Filet de sécurité : si l'API /api/vendor/dashboard n'a pas répondu
+      // (auth expirée, 5xx…), l'onglet Chiffre d'affaires doit quand même être
+      // synchronisé avec les commandes réellement chargées (= même source que
+      // la carte overview). On réutilise mergedStats.totalRevenue/Commissions.
+      const apiRevenue = (baseData.revenue ?? {}) as Partial<SellerRevenue>
+      const apiTotal = Number(apiRevenue.totalRevenue)
+      const apiAllTime = Number(apiRevenue.totalRevenueAllTime)
+      const fallbackTotal = Number.isFinite(apiTotal) && apiTotal > 0
+        ? apiTotal
+        : Number.isFinite(apiAllTime) && apiAllTime > 0
+          ? apiAllTime
+          : Number(mergedStats.totalRevenue ?? 0)
+      const apiNet = Number(apiRevenue.netRevenue)
+      const fallbackCommissions = (() => {
+        const c = Number(apiRevenue.totalCommissions)
+        return Number.isFinite(c) && c >= 0 ? c : Number(mergedStats.totalCommissions ?? 0)
+      })()
+      const fallbackNet = Number.isFinite(apiNet) && apiNet >= 0
+        ? apiNet
+        : Math.max(0, fallbackTotal - fallbackCommissions)
+
       const resolvedRevenue: SellerRevenue = {
         ...defaultRevenue,
-        ...((baseData.revenue ?? {}) as Partial<SellerRevenue>),
+        ...apiRevenue,
+        totalRevenue: fallbackTotal,
+        totalRevenueAllTime: fallbackTotal,
+        netRevenue: fallbackNet,
+        totalCommissions: fallbackCommissions,
         salesEvolution: Array.isArray((baseData.revenue as any)?.salesEvolution)
           ? ((baseData.revenue as any).salesEvolution as any)
           : defaultRevenue.salesEvolution,
