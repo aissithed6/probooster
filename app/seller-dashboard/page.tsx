@@ -449,6 +449,57 @@ function SellerDashboardPageInner() {
     }
   }, [refreshData, vendorId])
 
+  // Realtime avis & réputation : nouveau client avis / réponse / modération
+  // (product_reviews + product_review_responses sur les produits du vendeur)
+  // → refresh de la section Avis pour qu'elle reste synchronisée à 100 %.
+  const reviewsRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!vendorId) return
+
+    const channel = supabase
+      .channel(`realtime:vendor_reviews:${vendorId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'product_reviews' },
+        () => {
+          if (reviewsRealtimeRefreshTimerRef.current) {
+            clearTimeout(reviewsRealtimeRefreshTimerRef.current)
+          }
+          reviewsRealtimeRefreshTimerRef.current = window.setTimeout(() => {
+            reviewsRealtimeRefreshTimerRef.current = null
+            void refreshData()
+          }, 350)
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'product_review_responses' },
+        () => {
+          if (reviewsRealtimeRefreshTimerRef.current) {
+            clearTimeout(reviewsRealtimeRefreshTimerRef.current)
+          }
+          reviewsRealtimeRefreshTimerRef.current = window.setTimeout(() => {
+            reviewsRealtimeRefreshTimerRef.current = null
+            void refreshData()
+          }, 350)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      if (reviewsRealtimeRefreshTimerRef.current) {
+        clearTimeout(reviewsRealtimeRefreshTimerRef.current)
+        reviewsRealtimeRefreshTimerRef.current = null
+      }
+      try {
+        supabase.removeChannel(channel)
+      } catch {
+        // ignore
+      }
+    }
+  }, [refreshData, vendorId])
+
   const syncVendorNotificationsFromDb = useCallback(async () => {
     if (!vendorId) return
     try {
