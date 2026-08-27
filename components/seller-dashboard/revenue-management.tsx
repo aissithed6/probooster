@@ -1135,8 +1135,9 @@ export default function RevenueManagement({
                 <div className="text-sm text-blue-800">
                   <p className="font-medium">Demande en attente :</p>
                   <p>
-                    Une demande de paiement est déjà en cours de traitement. Tu pourras effectuer une nouvelle demande
-                    une fois celle-ci approuvée et exécutée.
+                    Une demande de paiement est en cours de traitement. Vous pouvez demander le solde restant :
+                    cette nouvelle demande portera uniquement sur les commandes pas encore incluses dans la demande
+                    en cours (pas de doublon possible).
                   </p>
                 </div>
               </div>
@@ -1196,11 +1197,18 @@ export default function RevenueManagement({
                 await handleConfirmPaymentRequest()
                 setShowAllVendorsModal(false)
               }}
-              disabled={isLoading || Number(revenue.pendingPayments ?? 0) > 0}
+              disabled={
+                isLoading ||
+                !(
+                  typeof withdrawableSummary?.amount === 'number'
+                    ? withdrawableSummary.amount > 0
+                    : Number(revenue.netRevenue ?? 0) > 0
+                )
+              }
               className="bg-[#8b5cf6] hover:bg-[#8b5cf6]/90 text-white shadow-md hover:shadow-lg transition-all duration-300"
             >
               <Users className="w-4 h-4 mr-2" />
-              Confirmer la Demande
+              {Number(revenue.pendingPayments ?? 0) > 0 ? 'Confirmer la Demande (solde restant)' : 'Confirmer la Demande'}
             </Button>
           </DialogFooter>
                  </DialogContent>

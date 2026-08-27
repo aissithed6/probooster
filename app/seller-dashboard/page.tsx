@@ -406,6 +406,49 @@ function SellerDashboardPageInner() {
     }
   }, [refreshData, vendorId])
 
+  // Realtime demandes de paiement : quand le Super Admin approuve/rejette une
+  // demande (finance_payment_requests), le dashboard vendeur se rafraîchit
+  // immédiatement (cartes paiements en attente / reçus, badges, montants).
+  const paymentRequestsRealtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!vendorId) return
+
+    const channel = supabase
+      .channel(`realtime:vendor_payment_requests:${vendorId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'finance_payment_requests',
+          filter: `vendor_id=eq.${vendorId}`
+        },
+        () => {
+          if (paymentRequestsRealtimeRefreshTimerRef.current) {
+            clearTimeout(paymentRequestsRealtimeRefreshTimerRef.current)
+          }
+          paymentRequestsRealtimeRefreshTimerRef.current = window.setTimeout(() => {
+            paymentRequestsRealtimeRefreshTimerRef.current = null
+            void refreshData()
+          }, 250)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      if (paymentRequestsRealtimeRefreshTimerRef.current) {
+        clearTimeout(paymentRequestsRealtimeRefreshTimerRef.current)
+        paymentRequestsRealtimeRefreshTimerRef.current = null
+      }
+      try {
+        supabase.removeChannel(channel)
+      } catch {
+        // ignore
+      }
+    }
+  }, [refreshData, vendorId])
+
   const syncVendorNotificationsFromDb = useCallback(async () => {
     if (!vendorId) return
     try {
