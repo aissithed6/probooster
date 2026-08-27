@@ -343,6 +343,15 @@ export default function ReviewsSection({
         </div>
       </div>
 
+      {/* Onglets : Avis sur les produits / Avis sur le vendeur */}
+      <Tabs defaultValue="products" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="products">Avis sur les produits</TabsTrigger>
+          <TabsTrigger value="vendor">Avis sur le vendeur</TabsTrigger>
+        </TabsList>
+
+        {/* ================= Avis sur les produits ================= */}
+        <TabsContent value="products" className="space-y-6">
       {/* Cartes (calculées sur données filtrées) */}
       {(() => {
         const items = filteredReviews
@@ -411,90 +420,6 @@ export default function ReviewsSection({
           </div>
         )
       })()}
-
-      {/* Statistiques de réputation */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Star className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Note moyenne</p>
-                <p className="text-2xl font-bold text-gray-900">{reputationData.overallRating.toFixed(1)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <MessageCircle className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total avis</p>
-                <p className="text-2xl font-bold text-gray-900">{reputationData.totalReviews}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Taux de réponse</p>
-                <p className="text-2xl font-bold text-gray-900">{reputationData.responseRate}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Temps de réponse</p>
-                <p className="text-2xl font-bold text-gray-900">{reputationData.averageResponseTime}h</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Distribution des notes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Distribution des notes</CardTitle>
-          <CardDescription>Répartition des avis par note</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {Object.entries(reputationData.ratingDistribution).reverse().map(([rating, count]) => {
-              const percentage = (count / reputationData.totalReviews) * 100
-              return (
-                <div key={rating} className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-1 w-16">
-                    <span className="text-sm font-medium text-gray-600">{rating}</span>
-                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                  </div>
-                  <Progress value={percentage} className="flex-1" />
-                  <span className="text-sm text-gray-600 w-16 text-right">{count}</span>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Filtres et recherche */}
       <Card>
