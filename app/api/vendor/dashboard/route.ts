@@ -8,7 +8,7 @@ import {
   mapReviewRowsToUiItems
 } from '@/lib/product-reviews'
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { getVendorRevenueSnapshots, recomputeVendorRevenueLive } from '@/lib/vendor-revenue'
+import { getVendorRevenueSnapshots, recomputeVendorRevenueLive, isPaidRevenueStatus } from '@/lib/vendor-revenue'
 
 type CommissionRuleRow = {
   id: string
@@ -59,10 +59,9 @@ function computeCommissionAmount(params: { totalAmount: number; rule: Commission
   * On évite d'être trop strict car certains providers renvoient des variantes (successful, succeeded, paid, etc.).
   */
  function isPaidLikeStatus(value: unknown): boolean {
-   const s = typeof value === 'string' ? value.trim().toLowerCase() : ''
-   if (!s) return false
-   if (s === 'unpaid' || s === 'failed' || s === 'cancelled' || s === 'canceled' || s === 'pending' || s === 'complete' || s === 'completed') return false
-   return s.includes('paid') || s.includes('success') || s.includes('succeed')
+   // SOURCE UNIQUE : même définition que lib/vendor-revenue.ts
+   // ('paid', 'completed', 'successful', ...). 'completed' = PAYÉ.
+   return isPaidRevenueStatus(value)
  }
 
  function isDeliveredLikeStatus(value: unknown): boolean {
