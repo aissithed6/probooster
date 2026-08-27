@@ -52,7 +52,19 @@ function safeStr(value: unknown): string {
  */
 export async function POST(request: NextRequest) {
   try {
-    const adminId = await assertSuperAdmin(request)
+    // Accès autorisé soit au Super Admin authentifié, soit à un appel interne
+    // (même serveur) portant le secret RANKINGS_RECOMPUTE_SECRET — utilisé
+    // pour le recalcul automatique déclenché par GET /api/vendor/rankings
+    // lorsque les données de classement sont périmées.
+    const internalSecret = String(process.env.RANKINGS_RECOMPUTE_SECRET ?? '')
+    const headerSecret = request.headers.get('x-internal-recompute-secret') ?? ''
+    const isInternalCall = internalSecret.length > 0 && headerSecret === internalSecret
+
+    let adminId = 'internal-auto'
+    if (!isInternalCall) {
+      adminId = await assertSuperAdmin(request)
+    }
+
     const url = new URL(request.url)
     const range = parseRange(url.searchParams.get('range'))
     const scope = parseScope(url.searchParams.get('scope'))

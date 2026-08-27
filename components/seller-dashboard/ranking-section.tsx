@@ -57,25 +57,6 @@ interface CategoryRanking {
   averagePerformance: number
 }
 
-interface RankingMetrics {
-  totalVendors: number
-  currentPosition: number
-  topPosition: number
-  improvement: number
-  categoryPosition: number
-  globalTrend: 'rising' | 'falling' | 'stable'
-  nextMilestone: string
-  estimatedTimeToNextRank: string
-}
-
-interface RankingFilters {
-  category: string
-  timeRange: string
-  sortBy: string
-  showOnlyCompetitors: boolean
-  minRating: number
-}
-
 // Interface pour les objectifs et milestones
 interface Objective {
   id: string
@@ -441,17 +422,6 @@ export default function RankingSection() {
     if (!showObjectiveModal) return
     setObjectivePriority(editingObjective?.priority ?? 'medium')
   }, [showObjectiveModal, editingObjective])
-
-  const mockMetrics: RankingMetrics = {
-    totalVendors: 0,
-    currentPosition: 0,
-    topPosition: 0,
-    improvement: 0,
-    categoryPosition: 0,
-    globalTrend: 'stable',
-    nextMilestone: 'Aucun objectif défini',
-    estimatedTimeToNextRank: 'N/A'
-  }
 
   const categories = [
     { id: 'all', name: 'Toutes les catégories', icon: '🏆' },
