@@ -835,6 +835,8 @@ export default function ReviewsSection({
           </div>
         </DialogContent>
       </Dialog>
+      </TabsContent>
+      </Tabs>
     </div>
   )
 }
