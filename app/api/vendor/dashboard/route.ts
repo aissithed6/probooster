@@ -8,6 +8,7 @@ import {
   mapReviewRowsToUiItems
 } from '@/lib/product-reviews'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { getVendorRevenueSnapshots, recomputeVendorRevenueLive } from '@/lib/vendor-revenue'
 
 type CommissionRuleRow = {
   id: string
@@ -1221,12 +1222,33 @@ export async function GET(request: NextRequest) {
       console.warn('⚠️ Erreur calcul stats chat:', e)
     }
 
+    // ── SOURCE UNIQUE DE VÉRITÉ : CA vendeur depuis le snapshot (O(1)) ─────
+    // Le CA affiché partout (carte "Chiffre d'affaires", RevenueManagement, analytics)
+    // doit provenir de `vendor_revenue_snapshot` maintenu par triggers = CA = ventes
+    // payées − retours. Fallback : recalcul en direct via les mêmes règles.
+    const revenueSnapshots = await getVendorRevenueSnapshots(supabase, vendorIds)
+    let canonicalRevenue = revenueSnapshots.get(String(vendorId))
+    if (
+      !canonicalRevenue ||
+      (canonicalRevenue.totalRevenue === 0 && canonicalRevenue.ordersCount === 0 && resolvedTotalRevenueAllTime > 0)
+    ) {
+      const live = await recomputeVendorRevenueLive(supabase, vendorIds)
+      canonicalRevenue = live.get(String(vendorId)) ?? canonicalRevenue
+    }
+    const canonicalTotalRevenue = canonicalRevenue?.totalRevenue ?? Math.round(resolvedTotalRevenueAllTime)
+    const canonicalReturnsAmount = canonicalRevenue?.returnsAmount ?? 0
+    const canonicalNetRevenue = canonicalRevenue?.netRevenue ?? canonicalTotalRevenue
+
     return NextResponse.json(
       {
         data: {
           debug,
           stats: {
             totalSales: resolvedTotalSales,
+            totalRevenue: canonicalTotalRevenue,
+            totalCommissions,
+            returnsAmount: canonicalReturnsAmount,
+            netRevenue: canonicalNetRevenue,
             averageRating,
             totalReviews,
             ranking,
@@ -1235,11 +1257,12 @@ export async function GET(request: NextRequest) {
             averageResponseTime
           },
           revenue: {
-            totalRevenueAllTime: Math.round(resolvedTotalRevenueAllTime),
-            totalRevenue30Days: Math.round(resolvedTotalRevenue30Days),
-            totalRevenue,
+            totalRevenue: canonicalTotalRevenue,
+            totalRevenueAllTime: canonicalTotalRevenue,
+            totalRevenue30Days: Math.min(canonicalTotalRevenue, Math.round(resolvedTotalRevenue30Days)),
+            returnsAmount: canonicalReturnsAmount,
+            netRevenue: canonicalNetRevenue,
             totalCommissions,
-            netRevenue,
             pendingPayments: Math.round(pendingPayments),
             completedPayments,
             monthlyRevenue,

@@ -15,6 +15,7 @@ import type { SharedProductInput } from '@/lib/types/shared-product'
 import { mapSupabaseProductToSharedProduct } from '@/lib/utils/product-transformers'
 import { fetchApprovedReviewAggregates } from '@/lib/product-reviews'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { PAID_REVENUE_STATUSES } from '@/lib/vendor-revenue'
 
 const listQuerySchema = z.object({
   search: z.string().optional(),
@@ -100,7 +101,7 @@ async function fetchPaidProductAggregates(
     )
     .in('product_id', params.productIds)
     .in('orders.vendor_id', params.vendorIds)
-    .eq('orders.payment_status', 'paid')
+    .in('orders.payment_status', PAID_REVENUE_STATUSES as any)
 
   if (error) {
     console.warn('⚠️ fetchPaidProductAggregates failed:', error)

@@ -160,17 +160,67 @@ export async function GET(request: NextRequest) {
     const pointsTransfersVolume = (trErr ? [] : (trRows ?? [])).reduce((s: number, r: any) => s + Number(r.points_amount || 0), 0)
     const pointsRedemptionsTotal = (rdErr ? [] : (rdRows ?? [])).reduce((s: number, r: any) => s + Number(r.points_spent || 0), 0)
 
+    // ── SOURCE UNIQUE DE VÉRITÉ : CA depuis `vendor_revenue_snapshot` (Σ par vendeur) ──
+    // Le CA du super-admin (total + par vendeur) DOIT égaler la somme des CA vendeurs
+    // (mêmes règles : ventes payées − retours), et non diverger de finance_transactions.
+    let revGrossFinal = revenueGross
+    let revRefundsFinal = revenueRefunds
+    let revNetFinal = revenueNet
+    let totalRevenueFinal = totalRevenue
+    let vendorRevenue: Array<{
+      vendorId: string
+      totalRevenue: number
+      returnsAmount: number
+      netRevenue: number
+      totalSales: number
+      ordersCount: number
+    }> = []
+
+    const { data: snapRows, error: snapErr } = await supabase
+      .from('vendor_revenue_snapshot')
+      .select('vendor_id, total_revenue, returns_amount, net_revenue, total_sales, orders_count')
+
+    if (!snapErr && Array.isArray(snapRows) && snapRows.length > 0) {
+      let sumGross = 0
+      let sumReturns = 0
+      let sumNet = 0
+      for (const r of snapRows) {
+        sumGross += Number(r?.total_revenue || 0)
+        sumReturns += Number(r?.returns_amount || 0)
+        sumNet += Number(r?.net_revenue || 0)
+      }
+      // N'écrase le CA transactionnel que si le snapshot contient des ventes (sinon on
+      // garde le fallback existant, ex. snapshot non encore backfillé / table vide).
+      if (sumGross > 0) {
+        revGrossFinal = Math.round(sumGross)
+        revRefundsFinal = Math.round(sumReturns)
+        revNetFinal = Math.round(sumNet)
+        totalRevenueFinal = revNetFinal
+      }
+      vendorRevenue = (snapRows ?? [])
+        .map((r) => ({
+          vendorId: String(r?.vendor_id ?? ''),
+          totalRevenue: Math.round(Number(r?.total_revenue || 0)),
+          returnsAmount: Math.round(Number(r?.returns_amount || 0)),
+          netRevenue: Math.round(Number(r?.net_revenue || 0)),
+          totalSales: Math.round(Number(r?.total_sales || 0)),
+          ordersCount: Math.round(Number(r?.orders_count || 0))
+        }))
+        .sort((a, b) => b.netRevenue - a.netRevenue)
+    }
+
     return NextResponse.json({
-      totalRevenue,
-      revenueGross,
-      revenueRefunds,
-      revenueNet,
+      totalRevenue: totalRevenueFinal,
+      revenueGross: revGrossFinal,
+      revenueRefunds: revRefundsFinal,
+      revenueNet: revNetFinal,
       totalCommission,
       totalPayouts,
       pendingPayouts,
       monthlyGrowth,
       averageOrderValue,
       approvalRate,
+      vendorRevenue,
       points: {
         totalBalance: pointsTotalBalance,
         totalFcfaValue: pointsTotalFcfaValue,

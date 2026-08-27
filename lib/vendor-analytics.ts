@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { isAnalyticsEnabled } from '@/app/api/_helpers/analytics-privacy'
+import { isPaidRevenueStatus } from '@/lib/vendor-revenue'
 
 export type VendorAnalyticsPeriod = '7d' | '30d' | '90d' | '1y'
 
@@ -110,22 +111,10 @@ function periodToDays(period: VendorAnalyticsPeriod): number {
 
 /**
  * Heuristique alignée sur GET /api/vendor/dashboard — évite les divergences de CA / ventes.
+ * Délègue à la source unique (lib/vendor-revenue) pour une seule définition du « payé ».
  */
 function isPaidLikeStatus(value: unknown): boolean {
-  const s = typeof value === 'string' ? value.trim().toLowerCase() : ''
-  if (!s) return false
-  if (
-    s === 'unpaid' ||
-    s === 'failed' ||
-    s === 'cancelled' ||
-    s === 'canceled' ||
-    s === 'pending' ||
-    s === 'complete' ||
-    s === 'completed'
-  ) {
-    return false
-  }
-  return s.includes('paid') || s.includes('success') || s.includes('succeed')
+  return isPaidRevenueStatus(value)
 }
 
 function isDeliveredLikeStatus(value: unknown): boolean {
