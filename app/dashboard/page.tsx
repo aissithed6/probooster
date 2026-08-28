@@ -2804,21 +2804,22 @@ function DashboardPageContent() {
   const recentWithdrawals = dashboardData?.withdrawals ?? []
 
   const shareEvents = useMemo(() => {
-    const events = pointsHistory
-      .filter((t) => t && typeof (t as any).date === 'string')
-      .filter((t) => {
-        const desc = String((t as any).description ?? '').toLowerCase()
-        return desc.includes('share') || desc.includes('partage')
-      })
+    // Source réelle : product_shares agrégés (via dashboardData.sharedProducts)
+    const shared = (dashboardData?.sharedProducts ?? []) as any[]
 
     const countByDay = new Map<string, number>()
-    for (const e of events) {
-      const dayKey = String((e as any).date ?? '').slice(0, 10)
-      if (!dayKey) continue
-      countByDay.set(dayKey, (countByDay.get(dayKey) ?? 0) + 1)
+    for (const p of shared) {
+      const sharedAt = String((p as any).sharedAt ?? '')
+      const total = Number((p as any).totalShares ?? 0) || 0
+      if (!sharedAt || total <= 0) continue
+      // On répartit le cumul du produit sur sa date de dernier partage
+      for (let i = 0; i < total; i++) {
+        const dayKey = sharedAt.slice(0, 10)
+        countByDay.set(dayKey, (countByDay.get(dayKey) ?? 0) + 1)
+      }
     }
 
-    const totalCount = events.length
+    const totalCount = Array.from(countByDay.values()).reduce((sum, n) => sum + n, 0)
     const todayKey = new Date().toISOString().slice(0, 10)
     const yesterdayKey = (() => {
       const d = new Date()
@@ -2827,12 +2828,12 @@ function DashboardPageContent() {
     })()
 
     return {
-      totalCount,
+      totalCount: totalCount > 0 ? totalCount : shared.length,
       todayCount: countByDay.get(todayKey) ?? 0,
       yesterdayCount: countByDay.get(yesterdayKey) ?? 0,
       countByDay
     }
-  }, [pointsHistory])
+  }, [dashboardData?.sharedProducts])
 
   const pointsChartData = useMemo(() => {
     const byDay = new Map<string, { earned: number; used: number; lastBalance: number }>()

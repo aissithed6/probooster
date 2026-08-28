@@ -1157,50 +1157,103 @@ export class DashboardService {
     }
   }
 
-  // Récupérer les produits partagés par l'utilisateur
+  // Récupérer les produits partagés par l'utilisateur (source réelle: table product_shares)
   static async getSharedProducts(userId: string): Promise<SharedProduct[]> {
     try {
-      console.log('🔍 Récupération des produits partagés pour:', userId)
-      
-      // Récupérer les statistiques de partage depuis la vraie table
-      const { data: stats, error } = await supabase
-        .from('statistiques_partages')
-        .select('*')
+      // Lire les partages réels enregistrés par POST /api/shares/record
+      const { data: shares, error } = await supabase
+        .from('product_shares')
+        .select('product_id, platform, points_earned, created_at')
         .eq('user_id', userId)
-        .order('last_shared_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('❌ Erreur lors de la récupération des produits partagés:', error);
+        console.error('❌ Erreur lors de la récupération des partages (product_shares):', error)
       }
 
-      // Si pas de statistiques ou erreur, retourner un tableau vide
-      if (!stats || stats.length === 0 || error) {
-        console.log('ℹ️ Aucune statistique de partage trouvée, tableau vide retourné')
-        return [];
+      const rows = Array.isArray(shares) ? shares : []
+      if (rows.length === 0) {
+        return []
       }
 
-      // Transformer les données en format SharedProduct
-      return (stats || []).map(stat => ({
-        id: stat.id,
-        productId: parseInt(stat.product_id || stat.id),
-        productName: stat.product_name || 'Produit partagé',
-        productImage: stat.product_image || '/placeholder.jpg',
-        shares: {
-          facebook: stat.facebook_shares || 0,
-          twitter: stat.twitter_shares || 0,
-          whatsapp: stat.whatsapp_shares || 0,
-          instagram: stat.instagram_shares || 0
-        },
-        totalShares: stat.total_shares || 0,
-        pointsEarned: stat.total_points_earned || 0,
-        pointsUsed: stat.total_points_used || 0,
-        pointsWithdrawn: stat.total_points_withdrawn || 0,
-        pointsAvailable: stat.total_points_available || 0,
-        sharedAt: stat.last_shared_at
-      }));
+      // Récupérer les infos produits pour le nom/image
+      const productIds = Array.from(
+        new Set(rows.map((r: any) => String(r?.product_id ?? '')).filter(Boolean))
+      ).slice(0, 500)
+
+      const productNameById = new Map<string, string>()
+      const productImageById = new Map<string, string>()
+      if (productIds.length > 0) {
+        const { data: products } = await supabase
+          .from('user_products')
+          .select('id, name, main_image')
+          .in('id', productIds as any)
+        ;(products ?? []).forEach((p: any) => {
+          if (p?.id) {
+            productNameById.set(String(p.id), String(p?.name ?? ''))
+            productImageById.set(String(p.id), String(p?.main_image ?? ''))
+          }
+        })
+      }
+
+      // Agréger par produit (fréquence + total + plateformes + date la plus récente)
+      const byProduct = new Map<
+        string,
+        {
+          shares: { facebook: number; twitter: number; whatsapp: number; instagram: number }
+          totalShares: number
+          pointsEarned: number
+          sharedAt: string | null
+        }
+      >()
+
+      for (const r of rows as any[]) {
+        const pid = String(r?.product_id ?? '').trim()
+        if (!pid) continue
+        const platform = String(r?.platform ?? '').trim().toLowerCase()
+        const earned = Number(r?.points_earned ?? 0) || 0
+        const created = String(r?.created_at ?? '')
+
+        const current =
+          byProduct.get(pid) ?? {
+            shares: { facebook: 0, twitter: 0, whatsapp: 0, instagram: 0 },
+            totalShares: 0,
+            pointsEarned: 0,
+            sharedAt: null
+          }
+
+        current.totalShares += 1
+        current.pointsEarned += earned
+        if (platform === 'facebook') current.shares.facebook += 1
+        else if (platform === 'twitter') current.shares.twitter += 1
+        else if (platform === 'whatsapp') current.shares.whatsapp += 1
+        else if (platform === 'instagram') current.shares.instagram += 1
+
+        if (created && (!current.sharedAt || String(current.sharedAt) < created)) {
+          current.sharedAt = created
+        }
+
+        byProduct.set(pid, current)
+      }
+
+      return Array.from(byProduct.entries())
+        .map(([productId, stats]) => ({
+          id: productId,
+          productId: Number(productId) || 0,
+          productName: productNameById.get(productId) || 'Produit partagé',
+          productImage: productImageById.get(productId) || '/placeholder.jpg',
+          shares: stats.shares,
+          totalShares: stats.totalShares,
+          pointsEarned: stats.pointsEarned,
+          pointsUsed: 0,
+          pointsWithdrawn: 0,
+          pointsAvailable: 0,
+          sharedAt: stats.sharedAt
+        }))
+        .sort((a, b) => String(b.sharedAt ?? '').localeCompare(String(a.sharedAt ?? '')))
     } catch (error) {
-      console.error('❌ Erreur lors de la récupération des produits partagés:', error);
-      return [];
+      console.error('❌ Erreur lors de la récupération des produits partagés:', error)
+      return []
     }
   }
 
