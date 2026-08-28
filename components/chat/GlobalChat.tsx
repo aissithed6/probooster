@@ -578,44 +578,44 @@ export const GlobalChat: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="produits" className="flex-1 min-h-0 h-full data-[state=active]:flex data-[state=active]:flex-col overflow-hidden">
-            <div className="p-4">
-              <div className="mb-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
+              <div className="mb-3">
                 <Input
                   placeholder="Rechercher un produit..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full"
+                  className="w-full h-9 text-sm"
                 />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+              <div className="grid grid-cols-2 gap-3">
                 {mockChatProducts
-                  .filter(product => 
+                  .filter(product =>
                     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     product.seller.toLowerCase().includes(searchQuery.toLowerCase())
                   )
                   .map((product) => (
-                    <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <img 
-                          src={product.image} 
+                    <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow overflow-hidden">
+                      <CardContent className="p-3">
+                        <img
+                          src={product.image}
                           alt={product.name}
-                          className="w-full h-32 object-cover rounded-lg mb-3"
+                          className="w-full h-20 object-cover rounded-lg mb-2"
                         />
-                        <h4 className="font-medium text-gray-900 mb-2">{product.name}</h4>
-                        <div className="text-sm text-gray-600 mb-3">
-                          <p>Prix: {product.price} F CFA</p>
-                          <p className="flex items-center">
-                            <Coins className="w-4 h-4 mr-1" />
+                        <h4 className="font-medium text-gray-900 text-xs line-clamp-2 mb-1">{product.name}</h4>
+                        <div className="text-xs text-gray-600 mb-2 space-y-0.5">
+                          <p className="font-semibold text-gray-900">{product.price} F CFA</p>
+                          <p className="flex items-center text-orange-600">
+                            <Coins className="w-3 h-3 mr-1" />
                             {product.points} points
                           </p>
                         </div>
                         <Button
                           size="sm"
-                          className="w-full"
+                          className="w-full h-8 text-xs"
                           onClick={() => handleProductClick(product)}
                         >
-                          <MessageCircle className="w-4 h-4 mr-2" />
+                          <MessageCircle className="w-3 h-3 mr-1" />
                           Contacter le vendeur
                         </Button>
                       </CardContent>
