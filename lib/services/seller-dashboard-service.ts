@@ -1996,21 +1996,28 @@ export class SellerDashboardService {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
 
+      // vendor_share_stats peut n'avoir aucune ligne pour ce vendeur → `.single()`
+      // renverrait 406/PGRST116. On tolère 0 ligne avec maybeSingle.
       const { data: shareStats } = await supabase
         .from('vendor_share_stats')
         .select('*')
         .eq('vendor_id', vendorId)
-        .single()
+        .maybeSingle()
 
       // NB: share_interaction_stats est une vue protégée (406 côté client anonyme).
       // On passe par la fonction RPC sécurisée dédiée (auth.uid() = vendeur).
-      const { data: shareInteractions, error: shareInteractionsErr } = await supabase
+      // NB2: la fonction est « set-returning » — si le vendeur n'a aucune ligne,
+      // PostgREST renvoie 406 avec `maybeSingle()` (objet attendu, 0 lignes).
+      // On appelle donc SANS maybeSingle et on prend la première ligne du tableau.
+      const { data: shareInteractionsRows, error: shareInteractionsErr } = await supabase
         .rpc('share_interaction_stats_for', { p_vendor: vendorId })
-        .maybeSingle()
 
       if (shareInteractionsErr) {
         console.warn('⚠️ share_interaction_stats_for RPC failed:', shareInteractionsErr)
       }
+      const shareInteractions = Array.isArray(shareInteractionsRows)
+        ? (shareInteractionsRows[0] ?? null)
+        : ((shareInteractionsRows as any) ?? null)
 
       const fromDate = new Date()
       fromDate.setMonth(fromDate.getMonth() - 1)
