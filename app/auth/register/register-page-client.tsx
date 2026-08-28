@@ -185,7 +185,7 @@ export default function RegisterPageClient() {
         first_name: formData.firstName,
         last_name: formData.lastName,
         phone: formData.phone,
-        country: "Côte d'Ivoire",
+        country: "Bénin",
       }
 
       // Déterminer le rôle basé sur userType

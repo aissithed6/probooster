@@ -241,7 +241,7 @@ type FetchUsersAdminOptions = GetUsersOptions & {
 
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 500
-const DEFAULT_PROFILE_COUNTRY = "Côte d'Ivoire"
+const DEFAULT_PROFILE_COUNTRY = "Bénin"
 const FALLBACK_LAST_NAME = ''
 
 /** Normalise un rôle/statut/valeur de filtre pour comparaison côté serveur. */

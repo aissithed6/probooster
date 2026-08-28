@@ -1149,7 +1149,7 @@ export class SellerDashboardService {
         street: String(profile?.address ?? ''),
         city: String(profile?.city ?? ''),
         state: String(prefsRaw.address_state ?? ''),
-        country: String(profile?.country ?? ''),
+                country: String(profile?.country ?? 'Bénin'),
         postalCode: String(profile?.postal_code ?? '')
       },
       socialMedia: {
