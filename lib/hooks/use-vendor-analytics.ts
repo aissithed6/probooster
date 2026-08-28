@@ -152,13 +152,15 @@ export function useVendorAnalytics(
         return
       }
 
-      if (data) {
-        setData({ ...data, period: nextPeriod })
-      }
-
-      void fetchPeriod(nextPeriod, { updateVisible: true, silent: true })
+      // Aucune donnée de confiance pour cette période : on efface l'affichage
+      // (squelette de chargement) plutôt que de ré-étiqueter les chiffres de
+      // l'ancienne période comme appartenant à la nouvelle.
+      trustedPeriodRef.current = null
+      setData(null)
+      setIsLoading(true)
+      void fetchPeriod(nextPeriod, { updateVisible: true, silent: false })
     },
-    [applyDashboardMerge, data, fetchPeriod]
+    [applyDashboardMerge, fetchPeriod]
   )
 
   const refresh = useCallback(async () => {
