@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/request'
-import { NextResponse } from 'next/response'
+import { NextResponse } from 'next/server'
 
 import { assertCustomer } from '../../_helpers/auth'
 import { getSupabaseAdmin } from '../../../../../lib/supabase'
