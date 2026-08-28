@@ -238,8 +238,9 @@ export const LegacyChatModal: React.FC<LegacyChatModalProps> = ({
               return
             }
 
-            // Ouvrir la session
-            openChatSession(sessionId)
+            // Ouvrir la session SANS déclencher le modal global
+            // (isAnyChatOpen) : ce modal Legacy est déjà l'UI de chat ouverte.
+            openChatSession(sessionId, false)
             console.log('✅ Session ouverte')
 
             // Vérifier que la session est bien active
@@ -346,7 +347,7 @@ export const LegacyChatModal: React.FC<LegacyChatModalProps> = ({
         try {
           const sessionId = await createChatSession(sellerId, sellerName, sellerAvatar)
           console.log('🆕 Session créée en urgence:', sessionId)
-          openChatSession(sessionId)
+          openChatSession(sessionId, false)
           
           // Attendre un peu et réessayer
           setTimeout(() => {

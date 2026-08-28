@@ -59,7 +59,7 @@ interface ChatContextType {
   
   // Actions
   createChatSession: (sellerId: string, sellerName: string, sellerAvatar?: string) => Promise<string>
-  openChatSession: (sessionId: string) => void
+  openChatSession: (sessionId: string, openGlobalUI?: boolean) => void
   closeChatSession: () => void
   sendMessage: (content: string, type?: 'text' | 'product' | 'image' | 'document', product?: any, fileData?: any) => Promise<void>
   addProductToChat: (product: any) => void
@@ -125,6 +125,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   // États des conversations
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
+  // Miroir synchrone de chatSessions (évite les closures obsolètes lors de la
+  // création puis de l'ouverture immédiate d'une session).
+  const chatSessionsRef = useRef<ChatSession[]>([])
+  useEffect(() => {
+    chatSessionsRef.current = chatSessions
+  }, [chatSessions])
   const [activeChatSession, setActiveChatSession] = useState<ChatSession | null>(null)
   
   // États des messages
@@ -762,7 +768,9 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     // Vérifier si une session existe déjà localement
-    const existingSession = chatSessions.find(session => session.sellerId === sellerId)
+    const existingSession =
+      chatSessionsRef.current.find(session => session.sellerId === sellerId) ??
+      chatSessions.find(session => session.sellerId === sellerId)
     if (existingSession) {
       return existingSession.id
     }
@@ -795,7 +803,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       messages: [],
       isActive: true
     }
-    
+
+    // Mise à jour synchrone du ref pour que openChatSession (appelé juste
+    // après par les déclencheurs de chat) trouve bien la session.
+    chatSessionsRef.current = [newSession, ...chatSessionsRef.current.filter(s => s.id !== newSession.id)]
     setChatSessions(prev => [newSession, ...prev])
     return session.id
   }
@@ -803,11 +814,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Ouvrir une session de chat
    */
-  const openChatSession = (sessionId: string) => {
+  const openChatSession = (sessionId: string, openGlobalUI: boolean = true) => {
     // Toujours ouvrir l'UI
-    setIsAnyChatOpen(true)
+    if (openGlobalUI) {
+      setIsAnyChatOpen(true)
+    }
 
-    const session = chatSessions.find(s => s.id === sessionId)
+    // Lire depuis le ref pour éviter les closures obsolètes : quand une session
+    // vient d'être créée (createChatSession), elle n'est pas encore visible dans
+    // `chatSessions` capturé par cette closure au render courant.
+    const session = chatSessionsRef.current.find(s => s.id === sessionId)
+      ?? chatSessions.find(s => s.id === sessionId)
     if (session) {
       setActiveChatSession(session)
       setMessages(session.messages)

@@ -664,7 +664,9 @@ export default function ProductModal({
         const sessionId = await createChatSession(safeVendorId, sellerName, sellerAvatar)
         if (!sessionId) return
         if (cancelled) return
-        openChatSession(sessionId)
+        // Ne pas déclencher le modal global (isAnyChatOpen) : ce modal produit
+        // affiche déjà son propre chat inline synchronisé.
+        openChatSession(sessionId, false)
         setCurrentSession({
           id: sessionId,
           isTyping: false,
