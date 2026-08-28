@@ -1206,8 +1206,6 @@ export function buildLocalAnalyticsFallback(params: {
 }
 
 function fillSalesByDayFromNonCancelledOrders(
-
-function fillSalesByDayFromNonCancelledOrders(
   rows: any[],
   startIso: string,
   endIsoInclusive: string,
