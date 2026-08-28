@@ -3,9 +3,15 @@ import { getSupabaseAdmin } from '@/lib/supabase'
 
 /**
  * POST /api/_admin/exec-sql
- * Exécute une requête SQL (read-only recommandé) via le client admin (service_role).
- * Body: { sql: "SELECT ... FROM ..." }
- * ⚠️ À usage interne uniquement — à protéger côté infra (IP / auth admin) en prod.
+ *
+ * ⚠️  À usage interne / script de maintenance UNIQUEMENT.
+ * Ne pas exposer publiquement sans authentification supplémentaire.
+ *
+ * Exécute une requête SQL arbitraire via le client admin (service_role → bypass RLS).
+ * Body JSON : { "sql": "SELECT id,user_id,... FROM product_shares WHERE user_id='...'" }
+ *
+ * La fonction Postgres `exec(sql text)` doit exister dans le projet.
+ * Si elle n’existe pas, on renvoie une instruction précise pour la créer.
  */
 export async function POST(req: Request) {
   try {
@@ -18,43 +24,22 @@ export async function POST(req: Request) {
 
     const supabase = getSupabaseAdmin()
 
-    // Exécuter le SQL via l'endpoint natif PostgREST en mode raw
-    // https://supabase.com/docs/guides/api/using-rpc#post-a-function-with-parameters
-    // → On essaye d'abord via RPC "exec"; sinon on tente via route REST directe /rest/v1/
+    // 1) Essayer la RPC exec(sql) exposée (plpgSQL SECURITY DEFINER)
     const { data: rpcData, error: rpcError } = await supabase.rpc('exec', { sql })
 
     if (!rpcError) {
       return NextResponse.json({ data: rpcData, source: 'rpc' }, { status: 200 })
     }
 
-    // Fallback : appel direct à l'endpoint SQL de PostgREST (POST /rest/v1/ avec body SQL)
-    // Ce endpoint natif exige le header `apikey` + `Authorization: Bearer <service_role>`.
-    const directRes = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Prefer': 'count=exact'
-        },
-        body: JSON.stringify({ sql })
-      }
-    )
+    // 2) Indiquer la création de la fonction si elle n’existe pas
+    const hint = `Fonction Postgres "exec(sql)" manquante. Créez-la une fois (SQL Editor) :\n` +
+      `CREATE OR REPLACE FUNCTION exec(sql text) RETURNS void LANGUAGE plpgsql AS $$ BEGIN EXECUTE sql; END $$ SECURITY DEFINER;\n` +
+      `GRANT EXECUTE ON FUNCTION exec TO service_role;`
 
-    const directJson = await directRes.json().catch(() => null)
-
-    if (!directRes.ok) {
-      return NextResponse.json({
-        error: directJson?.message ?? 'Échec de l\'exécution SQL',
-        details: directJson?.details,
-        hint: rpcError?.message
-      }, { status: 400 })
-    }
-
-    return NextResponse.json({ data: directJson, source: 'rest' }, { status: 200 })
+    return NextResponse.json({
+      error: rpcError?.message || 'RPC exec indisponible',
+      hint
+    }, { status: 400 })
   } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     if (message.toLowerCase().includes('service_role')) {
