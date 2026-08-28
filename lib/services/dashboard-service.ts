@@ -371,6 +371,83 @@ export class DashboardService {
   }
 
   // Récupérer les commandes de l'utilisateur via Supabase directement
+    /**
+   * Mappe une ligne brute de la table `orders` vers le format UI UserOrderWithItems.
+   */
+  private static mapOrderRow(order: any, userId: string): UserOrderWithItems {
+    return {
+      id: order.id,
+      user_id: order.customer_id ?? userId,
+      vendor_id: order.vendor_id,
+      order_number: order.order_number ?? `ORDER-${order.id.slice(0, 8)}`,
+      status: order.status ?? 'pending',
+      total_amount: order.total_amount ?? 0,
+      currency: order.currency ?? 'XOF',
+      final_total: order.final_total,
+      points_used: order.points_used,
+      points_discount: order.points_discount,
+      payment_option: order.payment_option,
+      delivery_option: order.delivery_option,
+      shipping_address: order.shipping_address ?? null,
+      billing_address: order.billing_address ?? null,
+      payment_method: order.payment_method ?? 'unknown',
+      payment_status: order.payment_status ?? 'pending',
+      notes: order.notes ?? null,
+      created_at: order.created_at ?? new Date().toISOString(),
+      updated_at: order.updated_at ?? order.created_at ?? new Date().toISOString(),
+      metadata: order.metadata ?? null,
+      order_items: (order.order_items || []).map((item: any) => ({
+        id: item.id,
+        order_id: item.order_id,
+        product_id: item.product_id,
+        quantity: item.quantity ?? 0,
+        product_name: item.product_name ?? 'Produit',
+        unit_price: item.unit_price ?? 0,
+        total_price: item.total_price ?? (item.quantity ?? 0) * (item.unit_price ?? 0),
+        metadata: item.metadata ?? null
+      })),
+      return_info: order.order_returns && order.order_returns.length > 0 ? {
+        status: order.order_returns[0].status,
+        reason: order.order_returns[0].reason,
+        processedAt: order.order_returns[0].processed_at,
+        createdAt: order.order_returns[0].created_at
+      } : undefined,
+      dispute_info: order.order_disputes && order.order_disputes.length > 0 ? {
+        status: order.order_disputes[0].status,
+        priority: order.order_disputes[0].priority,
+        assignedTo: order.order_disputes[0].assigned_to,
+        subject: order.order_disputes[0].subject,
+        description: order.order_disputes[0].description,
+        openedAt: order.order_disputes[0].opened_at,
+        updatedAt: order.order_disputes[0].updated_at
+      } : undefined
+    }
+  }
+
+  /**
+   * Fallback : récupère les commandes via l'API client (client admin côté
+   * serveur, insensible aux policies RLS qui bloquent la lecture directe de
+   * `orders` depuis le navigateur).
+   */
+  private static async fetchOrdersViaApi(userId: string): Promise<UserOrderWithItems[] | null> {
+    try {
+      if (typeof window === 'undefined') return null
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+      const res = await fetch('/api/client/orders', {
+        cache: 'no-store',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+      })
+      if (!res.ok) return null
+      const json = await res.json().catch(() => null)
+      const rows = Array.isArray(json?.data) ? json.data : null
+      if (!rows) return null
+      return rows.map((order: any) => this.mapOrderRow(order, userId))
+    } catch {
+      return null
+    }
+  }
+
   static async getUserOrders(userId: string): Promise<UserOrderWithItems[]> {
     try {
       const { data: orders, error } = await supabase
@@ -387,59 +464,22 @@ export class DashboardService {
 
       if (error) {
         console.error('❌ Erreur lors de la récupération des commandes via Supabase:', error)
-        return []
+        const viaApi = await this.fetchOrdersViaApi(userId)
+        return viaApi ?? []
       }
 
-      return (orders || []).map(order => ({
-        id: order.id,
-        user_id: order.customer_id ?? userId,
-        vendor_id: order.vendor_id,
-        order_number: order.order_number ?? `ORDER-${order.id.slice(0, 8)}`,
-        status: order.status ?? 'pending',
-        total_amount: order.total_amount ?? 0,
-        currency: order.currency ?? 'XOF',
-        final_total: order.final_total,
-        points_used: order.points_used,
-        points_discount: order.points_discount,
-        payment_option: order.payment_option,
-        delivery_option: order.delivery_option,
-        shipping_address: order.shipping_address ?? null,
-        billing_address: order.billing_address ?? null,
-        payment_method: order.payment_method ?? 'unknown',
-        payment_status: order.payment_status ?? 'pending',
-        notes: order.notes ?? null,
-        created_at: order.created_at ?? new Date().toISOString(),
-        updated_at: order.updated_at ?? order.created_at ?? new Date().toISOString(),
-        metadata: order.metadata ?? null,
-        order_items: (order.order_items || []).map((item: any) => ({
-          id: item.id,
-          order_id: item.order_id,
-          product_id: item.product_id,
-          quantity: item.quantity ?? 0,
-          product_name: item.product_name ?? 'Produit',
-          unit_price: item.unit_price ?? 0,
-          total_price: item.total_price ?? (item.quantity ?? 0) * (item.unit_price ?? 0),
-          metadata: item.metadata ?? null
-        })),
-        return_info: order.order_returns && order.order_returns.length > 0 ? {
-          status: order.order_returns[0].status,
-          reason: order.order_returns[0].reason,
-          processedAt: order.order_returns[0].processed_at,
-          createdAt: order.order_returns[0].created_at
-        } : undefined,
-        dispute_info: order.order_disputes && order.order_disputes.length > 0 ? {
-          status: order.order_disputes[0].status,
-          priority: order.order_disputes[0].priority,
-          assignedTo: order.order_disputes[0].assigned_to,
-          subject: order.order_disputes[0].subject,
-          description: order.order_disputes[0].description,
-          openedAt: order.order_disputes[0].opened_at,
-          updatedAt: order.order_disputes[0].updated_at
-        } : undefined
-      }))
+      // RLS peut bloquer la lecture directe (0 ligne) alors que des commandes
+      // existent : basculer sur l'API client dans ce cas.
+      if ((orders || []).length === 0) {
+        const viaApi = await this.fetchOrdersViaApi(userId)
+        if (viaApi && viaApi.length > 0) return viaApi
+      }
+
+      return (orders || []).map(order => this.mapOrderRow(order, userId))
     } catch (error) {
       console.error('❌ Erreur inattendue lors de la récupération des commandes:', error)
-      return []
+      const viaApi = await this.fetchOrdersViaApi(userId)
+      return viaApi ?? []
     }
   }
 
@@ -1974,7 +2014,7 @@ export class DashboardService {
 
       const chatMessages = await this.getChatMessages(chats.map(chat => chat.id))
 
-      // Total commandes EXACT (indépendant de la limite d'affichage de getUserOrders)
+            // Total commandes EXACT (indépendant de l'ordre d'affichage de getUserOrders)
       const { count: allOrdersCount } = await supabase
         .from('orders')
         .select('id', { count: 'exact', head: true })
@@ -1986,14 +2026,32 @@ export class DashboardService {
         .select('status, total_amount, final_total')
         .eq('customer_id', userId)
 
-      const totalSpentExact = (allOrderAmounts ?? []).reduce((sum, row: any) => {
-        const status = String(row?.status ?? '').trim().toLowerCase()
-        if (status === 'cancelled' || status === 'canceled') return sum
-        const raw = row?.final_total != null ? row.final_total : row?.total_amount
-        return sum + (Number(raw ?? 0) || 0)
-      }, 0)
+      // Si le client peut lire la table (RLS permissive), on utilise la lecture
+      // dédiée (exacte, indépendante de la limite de 200 de getUserOrders).
+      // Sinon on dérive les totaux de la liste fallback (getUserOrders), qui
+      // elle provient de l'API admin et est fiable.
+      const clientOrdersCount = Number(allOrdersCount ?? 0) || 0
+      const clientAmounts = Array.isArray(allOrderAmounts) ? allOrderAmounts : []
 
-      const totalOrdersExact = Math.max(Number(allOrdersCount ?? 0) || 0, orders.length)
+      const totalSpentExact =
+        clientAmounts.length > 0
+          ? clientAmounts.reduce((sum: number, row: any) => {
+              const status = String(row?.status ?? '').trim().toLowerCase()
+              if (status === 'cancelled' || status === 'canceled') return sum
+              const raw = row?.final_total != null ? row.final_total : row?.total_amount
+              return sum + (Number(raw ?? 0) || 0)
+            }, 0)
+          : orders.reduce((sum: number, order: any) => {
+              const status = String(order.status ?? '').trim().toLowerCase()
+              if (status === 'cancelled' || status === 'canceled') return sum
+              const raw = order.final_total != null ? order.final_total : order.total_amount
+              return sum + (Number(raw ?? 0) || 0)
+            }, 0)
+
+      const totalOrdersExact = Math.max(
+        clientOrdersCount > 0 ? clientOrdersCount : 0,
+        orders.length
+      )
 
       const stats = this.calculateStats(
         orders,
