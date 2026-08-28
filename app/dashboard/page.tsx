@@ -2996,7 +2996,7 @@ function DashboardPageContent() {
     }
 
     const pct = (cur: number, prev: number) => {
-      if (prev <= 0) return 0
+      if (prev <= 0) return cur > 0 ? 100 : 0
       return Math.round(((cur - prev) / prev) * 100)
     }
 

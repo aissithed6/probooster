@@ -251,7 +251,9 @@ type Seller = {
 type RecentActivity = {
   id: string
   type: string
+  title: string
   description: string
+  time: string
   created_at: string
 }
 
@@ -1919,6 +1921,27 @@ export class DashboardService {
 
       const chatMessages = await this.getChatMessages(chats.map(chat => chat.id))
 
+      // Total commandes EXACT (indépendant de la limite d'affichage de getUserOrders)
+      const { count: allOrdersCount } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('customer_id', userId)
+
+      // Montant total dépensé EXACT (toutes commandes non annulées, colonnes légères)
+      const { data: allOrderAmounts } = await supabase
+        .from('orders')
+        .select('status, total_amount, final_total')
+        .eq('customer_id', userId)
+
+      const totalSpentExact = (allOrderAmounts ?? []).reduce((sum, row: any) => {
+        const status = String(row?.status ?? '').trim().toLowerCase()
+        if (status === 'cancelled' || status === 'canceled') return sum
+        const raw = row?.final_total != null ? row.final_total : row?.total_amount
+        return sum + (Number(raw ?? 0) || 0)
+      }, 0)
+
+      const totalOrdersExact = Math.max(Number(allOrdersCount ?? 0) || 0, orders.length)
+
       const stats = this.calculateStats(
         orders,
         products,
@@ -1926,8 +1949,12 @@ export class DashboardService {
         unreadMessages,
         unreadChats,
         notifications,
-        sharedProducts
+        sharedProducts,
+        totalOrdersExact,
+        totalSpentExact
       )
+
+      const recentActivities = this.buildRecentActivities(orders, pointsHistory, sharedProducts)
 
       return {
         user: resolvedUser,
@@ -1936,8 +1963,8 @@ export class DashboardService {
         userStats: resolvedUserStats,
         vendorStats: resolvedVendorStats,
         orders,
-        totalOrders: orders.length,
-        totalRevenue: orders.reduce((sum, order) => sum + (order.total_amount ?? 0), 0),
+        totalOrders: totalOrdersExact,
+        totalRevenue: totalSpentExact,
         messages,
         notifications,
         unreadMessages,
@@ -1961,7 +1988,7 @@ export class DashboardService {
         shopProducts,
         pointsHistory,
         withdrawals,
-        recentActivities: [],
+        recentActivities,
         stats
       }
     } catch (error) {
@@ -1978,12 +2005,23 @@ export class DashboardService {
     unreadMessages: number,
     unreadChats: number,
     notifications: UserNotification[],
-    sharedProducts: SharedProduct[]
+    sharedProducts: SharedProduct[],
+    totalOrdersOverride?: number,
+    totalSpentOverride?: number
   ): DashboardStats {
-    const totalOrders = orders.length
+    const totalOrders = totalOrdersOverride ?? orders.length
     const totalProducts = products.length
     const totalPoints = loyaltyPoints?.points_balance || 0
-    const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0)
+
+    // Total dépensé : exclut les commandes annulées (ou utilise le total exact fourni)
+    const totalRevenue =
+      totalSpentOverride !== undefined
+        ? totalSpentOverride
+        : orders.reduce((sum, order) => {
+            const status = String(order.status ?? '').trim().toLowerCase()
+            if (status === 'cancelled' || status === 'canceled') return sum
+            return sum + (order.total_amount || 0)
+          }, 0)
     const totalShares = sharedProducts.reduce((sum, product) => sum + product.totalShares, 0)
     
     // Note moyenne des produits
@@ -2013,6 +2051,82 @@ export class DashboardService {
       expiredPoints: 0, // TODO: Implémenter
       avgRating: Math.round(averageRating * 10) / 10
     }
+  }
+
+  /**
+   * Construit la liste des "Activités Récentes" à partir des vraies données
+   * (commandes, points, partages) au lieu d'un tableau vide codé en dur.
+   */
+  private static buildRecentActivities(
+    orders: UserOrderWithItems[],
+    pointsHistory: PointsTransaction[],
+    sharedProducts: SharedProduct[]
+  ): RecentActivity[] {
+    const activities: RecentActivity[] = []
+
+    for (const order of (orders ?? []).slice(0, 5)) {
+      const createdAt = String(order.created_at ?? '')
+      if (!createdAt) continue
+      activities.push({
+        id: `order-${order.id}`,
+        type: 'order',
+        title: 'Nouvelle commande',
+        description: `${order.order_number ?? `ORDER-${String(order.id).slice(0, 8)}`} • ${this.formatRelativeTime(createdAt)}`,
+        time: this.formatActivityTime(createdAt),
+        created_at: createdAt
+      })
+    }
+
+    for (const tx of (pointsHistory ?? []).slice(0, 5)) {
+      const date = String(tx.date ?? '')
+      if (!date) continue
+      const title =
+        tx.type === 'earned'
+          ? 'Points gagnés'
+          : tx.type === 'used'
+            ? 'Points utilisés'
+            : 'Points retirés'
+      activities.push({
+        id: `points-${tx.id}`,
+        type: 'points',
+        title,
+        description: `${tx.description || 'Transaction de points'} (+${Number(tx.amount) || 0} pts)`,
+        time: this.formatActivityTime(date),
+        created_at: date
+      })
+    }
+
+    for (const sp of (sharedProducts ?? []).slice(0, 5)) {
+      const date = String(sp.sharedAt ?? '')
+      if (!date) continue
+      activities.push({
+        id: `share-${sp.id}`,
+        type: 'share',
+        title: 'Produit partagé',
+        description: `${sp.productName} • ${Number(sp.totalShares) || 0} partage(s)`,
+        time: this.formatActivityTime(date),
+        created_at: date
+      })
+    }
+
+    return activities
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(0, 6)
+  }
+
+  private static formatActivityTime(value: string | null): string {
+    if (!value) return '-'
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return '-'
+    const diffMs = Date.now() - d.getTime()
+    const mins = Math.floor(diffMs / 60000)
+    if (mins < 1) return "À l'instant"
+    if (mins < 60) return `Il y a ${mins} min`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `Il y a ${hours} h`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `Il y a ${days} j`
+    return d.toLocaleDateString('fr-FR')
   }
 
   private static formatRelativeTime(date: string | null): string {
