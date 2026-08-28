@@ -37,6 +37,7 @@ import {
   buildSyncedOptimizations,
   buildSyncedTopCardSummary,
   buildVendorAnalyticsExportFile,
+  buildLocalAnalyticsFallback,
   mergeAnalyticsWithDashboardRevenue,
   type VendorAnalyticsExportFileFormat,
   type VendorAnalyticsPeriod
@@ -226,11 +227,42 @@ export default function StatisticsAnalyticsSection({
     })
   }, [analytics, effectiveRevenue, period, ordersForMetrics, productsForMetrics, trustApiForPeriod])
 
+  /** API analytics indisponible (échec fetch) → repli local sur CA dashboard + commandes. */
+  const analyticsUnavailable = !isLoading && !analyticsMerged
+  const fallbackAnalytics = useMemo(
+    () =>
+      analyticsUnavailable
+        ? buildLocalAnalyticsFallback({
+            period,
+            revenue: effectiveRevenue ?? null,
+            orders: ordersForMetrics,
+            products: productsForMetrics,
+            stats: effectiveStats ?? null,
+            reputation: reputation ?? null,
+            rankingSnapshot,
+            totalProductViews
+          })
+        : null,
+    [
+      analyticsUnavailable,
+      period,
+      effectiveRevenue,
+      ordersForMetrics,
+      productsForMetrics,
+      effectiveStats,
+      reputation,
+      rankingSnapshot,
+      totalProductViews
+    ]
+  )
+
+  const analyticsSource = analyticsMerged ?? fallbackAnalytics
+
   const topCards = useMemo(
     () =>
       buildSyncedTopCardSummary({
         period,
-        analyticsSummary: analyticsMerged?.summary ?? null,
+        analyticsSummary: analyticsSource?.summary ?? null,
         revenue: effectiveRevenue,
         stats: effectiveStats,
         orders: ordersForMetrics,
@@ -240,7 +272,7 @@ export default function StatisticsAnalyticsSection({
         trustApi: trustApiForPeriod
       }),
     [
-      analyticsMerged?.summary,
+      analyticsSource?.summary,
       effectiveRevenue,
       effectiveStats,
       orders,
@@ -253,11 +285,11 @@ export default function StatisticsAnalyticsSection({
   )
 
   const analyticsForUi = useMemo(() => {
-    if (!analyticsMerged) return null
+    if (!analyticsSource) return null
     return {
-      ...analyticsMerged,
+      ...analyticsSource,
       summary: {
-        ...analyticsMerged.summary,
+        ...analyticsSource.summary,
         totalRevenue: topCards.totalRevenue,
         totalSales: topCards.totalSales,
         growthRate: topCards.growthRate,
@@ -270,43 +302,43 @@ export default function StatisticsAnalyticsSection({
         conversionRate: topCards.conversionRate
       },
       overview: {
-        ...analyticsMerged.overview,
+        ...analyticsSource.overview,
         activeCustomers: topCards.activeCustomers,
         conversionRate: topCards.conversionRate
       },
       advanced: buildSyncedAdvancedMetrics({
         period,
-        apiAdvanced: analyticsMerged.advanced,
+        apiAdvanced: analyticsSource.advanced,
         orders: ordersForMetrics,
         totalRevenue: topCards.totalRevenue,
         activeCustomers: topCards.activeCustomers
       }),
       insights: buildSyncedInsights({
         summary: {
-          ...analyticsMerged.summary,
+          ...analyticsSource.summary,
           totalRevenue: topCards.totalRevenue,
           totalSales: topCards.totalSales,
-          totalShares: analyticsMerged.summary.totalShares,
+          totalShares: analyticsSource.summary.totalShares,
           conversionRate: topCards.conversionRate,
           growthRate: topCards.growthRate
         },
-        apiInsights: analyticsMerged.insights,
+        apiInsights: analyticsSource.insights,
         growthRate: topCards.growthRate
       }),
       optimizations: buildSyncedOptimizations({
         summary: {
-          ...analyticsMerged.summary,
+          ...analyticsSource.summary,
           totalRevenue: topCards.totalRevenue,
           totalSales: topCards.totalSales,
           averageRating: topCards.averageRating,
-          totalShares: analyticsMerged.summary.totalShares,
+          totalShares: analyticsSource.summary.totalShares,
           conversionRate: topCards.conversionRate
         },
-        topProducts: analyticsMerged.topProducts,
-        apiOptimizations: analyticsMerged.optimizations
+        topProducts: analyticsSource.topProducts,
+        apiOptimizations: analyticsSource.optimizations
       })
     }
-  }, [analyticsMerged, topCards, ordersForMetrics, period])
+  }, [analyticsSource, topCards, ordersForMetrics, period])
 
   const isInitialLoad = isLoading && !analyticsForUi
   const summary = analyticsForUi?.summary
@@ -431,6 +463,8 @@ export default function StatisticsAnalyticsSection({
                 <SelectItem value="30d">30 derniers jours</SelectItem>
                 <SelectItem value="90d">3 derniers mois</SelectItem>
                 <SelectItem value="1y">1 an</SelectItem>
+                <SelectItem value="2y">2 ans</SelectItem>
+                <SelectItem value="3y">3 ans</SelectItem>
               </SelectContent>
             </Select>
             <AnalyticsExportFormatMenu

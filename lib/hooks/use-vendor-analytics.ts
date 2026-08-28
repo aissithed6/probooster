@@ -10,7 +10,7 @@ import {
   type VendorAnalyticsPeriod
 } from '@/lib/vendor-analytics'
 
-const ALL_PERIODS: VendorAnalyticsPeriod[] = ['7d', '30d', '90d', '1y']
+const ALL_PERIODS: VendorAnalyticsPeriod[] = ['7d', '30d', '90d', '1y', '2y', '3y']
 
 export function useVendorAnalytics(
   initialPeriod: VendorAnalyticsPeriod = '30d',

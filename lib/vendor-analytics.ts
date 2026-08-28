@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { isAnalyticsEnabled } from '@/app/api/_helpers/analytics-privacy'
 import { isPaidRevenueStatus } from '@/lib/vendor-revenue'
 
-export type VendorAnalyticsPeriod = '7d' | '30d' | '90d' | '1y'
+export type VendorAnalyticsPeriod = '7d' | '30d' | '90d' | '1y' | '2y' | '3y'
 
 export type VendorAnalyticsSalesPoint = {
   period: string
@@ -106,6 +106,8 @@ function periodToDays(period: VendorAnalyticsPeriod): number {
   if (period === '7d') return 7
   if (period === '90d') return 90
   if (period === '1y') return 365
+  if (period === '2y') return 730
+  if (period === '3y') return 1095
   return 30
 }
 
@@ -159,7 +161,7 @@ function resolveLineTotal(item: any): number {
 }
 
 function formatSeriesLabel(date: Date, period: VendorAnalyticsPeriod): string {
-  if (period === '1y') {
+  if (period === '1y' || period === '2y' || period === '3y') {
     return date.toLocaleDateString('fr-FR', { month: 'short' })
   }
   return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
@@ -1118,6 +1120,92 @@ export function mergeAnalyticsWithDashboardRevenue(
     }
   }
 }
+/**
+ * Repli 100 % local : reconstruit des analytics à partir du CA dashboard (source de
+ * vérité de l'onglet Chiffre d'affaires) + commandes, lorsque l'API analytics est
+ * indisponible. Garantit que les cartes du haut (CA, ventes, clients actifs…) restent
+ * alimentées même en cas d'échec de GET /api/vendor/analytics.
+ */
+export function buildLocalAnalyticsFallback(params: {
+  period: VendorAnalyticsPeriod
+  revenue?: {
+    totalRevenue?: number
+    totalRevenue30Days?: number
+    salesEvolution?: Array<{ date?: string; revenue?: number; ordersCount?: number; orders?: number }>
+    topProducts?: DashboardTopProductRow[]
+  } | null
+  orders?: OrderForPeriodMetrics[]
+  products?: Array<{ id?: string; name?: string }>
+  stats?: {
+    ranking?: number
+    totalVendors?: number
+    averageRating?: number
+    totalReviews?: number
+  } | null
+  reputation?: { overallRating?: number; totalReviews?: number } | null
+  rankingSnapshot?: { position?: number; totalVendors?: number } | null
+  totalProductViews?: number
+}): VendorAnalyticsData {
+  const orders = params.orders ?? []
+  const summary = buildSyncedTopCardSummary({
+    period: params.period,
+    analyticsSummary: null,
+    revenue: params.revenue ?? null,
+    stats: params.stats ?? null,
+    orders,
+    reputation: params.reputation ?? null,
+    rankingSnapshot: params.rankingSnapshot ?? null,
+    totalProductViews: params.totalProductViews ?? 0,
+    trustApi: false
+  })
+
+  const stub = {
+    period: params.period,
+    generatedAt: new Date().toISOString(),
+    summary,
+    overview: {
+      salesGrowthRate: 0,
+      revenueGrowthRate: 0,
+      customersGrowthRate: 0,
+      conversionGrowthRate: 0,
+      activeCustomers: summary.activeCustomers,
+      conversionRate: summary.conversionRate
+    },
+    advanced: {
+      roiPercent: 0,
+      roiChangePercent: 0,
+      ltv: 0,
+      ltvChangePercent: 0,
+      cac: 0,
+      cacChangePercent: 0,
+      retentionRate: 0,
+      retentionChangePercent: 0
+    },
+    salesSeries: [] as VendorAnalyticsSalesPoint[],
+    topProducts: [] as VendorAnalyticsProductRow[],
+    sharePlatforms: [] as VendorAnalyticsSharePlatform[],
+    insights: [] as VendorAnalyticsInsight[],
+    optimizations: [] as VendorAnalyticsOptimization[],
+    revenueByCategory: [] as Array<{ category: string; revenue: number; percentage: number }>,
+    customersSample: [] as VendorAnalyticsCustomerSummary[]
+  }
+
+  const charts = mergeAnalyticsCharts(stub as unknown as VendorAnalyticsData, {
+    period: params.period,
+    trustApi: false,
+    revenue: params.revenue ?? null,
+    orders,
+    products: params.products
+  })
+
+  return {
+    ...stub,
+    salesSeries: charts.salesSeries,
+    topProducts: charts.topProducts
+  }
+}
+
+function fillSalesByDayFromNonCancelledOrders(
 
 function fillSalesByDayFromNonCancelledOrders(
   rows: any[],
@@ -1176,7 +1264,7 @@ export async function buildVendorAnalytics(
   const { data: orderRows } = await supabase
     .from('orders')
     .select(
-      'id, user_id, customer_id, vendor_id, created_at, status, delivery_status, payment_status, total_amount, final_total'
+      'id, customer_id, vendor_id, created_at, status, payment_status, total_amount, final_total'
     )
     .in('vendor_id', vendorIds as any)
     .order('created_at', { ascending: false })
@@ -1214,11 +1302,9 @@ export async function buildVendorAnalytics(
       order_id,
       orders!inner (
         id,
-        user_id,
         customer_id,
         created_at,
         status,
-        delivery_status,
         payment_status,
         vendor_id,
         total_amount,
@@ -1248,7 +1334,7 @@ export async function buildVendorAnalytics(
       const { data: itemRows } = await supabase
         .from('order_items')
         .select(
-          'product_id, quantity, unit_price, total_price, order_id, orders!inner(id, created_at, status, delivery_status, payment_status, vendor_id)'
+          'product_id, quantity, unit_price, total_price, order_id, orders!inner(id, created_at, status, payment_status, vendor_id)'
         )
         .in('order_id', idsForFallback as any)
         .limit(20000)
@@ -1285,7 +1371,7 @@ export async function buildVendorAnalytics(
     const { data: ordersWithItems } = await supabase
       .from('orders')
       .select(
-        'id, created_at, status, delivery_status, payment_status, order_items (product_id, quantity, unit_price, total_price)'
+        'id, created_at, status, payment_status, order_items (product_id, quantity, unit_price, total_price)'
       )
       .in('vendor_id', vendorIds as any)
       .in('id', paidOrderIds.slice(0, 4000) as any)
@@ -1581,7 +1667,7 @@ export async function buildVendorAnalytics(
   let totalVendors = 0
   const { data: rankingRows } = await supabase
     .from('rankings')
-    .select('overall_rank, rank, ranking')
+    .select('overall_rank, rank_position')
     .in('user_id', vendorIds as any)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -1593,7 +1679,7 @@ export async function buildVendorAnalytics(
 
   const { count: vendorCount } = await supabase
     .from('vendor_stats')
-    .select('id', { count: 'exact', head: true })
+    .select('vendor_id', { count: 'exact', head: true })
 
   totalVendors = Number(vendorCount ?? 0)
 

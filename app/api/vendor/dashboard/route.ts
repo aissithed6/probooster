@@ -259,7 +259,7 @@ export async function GET(request: NextRequest) {
     // Base: commandes vendeur (pour paymentHistory / cohérence)
     const { data: orderRows } = await supabase
       .from('orders')
-      .select('id, vendor_id, created_at, status, delivery_status, total_amount, final_total, payment_status, currency')
+      .select('id, vendor_id, created_at, status, total_amount, final_total, payment_status, currency')
       .in('vendor_id', vendorIds as any)
       .order('created_at', { ascending: false })
       .limit(2000)

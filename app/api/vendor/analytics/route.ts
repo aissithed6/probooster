@@ -8,7 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase'
 export const dynamic = 'force-dynamic'
 
 function parsePeriod(value: string | null): VendorAnalyticsPeriod {
-  if (value === '7d' || value === '30d' || value === '90d' || value === '1y') {
+  if (value === '7d' || value === '30d' || value === '90d' || value === '1y' || value === '2y' || value === '3y') {
     return value
   }
   return '30d'
