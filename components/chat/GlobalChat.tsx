@@ -122,9 +122,18 @@ export const GlobalChat: React.FC = () => {
   }
 
   const handleProductClick = (product: any) => {
-    if (activeChatSession) {
-      addProductToChat(product)
+    if (!activeChatSession) {
+      toast({
+        title: "Aucune conversation active",
+        description: "Sélectionnez d'abord une conversation pour y ajouter ce produit.",
+        variant: "destructive",
+      })
+      return
     }
+    // Envoyer le produit dans la conversation (carte avec options d'achat)
+    addProductToChat(product)
+    // Revenir sur l'onglet Conversations pour voir le message envoyé
+    setActiveTab('conversations')
   }
 
   const handleAddToCart = (product: any) => {
@@ -612,11 +621,11 @@ export const GlobalChat: React.FC = () => {
                         </div>
                         <Button
                           size="sm"
-                          className="w-full h-8 text-xs"
+                          className="w-full h-8 text-xs bg-[#ff6600] hover:bg-[#e55a00]"
                           onClick={() => handleProductClick(product)}
                         >
                           <MessageCircle className="w-3 h-3 mr-1" />
-                          Contacter le vendeur
+                          Ajouter au chat
                         </Button>
                       </CardContent>
                     </Card>
