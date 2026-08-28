@@ -343,8 +343,8 @@ export default function StatisticsAnalyticsSection({
   const isInitialLoad = isLoading && !analyticsForUi
   const summary = analyticsForUi?.summary
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', minimumFractionDigits: 0 }).format(amount)
+  const { formatMoney } = useMoney()
+  const formatCurrency = (amount: number) => formatMoney(amount, { minimumFractionDigits: 0 })
 
   const formatNumber = (num: number) => new Intl.NumberFormat('fr-FR').format(num)
 

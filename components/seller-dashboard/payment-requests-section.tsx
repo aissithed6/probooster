@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useMoney } from '@/lib/hooks/use-money'
 import { 
   DollarSign, CheckCircle, XCircle, Clock, AlertTriangle,
   Download, Filter, Search, Calendar, User, Package,
@@ -184,12 +185,7 @@ export default function PaymentRequestsSection({
     }
   }, [showPaymentModal])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XOF'
-    }).format(amount)
-  }
+  const { formatMoney: formatCurrency } = useMoney()
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR')

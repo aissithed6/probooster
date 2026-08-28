@@ -1,23 +1,24 @@
-"use client"
+﻿"use client"
 
 import { useMemo } from "react"
 import { useUserPreferences } from "@/contexts/UserPreferencesContext"
+import {
+  formatMoneyAuto,
+  formatMoneyWith,
+  type MoneyFormatOptions
+} from "@/lib/money-store"
 
-type MoneyFormatOptions = {
-  minimumFractionDigits?: number
-  maximumFractionDigits?: number
-  useGrouping?: boolean
-}
+export { formatMoneyAuto, formatMoneyWith }
+export type { MoneyFormatOptions }
 
 /**
  * Hook utilitaire pour formater les montants selon les préférences utilisateur.
+ * Réagit instantanément au changement de devise (contexte) — coût nul grâce au
+ * cache global d'instances Intl partagé avec `formatMoneyAuto` (lib/money-store).
  */
 export function useMoney() {
   const { systemPrefs } = useUserPreferences()
 
-  /**
-   * Déduit une locale compatible Intl à partir de la langue utilisateur.
-   */
   const locale = useMemo(() => {
     const lang = systemPrefs.language
     if (lang === "en") return "en-US"
@@ -26,9 +27,6 @@ export function useMoney() {
     return "fr-FR"
   }, [systemPrefs.language])
 
-  /**
-   * Déduit le code ISO de devise à partir de la préférence utilisateur.
-   */
   const currencyCode = useMemo(() => {
     const cur = systemPrefs.currency
     if (cur === "eur") return "EUR"
@@ -37,31 +35,9 @@ export function useMoney() {
     return "XOF"
   }, [systemPrefs.currency])
 
-  /**
-   * Formate un montant sous forme de devise, en gérant les valeurs non numériques.
-   */
   const formatMoney = useMemo(() => {
-    return (amount: number, options?: MoneyFormatOptions) => {
-      const n = typeof amount === "number" ? amount : Number(amount ?? 0)
-      const safe = Number.isFinite(n) ? n : 0
-
-      const isXof = currencyCode === "XOF"
-      const minimumFractionDigits = options?.minimumFractionDigits ?? (isXof ? 0 : 2)
-      const maximumFractionDigits = options?.maximumFractionDigits ?? (isXof ? 0 : 2)
-
-      try {
-        return new Intl.NumberFormat(locale, {
-          style: "currency",
-          currency: currencyCode,
-          minimumFractionDigits,
-          maximumFractionDigits,
-          useGrouping: options?.useGrouping ?? true
-        }).format(safe)
-      } catch (e) {
-        console.error("[useMoney] Error formatting money:", e)
-        return `${safe.toLocaleString(locale)} ${currencyCode}`
-      }
-    }
+    return (amount: number, options?: MoneyFormatOptions) =>
+      formatMoneyWith(amount, currencyCode, locale, options)
   }, [currencyCode, locale])
 
   return {

@@ -1,6 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+
+import { setActiveMoney } from '@/lib/money-store'
 import { useAuth } from './AuthContext'
 import { usePublicGlobalSettings } from './PublicGlobalSettingsContext'
 
@@ -264,6 +266,30 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     if (typeof document === 'undefined') return
     document.documentElement.lang = systemPrefs.language
   }, [systemPrefs.language])
+
+  /**
+   * Synchronise la devise/locale active du formateur global (lib/hooks/use-money)
+   * → tout `formatMoneyAuto` de l'app suit immédiatement le choix du vendeur.
+   */
+  useEffect(() => {
+    const code =
+      systemPrefs.currency === 'eur'
+        ? 'EUR'
+        : systemPrefs.currency === 'usd'
+          ? 'USD'
+          : systemPrefs.currency === 'gbp'
+            ? 'GBP'
+            : 'XOF'
+    const locale =
+      systemPrefs.language === 'en'
+        ? 'en-US'
+        : systemPrefs.language === 'es'
+          ? 'es-ES'
+          : systemPrefs.language === 'de'
+            ? 'de-DE'
+            : 'fr-FR'
+    setActiveMoney(code, locale)
+  }, [systemPrefs.currency, systemPrefs.language])
 
   /**
    * Applique le thème au DOM + persistance best-effort en localStorage.

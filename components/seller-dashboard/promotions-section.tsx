@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useMoney } from '@/lib/hooks/use-money'
 import { 
   Tag, Plus, Edit, Trash2, Eye, Download, Filter, Search,
   TrendingUp, Users, Calendar, Target, Zap, Award, Star,
@@ -101,12 +102,7 @@ export default function PromotionsSection({
     priority: 1
   })
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XOF'
-    }).format(amount)
-  }
+  const { formatMoney: formatCurrency } = useMoney()
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR')

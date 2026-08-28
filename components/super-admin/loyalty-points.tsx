@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react'
+import { useMoney } from '@/lib/hooks/use-money'
 import {
   Star, Gift, Users, TrendingUp, TrendingDown, Settings, Plus,
   Edit, Trash2, Eye, BarChart3, Download, RefreshCw, Minus, Lock, Unlock,
@@ -1930,13 +1931,7 @@ export default function LoyaltyPoints() {
     return num.toString()
   }
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XOF',
-      minimumFractionDigits: 0
-    }).format(price)
-  }
+  const { formatMoney: formatPrice } = useMoney()
 
   const getTierBadge = (tier: string) => {
     const tierConfig = {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from 'react'
+import { useMoney } from '@/lib/hooks/use-money'
 import { 
   TrendingUp, TrendingDown, DollarSign, CreditCard, Wallet, 
   Download, Calendar, BarChart, PieChart, LineChart, 
@@ -150,12 +151,7 @@ export default function RevenueManagement({
     }>
   >([])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XOF'
-    }).format(amount)
-  }
+  const { formatMoney: formatCurrency } = useMoney()
 
   const handleDownloadAllInvoicesZip = async () => {
     try {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useMoney } from '@/lib/hooks/use-money'
 import { 
   Trophy, TrendingUp, TrendingDown, Target, Award, BarChart3, 
   Users, Star, Eye, ArrowUp, ArrowDown, Minus, Calendar,
@@ -69,12 +70,7 @@ export default function RankingsSection({ rankingData }: RankingsSectionProps) {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [activeTab, setActiveTab] = useState('overview')
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XOF'
-    }).format(amount)
-  }
+  const { formatMoney: formatCurrency } = useMoney()
 
   const getRankChange = () => {
     const change = rankingData.previousRank - rankingData.currentRank

@@ -2,6 +2,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useMoney } from '@/lib/hooks/use-money'
 import { 
   Share2, TrendingUp, Users, Eye, BarChart3, Download, Filter,
   Search, Heart, Star, Target, Award, Zap, DollarSign,
@@ -197,12 +198,7 @@ export default function SharesEngagementSection() {
     ]
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XOF'
-    }).format(amount)
-  }
+  const { formatMoney: formatCurrency } = useMoney()
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
