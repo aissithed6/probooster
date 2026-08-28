@@ -2020,7 +2020,7 @@ function SellerDashboardPageInner() {
                       <div className="text-2xl font-bold text-orange-900">{formatCurrency(sellerStats.totalRevenue)}</div>
                       <TrendingUp className="w-8 h-8 text-orange-600" />
                     </div>
-                    <p className="text-xs text-orange-600 mt-2">+12% ce mois</p>
+                    <p className="text-xs text-orange-600 mt-2">Total cumulé des commandes éligibles</p>
                   </CardContent>
                 </Card>
 
@@ -2033,7 +2033,7 @@ function SellerDashboardPageInner() {
                       <div className="text-2xl font-bold text-green-900">{sellerStats.totalOrders}</div>
                       <ShoppingCart className="w-8 h-8 text-green-600" />
                     </div>
-                    <p className="text-xs text-green-600 mt-2">+8% ce mois</p>
+                    <p className="text-xs text-green-600 mt-2">Commandes enregistrées</p>
                   </CardContent>
                 </Card>
 
