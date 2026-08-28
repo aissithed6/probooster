@@ -218,6 +218,38 @@ export class CartService {
       safeLocalStorage.setItem('cart', cart)
       bumpCartVersion()
       emitCartUpdated(cart)
+
+      // Notifier l'UI globale (notification moderne d'ajout au panier).
+      try {
+        if (typeof window !== 'undefined') {
+          const quantityAdded = 1
+          const cartCount = (Array.isArray(cart) ? cart : []).reduce(
+            (sum: number, it: any) => sum + (Number(it?.quantity ?? 0) || 0),
+            0
+          )
+          window.dispatchEvent(
+            new CustomEvent('probooster:cart-added', {
+              detail: {
+                product: {
+                  id: (product as any)?.id,
+                  name: (product as any)?.name ?? (product as any)?.title ?? 'Produit',
+                  price: effectivePrice,
+                  image:
+                    (product as any)?.image ??
+                    (Array.isArray((product as any)?.images) ? (product as any).images?.[0] : undefined) ??
+                    (product as any)?.thumbnail ??
+                    ''
+                },
+                quantityAdded,
+                cartCount
+              }
+            })
+          )
+        }
+      } catch {
+        // ignore
+      }
+
       try {
         if (typeof window !== 'undefined' && window.localStorage?.getItem('probooster_debug_cart') === 'true') {
           console.log('[CartDebug] addToCart:done', {

@@ -10,6 +10,7 @@ import HotToastClient from "@/components/providers/hot-toast-client"
 import { ChatProviderWrapper } from "@/components/providers/ChatProviderWrapper"
 import { InternalMessagingProviderWrapper } from "@/components/providers/InternalMessagingProviderWrapper"
 import { NotificationProvider, NotificationContainer } from "@/components/ui/modern-notification"
+import { CartAddedNotification } from "@/components/cart/CartAddedNotification"
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { DeliveryConfigProvider } from "@/contexts/DeliveryConfigContext"
@@ -73,6 +74,7 @@ export default function AppClientProviders({
                     <main className="min-h-screen main-content">{children}</main>
                     <Footer />
                     <NotificationContainer />
+                    <CartAddedNotification />
                     <GlobalChatEventListener />
                     <GlobalChatSystem />
                     <Suspense fallback={null}>
