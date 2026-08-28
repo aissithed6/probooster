@@ -850,6 +850,9 @@ function DashboardPageContent() {
   }, [user?.id])
   const [dashboardDataRaw, setDashboardDataRaw] = useState<DashboardData | null>(null)
   const dashboardData = dashboardDataRaw
+  // Transactions de points récentes lues via l'API admin (source fiable pour
+  // la carte "Points aujourd'hui", indépendante des policies RLS).
+  const [recentPointTx, setRecentPointTx] = useState<Array<{ type: string; points: number; createdAt: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -2430,6 +2433,22 @@ function DashboardPageContent() {
 
       const data = await DashboardService.getDashboardData(user.id)
       setDashboardDataRaw(data)
+
+      // Recharge fiable des points récents (contourne les policies RLS
+      // éventuelles sur point_transactions).
+      try {
+        const accessToken = await getClientAccessTokenSafe()
+        const res = await fetch('/api/client/points/today', {
+          cache: 'no-store',
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+        })
+        const json = await res.json().catch(() => null)
+        if (res.ok && Array.isArray(json?.data?.rows)) {
+          setRecentPointTx(json.data.rows)
+        }
+      } catch {
+        // Silencieux : le fallback pointsHistory reste utilisé.
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erreur lors du chargement du tableau de bord'
       setError(message)
@@ -2801,6 +2820,40 @@ function DashboardPageContent() {
   const realPromotions = dashboardData?.promotions ?? []
   const pointsHistory = dashboardData?.pointsHistory ?? []
   const recentPointsTransactions = useMemo(() => pointsHistory.slice(0, 10), [pointsHistory])
+
+  // Clé de jour locale (YYYY-MM-DD) — évite les décalages UTC/heure locale.
+  const localDayKey = useCallback((value: string | Date) => {
+    const d = value instanceof Date ? value : new Date(value)
+    if (Number.isNaN(d.getTime())) return ''
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }, [])
+
+  // Points gagnés pour un jour local donné.
+  // Source prioritaire : transactions récentes lues via /api/client/points/today
+  // (client admin, fiable même si RLS bloque la lecture directe de
+  // point_transactions). Fallback : pointsHistory du dashboard.
+  const DEBIT_POINT_TYPES = new Set([
+    'spend', 'exchange', 'withdrawal', 'expire', 'transfer', 'reward_redemption',
+    'transfer_fee', 'exchange_fee', 'withdrawal_fee', 'freeze'
+  ])
+  const pointsEarnedForDay = useCallback((dayKey: string) => {
+    const fromApi = recentPointTx
+      .filter((t) => localDayKey(t.createdAt) === dayKey && !DEBIT_POINT_TYPES.has(String(t.type).toLowerCase()))
+      .reduce((sum, t) => sum + Math.abs(Number(t.points) || 0), 0)
+    if (fromApi > 0) return fromApi
+
+    return pointsHistory
+      .filter((t) => localDayKey(String((t as any).date ?? '')) === dayKey && String((t as any).type ?? '').toLowerCase() === 'earned')
+      .reduce((sum, t) => sum + (Number((t as any).amount ?? 0) || 0), 0)
+  }, [recentPointTx, pointsHistory, localDayKey])
+
+  const pointsTodayKey = localDayKey(new Date())
+  const pointsYesterdayKey = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    return localDayKey(d)
+  })()
+
   const recentWithdrawals = dashboardData?.withdrawals ?? []
 
   const shareEvents = useMemo(() => {
@@ -7612,28 +7665,12 @@ Pro Booster - Votre marketplace de confiance
                 </div>
 
                 <RealTimeStats
-                  pointsToday={(() => {
-                    const today = new Date().toISOString().slice(0, 10)
-                    const todayEarned = pointsHistory
-                      .filter((t) => String((t as any).date ?? '').slice(0, 10) === today && String((t as any).type ?? '').toLowerCase() === 'earned')
-                      .reduce((sum, t) => sum + (Number((t as any).amount ?? 0) || 0), 0)
-                    return Math.round(todayEarned)
-                  })()}
-                  pointsDeltaLabel={(() => {
-                    const today = new Date().toISOString().slice(0, 10)
-                    const yesterdayKey = (() => {
-                      const d = new Date()
-                      d.setDate(d.getDate() - 1)
-                      return d.toISOString().slice(0, 10)
-                    })()
-                    const todayEarned = pointsHistory
-                      .filter((t) => String((t as any).date ?? '').slice(0, 10) === today && String((t as any).type ?? '').toLowerCase() === 'earned')
-                      .reduce((sum, t) => sum + (Number((t as any).amount ?? 0) || 0), 0)
-                    const yesterdayEarned = pointsHistory
-                      .filter((t) => String((t as any).date ?? '').slice(0, 10) === yesterdayKey && String((t as any).type ?? '').toLowerCase() === 'earned')
-                      .reduce((sum, t) => sum + (Number((t as any).amount ?? 0) || 0), 0)
-                    return computeDeltaLabel(Math.round(todayEarned), Math.round(yesterdayEarned), 'pts')
-                  })()}
+                  pointsToday={Math.round(pointsEarnedForDay(pointsTodayKey))}
+                  pointsDeltaLabel={computeDeltaLabel(
+                    Math.round(pointsEarnedForDay(pointsTodayKey)),
+                    Math.round(pointsEarnedForDay(pointsYesterdayKey)),
+                    'pts'
+                  )}
                   sharesToday={(() => {
                     const today = new Date().toISOString().slice(0, 10)
                     const fromTable = (dashboardData?.sharedProducts ?? [])
