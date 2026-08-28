@@ -1246,12 +1246,13 @@ export async function GET(request: NextRequest) {
             totalCommissions,
             returnsAmount: canonicalReturnsAmount,
             netRevenue: canonicalNetRevenue,
-            averageRating,
+                        averageRating,
             totalReviews,
             ranking,
             totalVendors,
             responseRate,
-            averageResponseTime
+            averageResponseTime,
+            totalProducts: vendorProducts.length
           },
           revenue: {
             totalRevenue: canonicalTotalRevenue,
