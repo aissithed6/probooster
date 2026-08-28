@@ -3358,10 +3358,24 @@ export class SellerDashboardService {
 
   /**
    * Active ou désactive la double authentification.
+   * Source principale : `user_security_settings` (partagée avec le super admin).
+   * Miroir conservé dans `user_profiles.preferences.security` pour compatibilité UI.
    */
   static async toggleTwoFactor(vendorId: string, enabled: boolean): Promise<void> {
     try {
-      // Pour l'instant on stocke ça dans les préférences si la table dédiée n'est pas dispo
+      // 1. Source de vérité partagée : user_security_settings (upsert).
+      const { error: securityError } = await supabase
+        .from('user_security_settings')
+        .upsert(
+          { user_id: vendorId, two_factor_enabled: enabled },
+          { onConflict: 'user_id' }
+        )
+      if (securityError) {
+        // Table pas encore créée (migration non appliquée) : on continue avec le miroir.
+        console.warn('toggleTwoFactor: user_security_settings indisponible, miroir preferences seul.', securityError.message)
+      }
+
+      // 2. Miroir dans les préférences du profil (lecture-modification-écriture).
       const { data: current, error: loadError } = await supabase
         .from('user_profiles')
         .select('preferences')
