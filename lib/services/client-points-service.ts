@@ -1066,7 +1066,27 @@ export class ClientPointsService {
         throw exchangeErr
       }
 
-      const exchangeId = exchangeRow?.id ? String(exchangeRow.id) : null
+            const exchangeId = exchangeRow?.id ? String(exchangeRow.id) : null
+
+      // Idempotence: éviter de doubler les écritures en cas de retry réseau. On
+      // vérifie d'abord si un point_transactions `exchange` référence déjà un
+      // échange identique (même amount + même devise cible) créé il y a < 10s.
+      const idempotencyWindowStart = new Date(Date.now() - 10_000).toISOString()
+      const { data: existingExchangeTx } = await supabase
+        .from('point_transactions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('type', 'exchange')
+        .eq('points', amount)
+        .gte('created_at', idempotencyWindowStart)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (existingExchangeTx?.id) {
+        // Échange déjà enregistré pour ce lot → ne pas réécrire.
+        return
+      }
 
       await supabase
         .from('point_transactions')

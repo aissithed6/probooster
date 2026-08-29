@@ -1,8 +1,10 @@
 "use client"
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { LatLngExpression } from 'leaflet'
-import L from 'leaflet'
+// CSS du moteur WebGL (bundled dans le chunk dynamique, pas dans le JS initial).
+import 'maplibre-gl/dist/maplibre-gl.css'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import maplibregl from 'maplibre-gl'
+import { MapPin } from 'lucide-react'
 
 export type DeliveryTrackingPoint = {
   lat: number
@@ -14,256 +16,237 @@ export type DeliveryTrackingMapProps = {
   driverPoint?: DeliveryTrackingPoint | null
   destinationPoint?: DeliveryTrackingPoint | null
   heightClassName?: string
+  /** thème d'affichage. `auto` suit prefers-color-scheme. Par défaut `auto`. */
+  theme?: 'light' | 'dark' | 'auto'
+}
+
+const OSM_ATTRIBUTION =
+  '&copy; <a href="https://openfreemap.org">OpenFreeMap</a> · ' +
+  '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+
+/** Tuiles raster OpenFreeMap : gratuit, zéro clé API, CDN global. */
+function tileUrl(theme: 'light' | 'dark'): string {
+  // positron (clair) / darkmatter (sombre) — style sobre, lisible pour du tracking.
+  const name = theme === 'light' ? 'positron' : 'darkmatter'
+  return `https://tile.openfreemap.org/names/${name}/{z}/{x}/{y}{r}.png`
+}
+
+/** Style MapLibre (vectorielle, version 8) pour le thème donné. */
+function buildStyle(theme: 'light' | 'dark'): maplibregl.Style {
+  return {
+    version: 8,
+    sources: {
+      'osm-tiles': {
+        type: 'raster',
+        tiles: [tileUrl(theme)],
+        attribution: OSM_ATTRIBUTION,
+        tileSize: 256
+      }
+    },
+    layers: [
+      { id: 'osm-tiles', type: 'raster', source: 'osm-tiles', paint: { 'raster-opacity': 0.92 } }
+    ]
+  } as unknown as maplibregl.Style
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+/** Marqueur SVG ultra-léger (pas d'assets/images externes). */
+function markerElement(variant: 'driver' | 'destination', label = ''): HTMLDivElement {
+  const wrap = document.createElement('div')
+  wrap.title = label
+  const color = variant === 'driver' ? '#2563eb' : '#dc2626'
+  const svg =
+    variant === 'driver'
+      ? `<svg viewBox="0 0 24 24" width="22" height="22" fill="${color}" aria-hidden="true"><path d="M3 6h2.5l3-3h6l3 3H21a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/><circle cx="9" cy="16" r="2"/><circle cx="15" cy="16" r="2"/></svg>`
+      : `<svg viewBox="0 0 24 24" width="22" height="22" fill="${color}" aria-hidden="true"><path d="M12 2l9 9h-3v9h-4v-6H10v6H6v-9H3z"/></svg>`
+  wrap.innerHTML = `<div style="width:36px;height:36px;background:#fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center">${svg}</div>`
+  return wrap
 }
 
 /**
- * Carte de tracking basée sur OpenStreetMap (Leaflet).
- * Affiche:
- * - Position actuelle du livreur
- * - Destination (adresse client) si coords disponibles
- * - Un tracé simple (Polyline) entre les 2 points
+ * Carte de tracking vectorielle (MapLibre GL JS + OpenFreeMap).
+ * Gains vs Leaflet raster: rendu WebGL fluide, marqueur animé (easeTo),
+ * polyline incrémentale. Le bundle n'est chargé qu'a l'ouverture de la carte
+ * (import dynamique ssr:false chez le consommateur) => bundle initial léger.
  */
 export default function DeliveryTrackingMap({
   driverPoint,
   destinationPoint,
-  heightClassName = 'h-64'
+  heightClassName = 'h-64',
+  theme = 'auto'
 }: DeliveryTrackingMapProps): React.JSX.Element {
-  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null)
-  const mapRef = useRef<L.Map | null>(null)
-  const instanceKeyRef = useRef<string>(
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `map_${Date.now()}_${Math.floor(Math.random() * 1000000)}`
-  )
-  const containerLeafletIdRef = useRef<unknown>(null)
-  const resizeObserverRef = useRef<ResizeObserver | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const mapRef = useRef<maplibregl.Map | null>(null)
+  const driverMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const destinationMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const routeSourceId = 'probooster-route'
 
-  // Fix icônes Leaflet (sinon markers invisibles dans Next.js)
+  // Résolution du thème: `auto` suit le CSS prefers-color-scheme.
+  const resolvedTheme = useMemo<'light' | 'dark'>(() => {
+    if (theme !== 'auto') return theme
+    if (typeof window === 'undefined') return 'light'
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }, [theme])
+
+  // true si le livreur OU la destination a des coords valides.
+  const hasDriverCoords = driverPoint && isFiniteNumber(driverPoint.lat) && isFiniteNumber(driverPoint.lng)
+  const hasDestinationCoords =
+    destinationPoint && isFiniteNumber(destinationPoint.lat) && isFiniteNumber(destinationPoint.lng)
+  const hasAnyCoords = Boolean(hasDriverCoords || hasDestinationCoords)
+
+    // --- Montage unique (évite la recompilation WebGL). Le style (thème) est
+  //     réappliqué dynamiquement par l'effet dédié ci-dessous.
+  //     On n'initialise le contexte WebGL QUE s'il existe au moins une coordonnée. ---
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (L.Icon.Default.prototype as any)._getIconUrl
+    if (!containerRef.current) return
+    if (!hasAnyCoords) return
+    const container = containerRef.current
 
-    L.Icon.Default.mergeOptions({
-      // CDN pour éviter d'ajouter des assets dans /public
-      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+    const map = new maplibregl.Map({
+      container,
+      style: buildStyle(resolvedTheme),
+      center: [13.404954, 52.520008],
+      zoom: 12,
+      attributionControl: true,
+      antialias: true
     })
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      try {
-        const map = mapRef.current
-        if (map) {
-          const container = map.getContainer() as unknown as { _leaflet_id?: unknown }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const mapContainerId = (map as any)?._containerId ?? null
-          const currentLeafletId = container._leaflet_id ?? null
-          const canRemove = mapContainerId !== null && currentLeafletId !== null && mapContainerId === currentLeafletId
-
-          if (canRemove) {
-            try {
-              map.remove()
-            } catch {
-              // ignore: cleanup must never throw
-            }
-          }
-          try {
-            delete container._leaflet_id
-          } catch {
-            // ignore
-          }
-        }
-      } catch {
-        // ignore
-      } finally {
-        containerLeafletIdRef.current = null
-        mapRef.current = null
-      }
-    }
-  }, [])
-
-  const center: LatLngExpression = useMemo(() => {
-    if (driverPoint?.lat && driverPoint?.lng) return [driverPoint.lat, driverPoint.lng]
-    if (destinationPoint?.lat && destinationPoint?.lng) return [destinationPoint.lat, destinationPoint.lng]
-    // fallback centre Afrique/Europe (ne doit quasiment jamais arriver)
-    return [0, 0]
-  }, [destinationPoint?.lat, destinationPoint?.lng, driverPoint?.lat, driverPoint?.lng])
-
-  const line: LatLngExpression[] = useMemo(() => {
-    const pts: LatLngExpression[] = []
-    if (driverPoint?.lat && driverPoint?.lng) pts.push([driverPoint.lat, driverPoint.lng])
-    if (destinationPoint?.lat && destinationPoint?.lng) pts.push([destinationPoint.lat, destinationPoint.lng])
-    return pts
-  }, [destinationPoint?.lat, destinationPoint?.lng, driverPoint?.lat, driverPoint?.lng])
-
-  const mapKey = useMemo(() => {
-    const d = driverPoint ? `${driverPoint.lat},${driverPoint.lng}` : 'no-driver'
-    const dest = destinationPoint ? `${destinationPoint.lat},${destinationPoint.lng}` : 'no-dest'
-    return `tracking-map:${instanceKeyRef.current}:${d}:${dest}`
-  }, [destinationPoint?.lat, destinationPoint?.lng, driverPoint?.lat, driverPoint?.lng])
-
-  useEffect(() => {
-    const container = containerEl
-    if (!container) return
-
-    if (mapRef.current) {
-      try {
-        mapRef.current.off()
-      } catch {
-        // ignore
-      }
-
-      try {
-        mapRef.current.remove()
-      } catch {
-        // ignore
-      }
-
-      mapRef.current = null
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((container as any)._leaflet_id) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (container as any)._leaflet_id
-    }
-
-    container.innerHTML = ''
-
-    const map = L.map(container, {
-      zoomControl: true,
-      attributionControl: true
-    }).setView(center as L.LatLngExpression, 13)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    containerLeafletIdRef.current = (map as any)?._containerId ?? (container as any)._leaflet_id ?? null
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(map)
-
-    const layers: L.Layer[] = []
-
-    if (driverPoint) {
-      layers.push(L.marker([driverPoint.lat, driverPoint.lng]).addTo(map))
-    }
-
-    if (destinationPoint) {
-      layers.push(L.marker([destinationPoint.lat, destinationPoint.lng]).addTo(map))
-    }
-
-    if (line.length >= 2) {
-      layers.push(L.polyline(line as L.LatLngExpression[], { color: '#f97316', weight: 4 }).addTo(map))
-    }
-
-    if (line.length >= 1) {
-      const bounds = L.latLngBounds(line as L.LatLngExpression[])
-      map.fitBounds(bounds, { padding: [24, 24] })
-    }
-
-    try {
-      resizeObserverRef.current?.disconnect()
-    } catch {
-      // ignore
-    }
-
-    try {
-      resizeObserverRef.current = new ResizeObserver(() => {
-        try {
-          map.invalidateSize({ animate: false })
-        } catch {
-          // ignore
-        }
-      })
-      resizeObserverRef.current.observe(container)
-    } catch {
-      resizeObserverRef.current = null
-    }
-
-    try {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          try {
-            map.invalidateSize({ animate: false })
-          } catch {
-            // ignore
-          }
-        })
-      })
-    } catch {
-      // ignore
-    }
-
     mapRef.current = map
 
+    const resizeObserver = new ResizeObserver(() => {
+      try {
+        map.invalidateSize()
+      } catch {
+        // ignore
+      }
+    })
+    resizeObserver.observe(container)
+
     return () => {
+      resizeObserver.disconnect()
+      driverMarkerRef.current?.remove()
+      destinationMarkerRef.current?.remove()
+      driverMarkerRef.current = null
+      destinationMarkerRef.current = null
       try {
-        resizeObserverRef.current?.disconnect()
+        map.remove()
       } catch {
-        // ignore
-      } finally {
-        resizeObserverRef.current = null
+        // ignore: cleanup must never throw
       }
-
-      layers.forEach((layer) => {
-        try {
-          layer.remove()
-        } catch {
-          // ignore
-        }
-      })
-
-      try {
-        map.off()
-      } catch {
-        // ignore
-      }
-
-      try {
-        // Si le conteneur a déjà été réutilisé par une autre instance Leaflet,
-        // ne pas retirer la carte pour éviter l'erreur "Map container is being reused by another instance".
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const currentLeafletId = (container as any)._leaflet_id ?? null
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mapContainerId = (map as any)?._containerId ?? null
-        const canRemove =
-          mapContainerId !== null &&
-          currentLeafletId !== null &&
-          mapContainerId === currentLeafletId &&
-          currentLeafletId === containerLeafletIdRef.current
-
-        if (canRemove) {
-          try {
-            map.remove()
-          } catch {
-            // ignore: cleanup must never throw
-          }
-        }
-      } finally {
-        if (mapRef.current === map) {
-          mapRef.current = null
-        }
-        if (containerLeafletIdRef.current !== null) {
-          containerLeafletIdRef.current = null
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((container as any)._leaflet_id) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          delete (container as any)._leaflet_id
-        }
-        container.innerHTML = ''
-      }
+      mapRef.current = null
     }
-  }, [mapKey, center, containerEl, destinationPoint, driverPoint, line])
+  }, [resolvedTheme, hasAnyCoords])
+
+  // (Re)dessine la polyligne route + recentre la caméra.
+  const fitRoute = useCallback(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const pts: [number, number][] = []
+    if (driverPoint && isFiniteNumber(driverPoint.lat) && isFiniteNumber(driverPoint.lng))
+      pts.push([driverPoint.lng, driverPoint.lat])
+    if (destinationPoint && isFiniteNumber(destinationPoint.lat) && isFiniteNumber(destinationPoint.lng))
+      pts.push([destinationPoint.lng, destinationPoint.lat])
+
+    if (pts.length === 0) return
+
+    if (!map.getSource(routeSourceId)) {
+      map.addSource(routeSourceId, {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} }
+      })
+      map.addLayer({
+        id: 'probooster-route-line',
+        type: 'line',
+        source: routeSourceId,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#f97316', 'line-width': 5, 'line-opacity': 0.9 }
+      })
+    }
+    const geo = map.getSource(routeSourceId) as maplibregl.GeoJSONSource
+    if (geo) {
+      geo.setData({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: pts },
+        properties: {}
+      })
+    }
+
+    const bounds = pts.reduce(
+      (b, c) => b.extend(c),
+      new maplibregl.LngLatBounds(pts[0], pts[0])
+    )
+    map.fitBounds(bounds, { padding: 24, maxZoom: 15, duration: 700, essential: true })
+  }, [driverPoint, destinationPoint])
+    // --- Re-réaction aux changements de position (sans recréer la carte) ---
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    // Marqueur du livreur (animé via easeTo)
+    if (driverPoint && isFiniteNumber(driverPoint.lat) && isFiniteNumber(driverPoint.lng)) {
+      const pos = { lng: driverPoint.lng, lat: driverPoint.lat }
+      if (!driverMarkerRef.current) {
+        driverMarkerRef.current = new maplibregl.Marker({
+          element: markerElement('driver', driverPoint.label ?? 'Livreur'),
+          anchor: 'center'
+        })
+          .setLngLat(pos)
+          .addTo(map)
+      } else {
+        driverMarkerRef.current.setLngLat(pos)
+      }
+      // Centre la carte derrière le livreur, légèrement au-dessus.
+      map.easeTo({
+        center: [driverPoint.lng, driverPoint.lat],
+        offset: [0, 60],
+        duration: 700,
+        essential: true
+      })
+    } else {
+      driverMarkerRef.current?.remove()
+      driverMarkerRef.current = null
+    }
+
+    // Marqueur de destination
+    if (destinationPoint && isFiniteNumber(destinationPoint.lat) && isFiniteNumber(destinationPoint.lng)) {
+      const pos = { lng: destinationPoint.lng, lat: destinationPoint.lat }
+      if (!destinationMarkerRef.current) {
+        destinationMarkerRef.current = new maplibregl.Marker({
+          element: markerElement('destination', destinationPoint.label ?? 'Destination'),
+          anchor: 'center'
+        })
+          .setLngLat(pos)
+          .addTo(map)
+      } else {
+        destinationMarkerRef.current.setLngLat(pos)
+      }
+    } else {
+      destinationMarkerRef.current?.remove()
+      destinationMarkerRef.current = null
+    }
+
+    fitRoute()
+  }, [driverPoint, destinationPoint, fitRoute, hasAnyCoords, resolvedTheme])
 
   return (
     <div
-      key={mapKey}
-      className={`w-full overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5 ${heightClassName}`}
+      className={`relative w-full overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5 ${heightClassName}`}
     >
-      <div key={mapKey} ref={setContainerEl} className="h-full w-full" />
+      <div ref={containerRef} className="h-full w-full" />
+      {!hasAnyCoords && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/80 p-4 text-center backdrop-blur-sm dark:bg-gray-900/80">
+          <MapPin className="h-7 w-7 text-gray-400" />
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            Localisation GPS indisponible
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            La position de suivi sera affichée dès que le livreur sera localisé.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

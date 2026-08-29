@@ -106,7 +106,7 @@ export function useClientDeliveries(options: UseClientDeliveriesOptions = {}) {
       if (cancelled || !mounted) return
       if (!userId) return
 
-      channel = supabase
+            channel = supabase
         .channel(`client-deliveries:${userId}`)
         .on(
           'postgres_changes',
@@ -115,6 +115,18 @@ export function useClientDeliveries(options: UseClientDeliveriesOptions = {}) {
             schema: 'public',
             table: 'deliveries',
             filter: `customer_id=eq.${userId}`
+          },
+          scheduleRefresh
+        )
+        // Les évènements de chronologie (driver_accept, delivered, client_received, …)
+        // sont insérés dans delivery_events sans toucher à deliveries.updated_at.
+        // On écoute donc aussi cette table pour rafraîchir la liste en temps réel.
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'delivery_events'
           },
           scheduleRefresh
         )
