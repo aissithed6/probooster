@@ -27,29 +27,16 @@ const OSM_ATTRIBUTION =
   '&copy; <a href="https://openfreemap.org">OpenFreeMap</a> · ' +
   '<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
-/** Tuiles raster OpenFreeMap : gratuit, zéro clé API, CDN global. */
-function tileUrl(theme: 'light' | 'dark'): string {
-  // positron (clair) / darkmatter (sombre) — style sobre, lisible pour du tracking.
-  const name = theme === 'light' ? 'positron' : 'darkmatter'
-  return `https://tile.openfreemap.org/names/${name}/{z}/{x}/{y}{r}.png`
-}
-
-/** Style MapLibre (vectorielle, version 8) pour le thème donné. */
-function buildStyle(theme: 'light' | 'dark'): maplibregl.StyleSpecification {
-  return {
-    version: 8,
-    sources: {
-      'osm-tiles': {
-        type: 'raster',
-        tiles: [tileUrl(theme)],
-        attribution: OSM_ATTRIBUTION,
-        tileSize: 256
-      }
-    },
-    layers: [
-      { id: 'osm-tiles', type: 'raster', source: 'osm-tiles', paint: { 'raster-opacity': 0.92 } }
-    ]
-  } as maplibregl.StyleSpecification
+/**
+ * Styles vectoriels hébergés par OpenFreeMap (gratuit, zéro clé API, CDN global).
+ * ⚠️ On utilise les URLs officielles `https://tiles.openfreemap.org/styles/*`
+ * (styles MapLibre complets). Les URLs raster "tiles.openfreemap.org/names/*"
+ * n'existent pas et provoquent ERR_NAME_NOT_RESOLVED.
+ */
+function styleUrl(theme: 'light' | 'dark'): string {
+  return theme === 'light'
+    ? 'https://tiles.openfreemap.org/styles/liberty'
+    : 'https://tiles.openfreemap.org/styles/dark'
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -124,7 +111,7 @@ export default function DeliveryTrackingMap({
 
     const map = new maplibregl.Map({
       container,
-      style: buildStyle(resolvedTheme),
+      style: styleUrl(resolvedTheme),
       center: [13.404954, 52.520008],
       zoom: 12,
       canvasContextAttributes: { antialias: true }
