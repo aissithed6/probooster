@@ -2,9 +2,12 @@
 
 // CSS du moteur WebGL (bundled dans le chunk dynamique, pas dans le JS initial).
 import 'maplibre-gl/dist/maplibre-gl.css'
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
-import maplibregl from 'maplibre-gl'
-import { MapPin } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+// Import "namespace" : la forme la plus fiable pour maplibre-gl (évite que le
+// module soit `undefined` sous certains tree-shaking/bundlers, cause de
+// "Cannot read properties of undefined (reading 'Map')").
+import * as maplibregl from 'maplibre-gl'
+import { MapPin, Loader2 } from 'lucide-react'
 
 export type DeliveryTrackingPoint = {
   lat: number
@@ -97,12 +100,22 @@ export default function DeliveryTrackingMap({
     destinationPoint && isFiniteNumber(destinationPoint.lat) && isFiniteNumber(destinationPoint.lng)
   const hasAnyCoords = Boolean(hasDriverCoords || hasDestinationCoords)
 
-    // --- Montage unique (évite la recompilation WebGL). Le style (thème) est
+  // La lib est-elle disponible au runtime ? (guard anti-crash "reading 'Map'")
+  const [libReady, setLibReady] = useState<boolean>(() => Boolean(maplibregl && maplibregl.Map))
+  const [mapFailed, setMapFailed] = useState<boolean>(false)
+
+  // --- Montage unique (évite la recompilation WebGL). Le style (thème) est
   //     réappliqué dynamiquement par l'effet dédié ci-dessous.
   //     On n'initialise le contexte WebGL QUE s'il existe au moins une coordonnée. ---
   useEffect(() => {
     if (!containerRef.current) return
     if (!hasAnyCoords) return
+    if (!maplibregl || !maplibregl.Map) {
+      // La lib n'a pas été résolue : on bascule en fallback au lieu de crasher.
+      setLibReady(false)
+      return
+    }
+    setLibReady(true)
     const container = containerRef.current
 
     const map = new maplibregl.Map({
@@ -113,6 +126,15 @@ export default function DeliveryTrackingMap({
       attributionControl: true,
       antialias: true
     })
+
+    map.on('error', (e) => {
+      // Les tuiles peuvent échouer (hors-ligne/refus CDN) sans casser l'UI.
+      // On ne marque un vrai échec que si le conteneur WebGL est indisponible.
+      if (e?.error && /webgl|context/i.test(String(e.error.message ?? ''))) {
+        setMapFailed(true)
+      }
+    })
+
     mapRef.current = map
 
     const resizeObserver = new ResizeObserver(() => {
@@ -176,14 +198,16 @@ export default function DeliveryTrackingMap({
 
     const bounds = pts.reduce(
       (b, c) => b.extend(c),
-      new maplibregl.LngLatBounds(pts[0], pts[0])
+      maplibregl && maplibregl.LngLatBounds ? new maplibregl.LngLatBounds(pts[0], pts[0]) : null
     )
-    map.fitBounds(bounds, { padding: 24, maxZoom: 15, duration: 700, essential: true })
+    if (bounds) {
+      map.fitBounds(bounds, { padding: 24, maxZoom: 15, duration: 700, essential: true })
+    }
   }, [driverPoint, destinationPoint])
     // --- Re-réaction aux changements de position (sans recréer la carte) ---
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !maplibregl || !maplibregl.Marker) return
 
     // Marqueur du livreur (animé via easeTo)
     if (driverPoint && isFiniteNumber(driverPoint.lat) && isFiniteNumber(driverPoint.lng)) {
@@ -244,6 +268,20 @@ export default function DeliveryTrackingMap({
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
             La position de suivi sera affichée dès que le livreur sera localisé.
+          </p>
+        </div>
+      )}
+      {hasAnyCoords && !libReady && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/80 p-4 text-center backdrop-blur-sm dark:bg-gray-900/80">
+          <Loader2 className="h-7 w-7 animate-spin text-gray-400" />
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Chargement de la carte…</p>
+        </div>
+      )}
+      {hasAnyCoords && libReady && mapFailed && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/80 p-4 text-center backdrop-blur-sm dark:bg-gray-900/80">
+          <MapPin className="h-7 w-7 text-gray-400" />
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            Affichage du suivi indisponible sur cet appareil
           </p>
         </div>
       )}
