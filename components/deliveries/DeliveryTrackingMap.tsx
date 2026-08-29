@@ -74,10 +74,12 @@ export default function DeliveryTrackingMap({
   const destinationMarkerRef = useRef<maplibregl.Marker | null>(null)
   const routeSourceId = 'probooster-route'
 
-  // Résolution du thème: `auto` suit le CSS prefers-color-scheme.
+  // Résolution du thème: `auto` suit d'abord le thème DU SITE (classe `dark`
+  // sur <html>, posée par UserPreferencesContext), sinon l'OS en dernier recours.
   const resolvedTheme = useMemo<'light' | 'dark'>(() => {
     if (theme !== 'auto') return theme
     if (typeof window === 'undefined') return 'light'
+    if (document.documentElement.classList.contains('dark')) return 'dark'
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   }, [theme])
 
