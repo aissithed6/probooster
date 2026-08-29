@@ -378,9 +378,11 @@ export function useClientPoints() {
   }, [state.adminPointsConfig?.basePointsPerFCFA, state.configuration?.settings])
 
   const basePointValue = useMemo(() => {
-    // basePointsPerFCFA = points / 1 FCFA => valeur d'1 point en FCFA = 1 / basePointsPerFCFA
-    return 1 / basePointsPerFCFA
-  }, [basePointsPerFCFA])
+    // Source de vérité: conversionRate = valeur d'1 point en FCFA configurée par le super admin
+    // (stockée dans point_settings.conversion_rate = pointValue). Ne pas utiliser 1/basePointsPerFCFA
+    // qui représente le taux d'ACQUISITION (points par FCFA dépensé), pas la valeur d'un point.
+    return conversionRate
+  }, [conversionRate])
 
   const balance = useMemo(() => state.summary?.balance ?? 0, [state.summary?.balance])
 

@@ -412,6 +412,21 @@ export default function PointsConfiguration({
                 className="border-teal-300"
               />
             </ThresholdCard>
+
+            <ThresholdCard
+              label="Frais d'achat"
+              helper="Frais appliqués sur le prix d'un achat de points (ex: 2 = 2%)"
+              suffix="%"
+              tone="blue"
+            >
+              <Input
+                type="number"
+                step="0.1"
+                value={config.purchaseFeePercent}
+                onChange={event => setConfig(previous => ({ ...previous, purchaseFeePercent: parseNumberInput(event.target.value) }))}
+                className="border-blue-300"
+              />
+            </ThresholdCard>
           </div>
         </div>
 

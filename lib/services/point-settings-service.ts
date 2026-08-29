@@ -7,6 +7,7 @@ export interface AdminPointSettings {
   transferFees: number
   exchangeFee: number
   purchaseValue: number
+  purchaseFeePercent: number
   withdrawalValue: number
   socialShareValue: number
   socialSharePerNetwork: Record<SocialNetworkKey, number>
@@ -44,6 +45,7 @@ export const DEFAULT_ADMIN_POINT_SETTINGS: AdminPointSettings = {
   transferFees: 100,
   exchangeFee: 50,
   purchaseValue: 0.01,
+  purchaseFeePercent: 2,
   withdrawalValue: 0.01,
   socialShareValue: 5,
   socialSharePerNetwork: {
@@ -198,6 +200,10 @@ export async function fetchAdminPointSettings(): Promise<AdminPointSettings> {
       const v = toLocaleNumber((conversion as any).socialShareValue)
       return Number.isFinite(v) && v >= 0 ? v : DEFAULT_ADMIN_POINT_SETTINGS.socialShareValue
     })(),
+    purchaseFeePercent: (() => {
+      const v = toLocaleNumber((conversion as any).purchaseFeePercent)
+      return Number.isFinite(v) && v >= 0 ? v : DEFAULT_ADMIN_POINT_SETTINGS.purchaseFeePercent
+    })(),
     socialSharePerNetwork: {
       ...DEFAULT_ADMIN_POINT_SETTINGS.socialSharePerNetwork,
       ...socialShares
@@ -337,7 +343,8 @@ export async function saveAdminPointSettings(settings: AdminPointSettings, userI
     conversion: {
       purchaseValue: settings.purchaseValue,
       withdrawalValue: settings.withdrawalValue,
-      socialShareValue: settings.socialShareValue
+      socialShareValue: settings.socialShareValue,
+      purchaseFeePercent: settings.purchaseFeePercent
     },
     socialSharePerNetwork: settings.socialSharePerNetwork,
     bonuses: {

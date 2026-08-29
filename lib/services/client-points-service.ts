@@ -34,6 +34,7 @@ export interface ClientPointsConfiguration {
     defaultCurrency: string
     conversionRate: number
     purchaseValue: number
+    purchaseFeePercent: number
     withdrawalValue: number
     socialShareValue: number
     basePointsPerFCFA: number
@@ -340,10 +341,12 @@ export class ClientPointsService {
       const purchaseValueRaw = this.toLocaleNumber(conversion?.purchaseValue)
       const withdrawalValueRaw = this.toLocaleNumber(conversion?.withdrawalValue)
       const socialShareValueRaw = this.toLocaleNumber(conversion?.socialShareValue)
+      const purchaseFeePercentRaw = this.toLocaleNumber(conversion?.purchaseFeePercent)
 
       const purchaseValue = Number.isFinite(purchaseValueRaw) && purchaseValueRaw > 0 ? purchaseValueRaw : conversionRate
       const withdrawalValue = Number.isFinite(withdrawalValueRaw) && withdrawalValueRaw > 0 ? withdrawalValueRaw : conversionRate
       const socialShareValue = Number.isFinite(socialShareValueRaw) && socialShareValueRaw > 0 ? socialShareValueRaw : 0
+      const purchaseFeePercent = Number.isFinite(purchaseFeePercentRaw) && purchaseFeePercentRaw >= 0 ? purchaseFeePercentRaw : 2
 
       const basePointsRaw = this.toLocaleNumber((bonuses as any)?.basePointsPerFCFA)
       const basePointsPerFCFA = Number.isFinite(basePointsRaw) && basePointsRaw > 0 ? basePointsRaw : 1
@@ -353,6 +356,7 @@ export class ClientPointsService {
           defaultCurrency,
           conversionRate,
           purchaseValue,
+          purchaseFeePercent,
           withdrawalValue,
           socialShareValue,
           basePointsPerFCFA,
@@ -527,6 +531,8 @@ export class ClientPointsService {
           fcfa_value: this.toPositive((loyalty.data.fcfa_value || 0) - (amount * conversionRate))
         })
         .eq('user_id', userId)
+
+      await this.syncLegacyUsersBalance(userId, this.toPositive(currentBalance - totalDebited))
     } catch (error) {
       this.handleSupabaseError(error, 'redeemRewardWithPoints')
       throw error instanceof Error ? error : new Error("Erreur inattendue lors de l'échange de récompense")
@@ -843,6 +849,8 @@ export class ClientPointsService {
         })
         .eq('user_id', userId)
 
+      await this.syncLegacyUsersBalance(userId, this.toPositive(Number(postBalance) - balanceToSubtract))
+
       const { data: transferReqRow, error: transferReqErr } = await supabase
         .from('point_transfer_requests')
         .insert({
@@ -934,6 +942,15 @@ export class ClientPointsService {
               created_at: nowIso
             })
         }
+
+        const { data: recipientLoyaltyAfter } = await supabase
+          .from('loyalty_points')
+          .select('points_balance')
+          .eq('user_id', recipient.userId)
+          .maybeSingle()
+
+        const recipientNewBalance = Number((recipientLoyaltyAfter as any)?.points_balance ?? 0)
+        await this.syncLegacyUsersBalance(recipient.userId, recipientNewBalance)
 
         if (feeAmount > 0) {
           const { data: existingFee } = await supabase
@@ -1084,6 +1101,8 @@ export class ClientPointsService {
           fcfa_value: this.toPositive((loyalty.data.fcfa_value || 0) - (amount * conversionRate))
         })
         .eq('user_id', userId)
+
+      await this.syncLegacyUsersBalance(userId, this.toPositive(currentBalance - totalDebited))
     } catch (error) {
       this.handleSupabaseError(error, 'exchangePoints')
       throw error instanceof Error ? error : new Error("Erreur inattendue lors de l'échange de points")
@@ -1212,6 +1231,8 @@ export class ClientPointsService {
           fcfa_value: this.toPositive((loyalty.data.fcfa_value || 0) - (totalDebited * withdrawalValue))
         })
         .eq('user_id', userId)
+
+      await this.syncLegacyUsersBalance(userId, this.toPositive(currentBalance - totalDebited))
     } catch (error) {
       this.handleSupabaseError(error, 'requestWithdrawal')
       throw error instanceof Error ? error : new Error('Erreur inattendue lors de la demande de retrait')
@@ -1261,6 +1282,22 @@ export class ClientPointsService {
 
   private static toPositive(value: number) {
     return Number(Math.max(value, 0).toFixed(2))
+  }
+
+  /**
+   * Synchronise la colonne legacy users.points_balance afin que le solde affiché côté
+   * super-admin (qui lit users.points_balance) reste cohérent avec loyalty_points.
+   * Best-effort : ne doit jamais bloquer l'opération principale.
+   */
+  private static async syncLegacyUsersBalance(userId: string, newBalance: number): Promise<void> {
+    try {
+      await supabase
+        .from('users')
+        .update({ points_balance: this.toPositive(Number(newBalance) || 0) } as any)
+        .eq('id', userId)
+    } catch {
+      // Ignore la synchro legacy en cas d'échec (police RLS ou autre).
+    }
   }
 
   private static async getPointSettings(): Promise<PointSettingsRow | null> {

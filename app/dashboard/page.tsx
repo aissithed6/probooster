@@ -5447,7 +5447,11 @@ function DashboardPageContent() {
     return 1
   }, [pointsConfigurationState?.settings, syncedConfiguration?.settings])
 
-  const basePointValue = useMemo(() => 1 / basePointsPerFCFA, [basePointsPerFCFA])
+  const basePointValue = useMemo(() => conversionRate, [conversionRate])
+  const purchaseFeePercent = useMemo(() => {
+    const raw = Number((pointsConfigurationState?.settings as any)?.purchaseFeePercent)
+    return Number.isFinite(raw) && raw >= 0 ? raw : 2
+  }, [pointsConfigurationState?.settings])
   const withdrawalValue = useMemo(() => {
     const fromHook = Number((syncedConfiguration?.settings as any)?.withdrawalValue)
     if (Number.isFinite(fromHook) && fromHook > 0) {
@@ -6690,7 +6694,9 @@ function DashboardPageContent() {
     try {
       // Flux réel: initialize -> verify -> purchase
       const totalPoints = Number(selectedPointsOffer.points ?? 0) + Number(selectedPointsOffer.bonus ?? 0)
-      const totalToPay = Number((Number(selectedPointsOffer.price ?? 0) * 1.02).toFixed(2))
+      const offerPrice = Number(selectedPointsOffer.price ?? 0)
+      const feePercent = purchaseFeePercent || 0
+      const totalToPay = Number((offerPrice + (offerPrice * feePercent) / 100).toFixed(2))
 
       if (!Number.isFinite(totalPoints) || totalPoints <= 0) {
         throw new Error('Nombre de points invalide')
@@ -6727,7 +6733,9 @@ function DashboardPageContent() {
             offer: {
               points: selectedPointsOffer.points,
               bonus: selectedPointsOffer.bonus,
-              price: selectedPointsOffer.price
+              price: selectedPointsOffer.price,
+              feePercent: purchaseFeePercent,
+              totalToPay
             }
           }
         })
@@ -17090,12 +17098,12 @@ Pro Booster - Votre marketplace de confiance
                     </div>
                     <div className="flex justify-between">
                       <span>Frais de transaction:</span>
-                      <span className="font-medium">{formatCurrency(selectedPointsOffer.price * 0.02)}</span>
+                      <span className="font-medium">{formatCurrency(selectedPointsOffer.price * (purchaseFeePercent / 100))}</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total à payer:</span>
-                      <span className="text-blue-600">{formatCurrency(selectedPointsOffer.price * 1.02)}</span>
+                      <span className="text-blue-600">{formatCurrency(selectedPointsOffer.price * (1 + purchaseFeePercent / 100))}</span>
                     </div>
                   </div>
                 </CardContent>
