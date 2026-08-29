@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "leaflet/dist/leaflet.css";
-
 /* Test pour forcer le chargement */
 @layer base {
   :root {
