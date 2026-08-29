@@ -12232,7 +12232,7 @@ Pro Booster - Votre marketplace de confiance
                         </div>
                         <TrendingDown className="w-8 h-8 text-green-600 shrink-0" />
                       </div>
-                      <p className="text-xs text-green-600 mt-2">Cette année</p>
+                      <p className="text-xs text-green-600 mt-2">Remises disponibles actuellement</p>
                     </CardContent>
                   </Card>
 
