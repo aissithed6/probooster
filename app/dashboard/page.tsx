@@ -10565,8 +10565,15 @@ Pro Booster - Votre marketplace de confiance
                     <div className="flex items-start space-x-6">
                       <div className="relative">
                         <Avatar className="w-24 h-24">
-                          <AvatarImage src="/placeholder.jpg" />
-                          <AvatarFallback className="text-2xl">JD</AvatarFallback>
+                          <AvatarImage src={profileData.avatar || '/placeholder.jpg'} />
+                          <AvatarFallback className="text-2xl">
+                            {(profileData.fullName || user?.email || 'P')
+                              .split(' ')
+                              .filter(Boolean)
+                              .slice(0, 2)
+                              .map((part) => part.charAt(0).toUpperCase())
+                              .join('') || 'P'}
+                          </AvatarFallback>
                         </Avatar>
                         <Button
                           size="sm"

@@ -953,13 +953,13 @@ export class DashboardService {
     const fallback = { total: 0, unread: 0, admin: 0, fromUser: 0 }
     if (!userId) return fallback
     try {
-      const base = supabase.from('user_messages').neq('status', 'deleted')
+      const base = supabase.from('user_messages')
 
       const [totalResp, unreadResp, adminResp, fromUserResp] = await Promise.all([
-        base.select('id', { count: 'exact', head: true }).or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
-        base.select('id', { count: 'exact', head: true }).eq('recipient_id', userId).eq('is_read', false),
-        base.select('id', { count: 'exact', head: true }).eq('recipient_id', userId).neq('sender_id', userId),
-        base.select('id', { count: 'exact', head: true }).eq('sender_id', userId)
+        base.select('id', { count: 'exact', head: true }).neq('status', 'deleted').or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
+        base.select('id', { count: 'exact', head: true }).neq('status', 'deleted').eq('recipient_id', userId).eq('is_read', false),
+        base.select('id', { count: 'exact', head: true }).neq('status', 'deleted').eq('recipient_id', userId).neq('sender_id', userId),
+        base.select('id', { count: 'exact', head: true }).neq('status', 'deleted').eq('sender_id', userId)
       ])
 
       return {
