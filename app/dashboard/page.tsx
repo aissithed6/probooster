@@ -2889,7 +2889,24 @@ function DashboardPageContent() {
   }, [dashboardData?.sharedProducts])
 
   const pointsChartData = useMemo(() => {
+    // Fusionne deux sources, la source admin fiable ("/api/client/points/today",
+    // lue via le client admin) étant prioritaire pour éviter les trous quand
+    // la lecture directe de point_transactions échoue (RLS).
     const byDay = new Map<string, { earned: number; used: number; lastBalance: number }>()
+
+    // 1) Source admin fiable (48h) : réduit le risque de données manquantes.
+    for (const t of recentPointTx) {
+      const dayKey = localDayKey(t.createdAt)
+      if (!dayKey) continue
+      const existing = byDay.get(dayKey) ?? { earned: 0, used: 0, lastBalance: 0 }
+      const amount = Math.abs(Number(t.points ?? 0)) || 0
+      const type = String(t.type ?? '').toLowerCase()
+      if (!DEBIT_POINT_TYPES.has(type)) existing.earned += amount
+      else existing.used += amount
+      byDay.set(dayKey, existing)
+    }
+
+    // 2) Historique complet (fallback / complément pour les jours plus anciens).
     const sorted = [...pointsHistory]
       .filter((t) => t && typeof (t as any).date === 'string')
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
@@ -2903,10 +2920,11 @@ function DashboardPageContent() {
       if (type === 'earned') existing.earned += Math.max(0, amount)
       if (type === 'used') existing.used += Math.max(0, Math.abs(amount))
       const balance = Number((t as any).balance ?? 0) || 0
-      existing.lastBalance = balance
+      if (balance !== 0) existing.lastBalance = balance
       byDay.set(dayKey, existing)
     }
 
+    // Associe le dernier solde connu par jour local.
     const items = Array.from(byDay.entries()).map(([dayKey, v]) => ({
       date: dayKey,
       points: v.lastBalance,
@@ -2917,17 +2935,17 @@ function DashboardPageContent() {
     if (items.length > 0) return items
 
     const todayDate = new Date()
-    const todayKey = todayDate.toISOString().slice(0, 10)
+    const todayKey = localDayKey(todayDate)
     const yesterdayDate = new Date(todayDate)
     yesterdayDate.setDate(yesterdayDate.getDate() - 1)
-    const yesterdayKey = yesterdayDate.toISOString().slice(0, 10)
+    const yesterdayKey = localDayKey(yesterdayDate)
     const balance = Number(pointsSummary?.balance ?? userPoints) || 0
 
     return [
       { date: yesterdayKey, points: balance, earned: 0, used: 0 },
       { date: todayKey, points: balance, earned: 0, used: 0 }
     ]
-  }, [pointsHistory, pointsSummary?.balance, userPoints])
+  }, [recentPointTx, pointsHistory, pointsSummary?.balance, userPoints, localDayKey, DEBIT_POINT_TYPES])
 
   const ordersChartData = useMemo(() => {
     const orders = realOrders ?? []
@@ -10391,6 +10409,7 @@ Pro Booster - Votre marketplace de confiance
                 <PointsEvolutionChart 
                   title="Évolution Détaillée des Points"
                   description="Analyse complète de vos gains et utilisations de points"
+                  data={pointsChartData}
                 />
               </div>
             )}

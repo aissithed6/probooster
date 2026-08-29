@@ -2062,7 +2062,14 @@ export class DashboardService {
         notifications,
         sharedProducts,
         totalOrdersExact,
-        totalSpentExact
+        totalSpentExact,
+        // Valeurs réelles Supabase pour les statistiques de points
+        Number(resolvedLoyaltyPoints?.points_spent ?? 0) || 0,
+        (withdrawals ?? []).reduce((sum: number, w: any) => sum + (Number(w?.points_amount ?? 0) || 0), 0),
+        (pointSettings as any)?.fees?.withdrawal?.percentage ?? (pointSettings as any)?.fees?.withdrawal?.flat ?? 0,
+        (pointsHistory ?? []).filter((t: any) => String(t?.type ?? '').toLowerCase() === 'expire')
+          .reduce((sum: number, t: any) => sum + (Number(t?.amount ?? 0) || 0), 0),
+        (pointSettings as any)?.limits?.withdrawal?.min ?? 0
       )
 
       const recentActivities = this.buildRecentActivities(orders, pointsHistory, sharedProducts)
@@ -2118,7 +2125,12 @@ export class DashboardService {
     notifications: UserNotification[],
     sharedProducts: SharedProduct[],
     totalOrdersOverride?: number,
-    totalSpentOverride?: number
+    totalSpentOverride?: number,
+    pointsUsedOverride?: number,
+    pointsWithdrawnOverride?: number,
+    withdrawalFeeOverride?: number,
+    expiredPointsOverride?: number,
+    withdrawalLimitOverride?: number
   ): DashboardStats {
     const totalOrders = totalOrdersOverride ?? orders.length
     const totalProducts = products.length
@@ -2154,12 +2166,12 @@ export class DashboardService {
       unreadChats,
       pendingNotifications,
       totalShares,
-      // Statistiques supplémentaires
-      pointsUsed: 0, // TODO: Implémenter
-      pointsWithdrawn: 0, // TODO: Implémenter
-      withdrawalThreshold: 0,
-      withdrawalFee: 0,
-      expiredPoints: 0, // TODO: Implémenter
+      // Statistiques supplémentaires issues de données réelles Supabase
+      pointsUsed: Number.isFinite(pointsUsedOverride ?? NaN) && (pointsUsedOverride ?? 0) >= 0 ? (pointsUsedOverride ?? 0) : 0,
+      pointsWithdrawn: Number.isFinite(pointsWithdrawnOverride ?? NaN) && (pointsWithdrawnOverride ?? 0) >= 0 ? (pointsWithdrawnOverride ?? 0) : 0,
+      withdrawalThreshold: Number.isFinite(withdrawalLimitOverride ?? NaN) && (withdrawalLimitOverride ?? 0) >= 0 ? (withdrawalLimitOverride ?? 0) : 0,
+      withdrawalFee: Number.isFinite(withdrawalFeeOverride ?? NaN) && (withdrawalFeeOverride ?? 0) >= 0 ? (withdrawalFeeOverride ?? 0) : 0,
+      expiredPoints: Number.isFinite(expiredPointsOverride ?? NaN) && (expiredPointsOverride ?? 0) >= 0 ? (expiredPointsOverride ?? 0) : 0,
       avgRating: Math.round(averageRating * 10) / 10
     }
   }
