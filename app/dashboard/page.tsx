@@ -780,9 +780,10 @@ function DashboardPageContent() {
     setPersonalizedRecommendations: setPersonalizedRecommendationsPref
   } = useUserPreferences()
 
+  const [activeSessions, setActiveSessions] = useState<any[]>([])
   const activeSessionsCount = useMemo(() => {
-    return 1
-  }, [])
+    return Array.isArray(activeSessions) ? activeSessions.length : 0
+  }, [activeSessions])
 
   /**
    * Normalise le SVG du QR code 2FA afin qu'il s'affiche correctement (taille + rendu) quel que soit
@@ -1347,6 +1348,7 @@ function DashboardPageContent() {
         description: 'Les autres appareils ont été déconnectés.',
         variant: 'default'
       })
+      void loadActiveSessions()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       toast({
@@ -2411,6 +2413,16 @@ function DashboardPageContent() {
     }
   }, [user?.id])
 
+  const loadActiveSessions = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const rows = await DashboardService.getActiveSessions(user.id)
+      setActiveSessions(rows)
+    } catch {
+      // ignore (best-effort)
+    }
+  }, [user?.id])
+
   const refreshInAppNotificationsOnly = useCallback(async () => {
     if (!user?.id) return
     try {
@@ -2437,6 +2449,11 @@ function DashboardPageContent() {
     if (activeTab !== 'messaging') return
     void loadMessageStats()
   }, [activeTab, loadMessageStats])
+
+  useEffect(() => {
+    if (activeTab !== 'settings') return
+    void loadActiveSessions()
+  }, [activeTab, loadActiveSessions])
 
   useEffect(() => {
     setUserPoints(resolvedPointsBalance)
@@ -14980,28 +14997,55 @@ Pro Booster - Votre marketplace de confiance
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <p className="font-medium">Session actuelle</p>
-                    <Badge variant="default" className="text-xs">Actuel</Badge>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Pour votre sécurité, vous pouvez contrôler votre connexion et déconnecter les autres appareils.
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Utilisez le bouton ci-dessous si vous pensez que quelqu'un d'autre est connecté à votre compte.
-                  </p>
-                </div>
+            {Array.isArray(activeSessions) && activeSessions.length > 0 ? (
+              <div className="space-y-2">
+                {activeSessions.map((session: any) => {
+                  const device = session?.device_info ?? null
+                  const deviceName =
+                    typeof device === 'object' && device !== null
+                      ? [device?.browser, device?.os, device?.device]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : ''
+                  return (
+                    <div key={session?.id ?? session?.session_token} className="p-4 rounded-lg border bg-blue-50 border-blue-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <p className="font-medium">
+                              {deviceName || `Session ${String(session?.session_token ?? '').slice(0, 8)}`}
+                            </p>
+                            <Badge variant="default" className="text-xs">Actif</Badge>
+                          </div>
+                          {session?.ip_address && (
+                            <p className="text-xs text-gray-500 mt-1">IP : {session.ip_address}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Connue le{' '}
+                            {session?.created_at
+                              ? new Date(session.created_at).toLocaleString('fr-FR')
+                              : 'date inconnue'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
+            ) : (
+              <div className="p-4 rounded-lg border bg-blue-50 border-blue-200">
+                <p className="font-medium">Aucune session active enregistrée</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Pour votre sécurité, vous pouvez contrôler votre connexion et déconnecter les autres appareils.
+                </p>
+              </div>
+            )}
 
             <Button
               variant="outline"
               className="w-full"
               onClick={() => void handleSignOutOtherSessions()}
-              disabled={isSigningOutOtherSessions}
+              disabled={isSigningOutOtherSessions || activeSessionsCount <= 1}
             >
               {isSigningOutOtherSessions ? 'Déconnexion...' : 'Déconnecter les autres appareils'}
             </Button>

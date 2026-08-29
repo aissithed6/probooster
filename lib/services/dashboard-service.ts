@@ -974,6 +974,30 @@ export class DashboardService {
     }
   }
 
+  /**
+   * Récupère les sessions actives de l'utilisateur (synchronisées avec la base).
+   */
+  static async getActiveSessions(userId: string): Promise<any[]> {
+    if (!userId) return []
+    try {
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('❌ Erreur lors de la récupération des sessions:', error)
+        return []
+      }
+      return data || []
+    } catch (error) {
+      console.error('❌ Erreur inattendue lors de la récupération des sessions:', error)
+      return []
+    }
+  }
+
   // Récupérer les produits recommandés par IA
   static async getRecommendedProducts(userId: string): Promise<RecommendedProduct[]> {
     try {
