@@ -35,7 +35,7 @@ function tileUrl(theme: 'light' | 'dark'): string {
 }
 
 /** Style MapLibre (vectorielle, version 8) pour le thème donné. */
-function buildStyle(theme: 'light' | 'dark'): maplibregl.Style {
+function buildStyle(theme: 'light' | 'dark'): maplibregl.StyleSpecification {
   return {
     version: 8,
     sources: {
@@ -49,7 +49,7 @@ function buildStyle(theme: 'light' | 'dark'): maplibregl.Style {
     layers: [
       { id: 'osm-tiles', type: 'raster', source: 'osm-tiles', paint: { 'raster-opacity': 0.92 } }
     ]
-  } as unknown as maplibregl.Style
+  } as maplibregl.StyleSpecification
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -100,6 +100,10 @@ export default function DeliveryTrackingMap({
     destinationPoint && isFiniteNumber(destinationPoint.lat) && isFiniteNumber(destinationPoint.lng)
   const hasAnyCoords = Boolean(hasDriverCoords || hasDestinationCoords)
 
+  // Style MapLibre chargé ? (addSource/addLayer exigent un style chargé,
+  // sinon MapLibre throw "Style is not done loading")
+  const [styleReady, setStyleReady] = useState(false)
+
   // La lib est-elle disponible au runtime ? (guard anti-crash "reading 'Map'")
   const [libReady, setLibReady] = useState<boolean>(() => Boolean(maplibregl && maplibregl.Map))
   const [mapFailed, setMapFailed] = useState<boolean>(false)
@@ -123,8 +127,7 @@ export default function DeliveryTrackingMap({
       style: buildStyle(resolvedTheme),
       center: [13.404954, 52.520008],
       zoom: 12,
-      attributionControl: true,
-      antialias: true
+      canvasContextAttributes: { antialias: true }
     })
 
     map.on('error', (e) => {
@@ -135,11 +138,15 @@ export default function DeliveryTrackingMap({
       }
     })
 
+    // addSource/addLayer ne sont autorisés qu'une fois le style chargé.
+    setStyleReady(false)
+    map.on('load', () => setStyleReady(true))
+
     mapRef.current = map
 
     const resizeObserver = new ResizeObserver(() => {
       try {
-        map.invalidateSize()
+        map.resize()
       } catch {
         // ignore
       }
@@ -162,9 +169,11 @@ export default function DeliveryTrackingMap({
   }, [resolvedTheme, hasAnyCoords])
 
   // (Re)dessine la polyligne route + recentre la caméra.
+  // IMPORTANT: ne s'exécute que si le style MapLibre est chargé,
+  // sinon addSource() throw "Style is not done loading".
   const fitRoute = useCallback(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !styleReady) return
 
     const pts: [number, number][] = []
     if (driverPoint && isFiniteNumber(driverPoint.lat) && isFiniteNumber(driverPoint.lng))
@@ -196,18 +205,23 @@ export default function DeliveryTrackingMap({
       })
     }
 
-    const bounds = pts.reduce(
-      (b, c) => b.extend(c),
-      maplibregl && maplibregl.LngLatBounds ? new maplibregl.LngLatBounds(pts[0], pts[0]) : null
-    )
+    let bounds: maplibregl.LngLatBounds | null = null
+    for (const c of pts) {
+      if (!bounds) {
+        bounds = maplibregl.LngLatBounds ? new maplibregl.LngLatBounds(c, c) : null
+      } else {
+        bounds = bounds.extend(c)
+      }
+    }
     if (bounds) {
       map.fitBounds(bounds, { padding: 24, maxZoom: 15, duration: 700, essential: true })
     }
-  }, [driverPoint, destinationPoint])
-    // --- Re-réaction aux changements de position (sans recréer la carte) ---
+  }, [driverPoint, destinationPoint, styleReady])
+  // --- Re-réaction aux changements de position (sans recréer la carte) ---
+  // Les marqueurs et la route ne sont posés qu'après le chargement du style.
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !maplibregl || !maplibregl.Marker) return
+    if (!map || !styleReady || !maplibregl || !maplibregl.Marker) return
 
     // Marqueur du livreur (animé via easeTo)
     if (driverPoint && isFiniteNumber(driverPoint.lat) && isFiniteNumber(driverPoint.lng)) {
@@ -253,7 +267,7 @@ export default function DeliveryTrackingMap({
     }
 
     fitRoute()
-  }, [driverPoint, destinationPoint, fitRoute, hasAnyCoords, resolvedTheme])
+  }, [driverPoint, destinationPoint, fitRoute, hasAnyCoords, resolvedTheme, styleReady])
 
   return (
     <div
