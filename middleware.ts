@@ -166,5 +166,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/(.*)'],
+  // On exclut les assets statiques Next (_next/static, _next/image) et les
+  // fichiers publics : le middleware n'a de valeur que sur les pages/API.
+  // Réduit la charge et évite toute interférence de cache sur les chunks JS.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|css|js|woff2?)$).*)'],
 }
