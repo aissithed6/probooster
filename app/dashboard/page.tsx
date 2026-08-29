@@ -4547,6 +4547,52 @@ function DashboardPageContent() {
   const realShopProducts = dashboardData?.shopProducts ?? []
   const realActivities = dashboardData?.recentActivities ?? []
 
+  // Précision IA réelle = moyenne des scores de confiance des recommandations actives
+  const aiPrecisionPercent = useMemo(() => {
+    const confidences = [
+      ...realRecommendedProducts.map((p: any) => Number(p?.aiConfidence ?? 0)),
+      ...realRecommendedSellers.map((s: any) => Number(s?.aiConfidence ?? 0)),
+      ...realRecommendedPromotions.map((p: any) => Number(p?.aiConfidence ?? 0))
+    ].filter(n => Number.isFinite(n) && n > 0)
+    if (confidences.length === 0) return 0
+    return Math.round(confidences.reduce((a: number, b: number) => a + b, 0) / confidences.length)
+  }, [realRecommendedProducts, realRecommendedSellers, realRecommendedPromotions])
+
+  // Hydratation des interactions persistées (favoris, follows, alertes, usage)
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    void (async () => {
+      const interactions = await DashboardService.getUserInteractions(user.id)
+      if (cancelled) return
+      if (interactions.wishlistProductIds.length > 0) {
+        setProductFavorites(prev => Array.from(new Set([...prev, ...interactions.wishlistProductIds])))
+      }
+      if (interactions.promotionFavorites.length > 0) {
+        setPromotionFavorites(prev => Array.from(new Set([...prev, ...interactions.promotionFavorites])))
+      }
+      if (interactions.sellerFollows.length > 0) {
+        setSellerFollowStatus(prev => {
+          const next = { ...prev }
+          for (const sellerId of interactions.sellerFollows) {
+            if (!(sellerId in next)) next[sellerId] = true
+          }
+          return next
+        })
+      }
+      if (interactions.promotionAlerts.length > 0) {
+        setPromotionAlerts(prev => Array.from(new Set([...prev, ...interactions.promotionAlerts])))
+      }
+      if (Object.keys(interactions.promotionUsage).length > 0) {
+        setPromotionUsage(prev => ({ ...interactions.promotionUsage, ...prev }))
+      }
+      if (interactions.promotionAppliedIds.length > 0) {
+        setAppliedPromotions(prev => Array.from(new Set([...prev, ...interactions.promotionAppliedIds])))
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user?.id])
+
   // Gestion du chargement et des erreurs Supabase
   useEffect(() => {
     if (dashboardData) {
@@ -6270,8 +6316,8 @@ function DashboardPageContent() {
     const isFavorite = productFavorites.includes(productIdStr)
     toast({
       title: isFavorite ? "Retiré des favoris" : "Ajouté aux favoris",
-      description: isFavorite 
-        ? "Produit retiré de vos favoris" 
+      description: isFavorite
+        ? "Produit retiré de vos favoris"
         : "Produit ajouté à vos favoris",
       variant: "default",
     })
@@ -6281,6 +6327,11 @@ function DashboardPageContent() {
         ? prev.filter(id => id !== productIdStr)
         : [...prev, productIdStr]
     )
+
+    // Persistance Supabase (table user_wishlists)
+    if (user?.id) {
+      void DashboardService.setProductWishlist(user.id, productIdStr, !isFavorite)
+    }
   }
 
   const shareProduct = (item: any) => {
@@ -6403,12 +6454,17 @@ function DashboardPageContent() {
   }
 
   const toggleSellerFollow = (sellerId: string) => {
+    const isFollowing = sellerFollowStatus[sellerId]
     setSellerFollowStatus(prev => ({
       ...prev,
       [sellerId]: !prev[sellerId]
     }))
-    
-    const isFollowing = sellerFollowStatus[sellerId]
+
+    // Persistance Supabase (table activity_logs)
+    if (user?.id) {
+      void DashboardService.setUserInteraction(user.id, 'seller_follow', 'seller', sellerId, !isFollowing)
+    }
+
     toast({
       title: isFollowing ? "Ne suit plus" : "Suit maintenant",
       description: isFollowing 
@@ -6501,6 +6557,11 @@ function DashboardPageContent() {
       [promotion.id]: (prev[promotion.id] || 0) + 1
     }))
 
+    // Persistance Supabase (table activity_logs)
+    if (user?.id) {
+      void DashboardService.setUserInteraction(user.id, 'promotion_applied', 'promotion', promotion.id, true)
+    }
+
     // Ajouter à l'historique
     const promotionRecord = {
       id: promotion.id,
@@ -6541,7 +6602,7 @@ function DashboardPageContent() {
   const exportPromotions = () => {
     const csvContent = [
       ['Titre', 'Type', 'Valeur', 'Début', 'Fin', 'Utilisations', 'Statut', 'Priorité'],
-              ...realPromotions.map(promotion => [
+              ...realPromotions.map((promotion: any) => [
         promotion.title,
         promotion.type,
         promotion.value,
@@ -6584,7 +6645,12 @@ function DashboardPageContent() {
   // Fonction pour activer les alertes de promotion
   const togglePromotionAlerts = (promotionTitle: string) => {
     const hasAlert = promotionAlerts.includes(promotionTitle)
-    
+
+    // Persistance Supabase (table activity_logs)
+    if (user?.id && promotionTitle) {
+      void DashboardService.setUserInteraction(user.id, 'promotion_alert', 'promotion', promotionTitle, !hasAlert)
+    }
+
     if (hasAlert) {
       setPromotionAlerts(prev => prev.filter(title => title !== promotionTitle))
       toast({
@@ -6635,17 +6701,22 @@ function DashboardPageContent() {
 
 
   const togglePromotionFavorite = (promotionId: string) => {
+    const isFavorite = promotionFavorites.includes(promotionId)
     setPromotionFavorites(prev =>
       prev.includes(promotionId)
         ? prev.filter(id => id !== promotionId)
         : [...prev, promotionId]
     )
-    
-    const isFavorite = promotionFavorites.includes(promotionId)
+
+    // Persistance Supabase (table activity_logs)
+    if (user?.id) {
+      void DashboardService.setUserInteraction(user.id, 'promotion_favorite', 'promotion', promotionId, !isFavorite)
+    }
+
     toast({
       title: isFavorite ? "Retiré des favoris" : "Ajouté aux favoris",
-      description: isFavorite 
-        ? "Promotion retirée de vos favoris" 
+      description: isFavorite
+        ? "Promotion retirée de vos favoris"
         : "Promotion ajoutée à vos favoris",
       variant: "default",
     })
@@ -11678,7 +11749,7 @@ Pro Booster - Votre marketplace de confiance
                     onClick={() => {
                       toast({
                         title: "Statistiques IA",
-                        description: "Précision IA: 94.2% - Basée sur vos interactions et retours",
+                        description: `Précision IA: ${aiPrecisionPercent}% - Basée sur les scores de confiance de vos recommandations actives`,
                         variant: "default",
                       })
                     }}
@@ -11688,7 +11759,7 @@ Pro Booster - Votre marketplace de confiance
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between">
-                        <div className="text-2xl font-bold text-purple-900">0%</div>
+                        <div className="text-2xl font-bold text-purple-900">{aiPrecisionPercent}%</div>
                         <Sparkles className="w-8 h-8 text-purple-600" />
                       </div>
                       <p className="text-xs text-purple-600 mt-2">Taux de satisfaction</p>

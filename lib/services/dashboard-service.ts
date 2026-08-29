@@ -1146,8 +1146,120 @@ export class DashboardService {
     }
   }
 
+  // ===== Interactions utilisateur persistées (favoris, follows, alertes) =====
+
+  /**
+   * Récupère les interactions persistées de l'utilisateur :
+   * - favoris produits (table user_wishlists)
+   * - favoris/alertes promotions, follows vendeurs, promotions appliquées (table activity_logs)
+   */
+  static async getUserInteractions(userId: string): Promise<{
+    wishlistProductIds: string[]
+    promotionFavorites: string[]
+    sellerFollows: string[]
+    promotionAlerts: string[]
+    promotionAppliedIds: string[]
+    promotionUsage: Record<string, number>
+  }> {
+    const empty = {
+      wishlistProductIds: [] as string[],
+      promotionFavorites: [] as string[],
+      sellerFollows: [] as string[],
+      promotionAlerts: [] as string[],
+      promotionAppliedIds: [] as string[],
+      promotionUsage: {} as Record<string, number>
+    }
+    try {
+      const [wishlistRes, activityRes] = await Promise.all([
+        supabase.from('user_wishlists').select('product_id').eq('user_id', userId),
+        supabase
+          .from('activity_logs')
+          .select('action, entity_type, entity_id')
+          .eq('user_id', userId)
+          .in('action', ['promotion_favorite', 'seller_follow', 'promotion_alert', 'promotion_applied'])
+          .order('created_at', { ascending: true })
+      ])
+
+      const result = { ...empty }
+      for (const row of wishlistRes.data ?? []) {
+        const pid = String((row as any)?.product_id ?? '').trim()
+        if (pid) result.wishlistProductIds.push(pid)
+      }
+
+      const usage: Record<string, number> = {}
+      for (const row of activityRes.data ?? []) {
+        const entityId = String((row as any)?.entity_id ?? '').trim()
+        if (!entityId) continue
+        const action = String((row as any)?.action ?? '')
+        if (action === 'promotion_favorite') result.promotionFavorites.push(entityId)
+        else if (action === 'seller_follow') result.sellerFollows.push(entityId)
+        else if (action === 'promotion_alert') result.promotionAlerts.push(entityId)
+        else if (action === 'promotion_applied') {
+          result.promotionAppliedIds.push(entityId)
+          usage[entityId] = (usage[entityId] ?? 0) + 1
+        }
+      }
+      result.promotionUsage = usage
+      return result
+    } catch {
+      return empty
+    }
+  }
+
+  /** Ajoute / retire un produit de la wishlist (table user_wishlists). */
+  static async setProductWishlist(userId: string, productId: string, active: boolean): Promise<boolean> {
+    try {
+      if (active) {
+        const { error } = await supabase
+          .from('user_wishlists')
+          .insert({ user_id: userId, product_id: productId } as any)
+        // 23505 = doublon déjà présent : considéré comme succès
+        return !error || (error as any)?.code === '23505'
+      }
+      const { error } = await supabase
+        .from('user_wishlists')
+        .delete()
+        .eq('user_id', userId)
+        .eq('product_id', productId)
+      return !error
+    } catch {
+      return false
+    }
+  }
+
+  /** Ajoute / retire une interaction générique (favoris promo, follow vendeur, alerte, application). */
+  static async setUserInteraction(
+    userId: string,
+    action: 'promotion_favorite' | 'seller_follow' | 'promotion_alert' | 'promotion_applied',
+    entityType: 'promotion' | 'seller',
+    entityId: string,
+    active: boolean
+  ): Promise<boolean> {
+    try {
+      if (active) {
+        const { error } = await supabase.from('activity_logs').insert({
+          user_id: userId,
+          action,
+          entity_type: entityType,
+          entity_id: entityId
+        } as any)
+        return !error
+      }
+      const { error } = await supabase
+        .from('activity_logs')
+        .delete()
+        .eq('user_id', userId)
+        .eq('action', action)
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+      return !error
+    } catch {
+      return false
+    }
+  }
+
   // Récupérer les promotions actives
-  static async getPromotions(userId: string): Promise<Promotion[]> {
+  static async getPromotions(userId: string): Promise<any[]> {
     try {
       console.log('🔍 Récupération des promotions pour:', userId)
 

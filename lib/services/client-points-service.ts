@@ -398,7 +398,7 @@ export class ClientPointsService {
       this.handleSupabaseError(error, 'getPointsConfiguration')
       throw error instanceof Error ? error : new Error("Impossible de charger la configuration des points")
     } finally {
-      if (this.pointsConfigurationInFlight?.promise === task) {
+      if (this.pointsConfigurationInFlight?.userId === resolvedUserId) {
         this.pointsConfigurationInFlight = null
       }
     }
@@ -1282,6 +1282,27 @@ export class ClientPointsService {
 
   private static toPositive(value: number) {
     return Number(Math.max(value, 0).toFixed(2))
+  }
+
+  /**
+   * Vérifie que le montant total débité respecte les limites min/max configurées
+   * par le super-admin (table point_operation_limits) pour l'opération donnée.
+   */
+  private static ensureLimits(
+    amount: number,
+    limitRow: PointOperationLimitRow | null | undefined,
+    label: string
+  ): void {
+    if (!limitRow) return
+    const min = limitRow.min_amount !== undefined && limitRow.min_amount !== null ? Number(limitRow.min_amount) : null
+    const max = limitRow.max_amount !== undefined && limitRow.max_amount !== null ? Number(limitRow.max_amount) : null
+
+    if (min !== null && Number.isFinite(min) && min > 0 && amount < min) {
+      throw new Error(`Le montant minimum pour ${label} est de ${this.toLocaleNumber(min)} points`)
+    }
+    if (max !== null && Number.isFinite(max) && max > 0 && amount > max) {
+      throw new Error(`Le montant maximum pour ${label} est de ${this.toLocaleNumber(max)} points`)
+    }
   }
 
   /**

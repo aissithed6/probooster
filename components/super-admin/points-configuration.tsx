@@ -417,7 +417,7 @@ export default function PointsConfiguration({
               label="Frais d'achat"
               helper="Frais appliqués sur le prix d'un achat de points (ex: 2 = 2%)"
               suffix="%"
-              tone="blue"
+              tone="teal"
             >
               <Input
                 type="number"
