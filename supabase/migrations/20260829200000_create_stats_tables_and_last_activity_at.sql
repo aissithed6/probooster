@@ -3,7 +3,19 @@
 
 -- ============================================================
 -- user_stats (une ligne par utilisateur, id = auth.users.id)
+-- NOTE : si user_stats existe comme VUE, on la remplace par une table
+-- (une vue ne supporte ni index ni RLS, et casse `.eq('id', ...)`).
 -- ============================================================
+do $$
+begin
+  if exists (
+    select 1 from information_schema.views
+    where table_schema = 'public' and table_name = 'user_stats'
+  ) then
+    drop view public.user_stats cascade;
+  end if;
+end $$;
+
 create table if not exists public.user_stats (
   id uuid primary key references auth.users(id) on delete cascade,
   total_orders integer not null default 0,
@@ -34,7 +46,22 @@ create policy "user_stats_update_own"
 
 -- ============================================================
 -- vendor_stats (une ligne par vendeur, id = auth.users.id du vendeur)
+-- NOTE : dans certaines installations, vendor_stats existe comme VUE
+-- (cf. database-setup-final.sql). Une vue ne supporte ni index ni RLS,
+-- ce qui casse les requêtes `.eq('id', ...)` / `.in('user_id', ...)`
+-- (HTTP 400). On la remplace donc par une vraie table si nécessaire.
 -- ============================================================
+do $$
+begin
+  -- Si vendor_stats existe comme vue, on la supprime pour créer la table.
+  if exists (
+    select 1 from information_schema.views
+    where table_schema = 'public' and table_name = 'vendor_stats'
+  ) then
+    drop view public.vendor_stats cascade;
+  end if;
+end $$;
+
 create table if not exists public.vendor_stats (
   id uuid primary key references auth.users(id) on delete cascade,
   user_id uuid references auth.users(id) on delete cascade,
