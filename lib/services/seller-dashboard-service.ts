@@ -1159,7 +1159,7 @@ export class SellerDashboardService {
         linkedin: String(socialRaw.linkedin ?? '')
       },
       verification: {
-        isVerified: Boolean(verificationRaw.isVerified ?? (verificationRaw.status === 'approved') || params.isVerified),
+        isVerified: Boolean(verificationRaw.isVerified ?? (verificationRaw.status === 'approved' || params.isVerified)),
         documents: Array.isArray(verificationRaw.documents) ? verificationRaw.documents : []
       },
       preferences: {
