@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -83,6 +83,7 @@ type TargetingVendor = {
 type TargetingProduct = {
   id: string
   name: string
+  price?: number
   vendor_id: string
   tags?: string[]
 }
@@ -652,7 +653,7 @@ export default function MarketingPromotions() {
       const authHeader = session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {}
       const resp = await fetch('/api/super-admin/promotions/special-conflicts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader },
+        headers: { 'Content-Type': 'application/json', ...(authHeader as Record<string, string>) },
         body: JSON.stringify({
           start_date: finalStartIso,
           end_date: endOfDayUtcIso,
@@ -1279,7 +1280,7 @@ export default function MarketingPromotions() {
 
     setLoading(true)
     try {
-      const success = await BoostingServiceManager.deleteService(serviceId)
+      const success = await BoostingServiceManager.updateService(serviceId, { is_active: false })
       
       if (success) {
         setServices(services.filter(s => s.id !== serviceId))
@@ -1801,7 +1802,7 @@ export default function MarketingPromotions() {
         method: 'GET',
         headers: {
           accept: 'application/json',
-          ...authHeader
+          ...(authHeader as Record<string, string>)
         },
         cache: 'no-store'
       }).catch(() => null)
@@ -2994,7 +2995,7 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                   <div>
                     <p className="text-sm font-medium text-green-600">Revenus Boostage</p>
                     <p className="text-3xl font-bold text-green-900">
-                      {formatPrice(campaigns.reduce((sum, c) => sum + c.totalCost, 0))}
+                      {formatPrice(campaigns.reduce((sum, c) => sum + (c as any).totalCost, 0))}
                     </p>
                     <p className="text-sm text-green-700 mt-1">Total généré</p>
                   </div>
@@ -5008,7 +5009,7 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <p className="text-2xl font-bold text-purple-600">
-                        {formatMoney(campaigns.filter(c => c.type === selectedService.type).reduce((sum, c) => sum + c.totalCost, 0))}
+                        {formatMoney(campaigns.filter(c => c.type === selectedService.type).reduce((sum, c) => sum + (c as any).totalCost, 0))}
                       </p>
                       <p className="text-sm text-gray-600">Revenus générés</p>
                     </div>
@@ -5055,7 +5056,7 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                   <Card>
                     <CardContent className="p-4 text-center">
                       <p className="text-2xl font-bold text-purple-600">
-                        {formatMoney(campaigns.filter(c => c.type === selectedService.type).reduce((sum, c) => sum + c.totalCost, 0))}
+                        {formatMoney(campaigns.filter(c => c.type === selectedService.type).reduce((sum, c) => sum + (c as any).totalCost, 0))}
                       </p>
                       <p className="text-sm text-gray-600">Revenus</p>
                     </CardContent>
@@ -5208,7 +5209,7 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                       <SelectContent>
                         {(vendorProducts[newCampaignData.vendorId] || []).map((product) => (
                           <SelectItem key={product.id} value={product.id}>
-                            {product.name} - {formatPrice(product.price)}
+                            {product.name} - {formatPrice(product.price ?? 0)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -6326,11 +6327,11 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Date de début</Label>
-                        <p className="font-medium">{selectedCampaign.startDate}</p>
+                        <p className="font-medium">{(selectedCampaign as any).start_date}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Date de fin</Label>
-                        <p className="font-medium">{selectedCampaign.endDate}</p>
+                        <p className="font-medium">{(selectedCampaign as any).end_date}</p>
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Durée</Label>
@@ -6338,7 +6339,7 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                       </div>
                       <div>
                         <Label className="text-sm font-medium text-gray-600">Coût total</Label>
-                        <p className="font-medium text-green-600">{formatPrice(selectedCampaign.totalCost)}</p>
+                        <p className="font-medium text-green-600">{formatPrice((selectedCampaign as any).totalCost)}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -6351,7 +6352,7 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
-                      {selectedCampaign.targetPages.map((page, index) => (
+                      {((selectedCampaign as any).target_pages || []).map((page: string, index: number) => (
                         <Badge key={index} variant="secondary">
                           {page === 'home' ? 'Accueil' : 
                            page === 'product' ? 'Produit' : 
@@ -6409,7 +6410,7 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
                             <span className="text-gray-600">ROAS estimé:</span>
                             <p className="font-medium">
                               {selectedCampaign.performance.conversions > 0 
-                                ? ((selectedCampaign.performance.conversions * 75000) / selectedCampaign.totalCost).toFixed(2)
+                                ? ((selectedCampaign.performance.conversions * 75000) / (selectedCampaign as any).totalCost).toFixed(2)
                                 : '0.00'}
                             </p>
                           </div>

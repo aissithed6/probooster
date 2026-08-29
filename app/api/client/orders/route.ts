@@ -552,10 +552,10 @@ export async function POST(request: NextRequest) {
         if (profileErr) {
           console.warn('⚠️ POST /api/client/orders: user_profiles normalization failed:', profileErr)
         } else {
-          const userIdByProfileId = new Map(
+          const userIdByProfileId = new Map<string, string>(
             (profileRows ?? [])
-              .map((r: any) => [r?.id, r?.user_id])
-              .filter((entry: any) => typeof entry?.[0] === 'string' && typeof entry?.[1] === 'string')
+              .filter((r: any) => typeof r?.id === 'string' && typeof r?.user_id === 'string')
+              .map((r: any) => [r.id as string, r.user_id as string])
           )
 
           if (userIdByProfileId.size > 0) {
@@ -798,7 +798,7 @@ export async function POST(request: NextRequest) {
           shippingLat,
           shippingLng,
           billingAddress: payload.billingAddress ?? null,
-          notes: payload.notes ?? null,
+          notes: payload.notes ?? undefined,
           items: itemsPayload
         },
         {

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Icons } from '@/components/icons';
 import { NavItem } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -75,6 +76,8 @@ export function Sidebar({
   unreadNotifications,
   cartItemsCount,
 }: SidebarProps) {
+  const { userProfile } = useAuth();
+
   // Si la barre latérale est fermée, ne pas rendre le contenu
   if (!isOpen) {
     return null;

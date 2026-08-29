@@ -39,7 +39,7 @@ function uniqueStrings(values: unknown[]): string[] {
 /**
  * Wrapper de lecture Supabase: retourne `fallback` en cas d'erreur.
  */
-async function safeSelect<T>(promise: Promise<{ data: T | null; error: any }>, fallback: T): Promise<T> {
+async function safeSelect<T>(promise: any, fallback: T): Promise<T> {
   try {
     const { data, error } = await promise
     if (error) return fallback

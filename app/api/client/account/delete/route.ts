@@ -33,17 +33,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Geler les points (best-effort)
-    await supabase
-      .from('loyalty_points')
-      .update({
-        is_frozen: true,
-        frozen_at: now,
-        freeze_reason: 'account_deleted',
-        updated_at: now
-      } as any)
-      .eq('user_id', userId)
-      .then(() => null)
-      .catch(() => null)
+    try {
+      await supabase
+        .from('loyalty_points')
+        .update({
+          is_frozen: true,
+          frozen_at: now,
+          freeze_reason: 'account_deleted',
+          updated_at: now
+        } as any)
+        .eq('user_id', userId)
+    } catch {
+      // ignore (best-effort)
+    }
 
     return NextResponse.json({ data: { userId, deletedAt: now } }, { status: 200 })
   } catch (error) {

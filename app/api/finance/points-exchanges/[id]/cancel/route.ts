@@ -90,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const nextBalance = Math.max(0, Number((lpRow as any)?.points_balance ?? 0) + pointsAmount)
   const nextEarned = Math.max(0, Number((lpRow as any)?.points_earned ?? 0) + pointsAmount)
-  const nextFcfa = Math.max(0, Number(Number((lpRow as any)?.fcfa_value ?? 0) + fcfaValue).toFixed(2))
+  const nextFcfa = Number(Math.max(0, Number((lpRow as any)?.fcfa_value ?? 0) + Number(fcfaValue)).toFixed(2))
 
   const { error: upErr } = await supabase
     .from('loyalty_points')

@@ -221,7 +221,8 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
     featured: undefined,
     'low-stock': undefined,
     draft: 'draft',
-    'vendor-products': undefined
+    'vendor-products': undefined,
+    categories: undefined
   }
 
   const categoryOptions = useMemo(() => {
@@ -653,7 +654,7 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
       brand: shared.brand ?? fallback.brand,
       vendorId: shared.vendorId ?? fallback.vendorId ?? null,
       source: shared.source ?? fallback.source,
-      status: mapServiceStatus((shared.productStatus as ProductStatus | undefined) ?? fallback.status),
+      status: (mapServiceStatus(((shared.productStatus ?? fallback.status) as ProductStatus | undefined) ?? fallback.status) as ProductStatus),
       stock: shared.stockQuantity ?? fallback.stock,
       stockAlert: shared.lowStockThreshold ?? fallback.stockAlert,
       featured: shared.isFeatured ?? fallback.featured,
@@ -721,7 +722,7 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
       totalRevenue: serviceProduct.statistics?.totalRevenue ?? 0,
       featured: serviceProduct.isFeatured,
       images: sortedMedia.map((media) => media.path),
-      mainImage: primaryMedia?.path ?? serviceProduct.mainImage ?? null,
+      mainImage: primaryMedia?.path ?? (serviceProduct as any).mainImage ?? null,
       galleryImages,
       media: sharedMedia,
       tags: serviceProduct.tags ?? [],
@@ -740,7 +741,7 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
         price: serviceProduct.price,
         salePrice: serviceProduct.salePrice,
         costPrice: serviceProduct.costPrice,
-        mainImage: serviceProduct.mainImage,
+        mainImage: (serviceProduct as any).mainImage,
         galleryImages: serviceProduct.images,
         media: serviceProduct.media,
         category: primaryCategory,
@@ -755,7 +756,6 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
         sku: serviceProduct.sku,
         brand: serviceProduct.metadata?.brand,
         metadata: serviceProduct.metadata,
-        galleryImages: serviceProduct.images,
         images: serviceProduct.images
       } as SharedProduct,
       baseProduct
@@ -983,10 +983,10 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
   )
 
   const handleCreateOrUpdate = useCallback(
-    async (payload: Record<string, unknown>, mode: 'create' | 'edit', productId?: string) => {
+    async (payload: SharedProductInput & { id?: string }, mode: 'create' | 'edit', productId?: string) => {
       try {
         const basePayload: SharedProductInput & { id?: string } = {
-          ...(payload as SharedProductInput),
+          ...(payload as unknown as SharedProductInput),
           ...(productId ? { id: productId } : {})
         }
 
@@ -2770,7 +2770,7 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
             isOpen={isCreateModalOpen}
             onClose={() => setIsCreateModalOpen(false)}
             mode="create"
-            product={null}
+            product={undefined}
             context="super-admin"
             vendorOptions={vendorSelectOptions}
             initialVendorId={null}
@@ -2937,7 +2937,7 @@ interface ProductListProps {
   onView: (product: Product) => void
   selectedProducts: Set<string>
   onSelectProduct: (productId: string) => void
-  onDuplicate: (productId: string) => void
+  onDuplicate: (product: Product) => void
   onReport: (productId: string) => void
 }
 
@@ -3085,7 +3085,7 @@ function ProductList({ products, onEdit, onDelete, onStatusChange, onToggleFeatu
                       <div className="py-1">
                         <button
                           onClick={() => {
-                            onDuplicate(product.id)
+                            onDuplicate(product)
                             setOpenMenuId(null)
                           }}
                           className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"

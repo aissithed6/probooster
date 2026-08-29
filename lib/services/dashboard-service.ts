@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { ClientPointsService, ClientPointsConfiguration, ClientPointsSummary } from '@/lib/services/client-points-service'
 import { ClientAuthService } from '@/lib/services/client-auth-service'
 import { InternalMessagingService } from '@/lib/services/internal-messaging-service'
-import { supabase, type Tables, type Views } from '@/lib/supabase'
+import { supabase, type Tables } from '@/lib/supabase'
+
+type Views<T extends string = string> = Record<string, any>
+
+type OrderItem = Record<string, any>
+
+type ClientOrderRecord = Record<string, any>
 
 /**
  * Calcule un libellé lisible pour un profil (vendeur/partenaire chat).
@@ -100,7 +106,7 @@ export interface DashboardData {
   stats: DashboardStats
 }
 
-type UserOrderWithItems = {
+export type UserOrderWithItems = {
   id: string
   user_id: string
   vendor_id?: string | null
@@ -231,7 +237,7 @@ type SharedProduct = {
   sharedAt: string | null
 }
 
-type Seller = {
+export type Seller = {
   name: string
   avatar: string
   rating: number
@@ -1571,7 +1577,7 @@ export class DashboardService {
         try {
           const [byIdRes, byUserIdRes] = await Promise.all([
             supabase.from('vendor_stats').select('*').in('id', ids),
-            supabase.from('vendor_stats').select('*').in('user_id' as any, ids)
+            (supabase.from('vendor_stats') as any).select('*').in('user_id', ids)
           ])
 
           const rows = [...(byIdRes.data ?? []), ...(byUserIdRes.data ?? [])]
@@ -2224,7 +2230,7 @@ export class DashboardService {
       )
 
       const stats = this.calculateStats(
-        orders,
+        orders as any,
         products,
         resolvedLoyaltyPoints,
         unreadMessages,

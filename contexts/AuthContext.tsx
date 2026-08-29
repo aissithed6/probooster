@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
+import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react'
 import { User, UserProfile, LoyaltyPoints } from '@/lib/supabase'
 import { supabase } from '@/lib/supabase'
 import { getClientSessionSafe } from '@/lib/supabase'
@@ -599,6 +599,60 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
     }
   }
 
+  /**
+   * Enregistre la session courante dans public.user_sessions.
+   * Objectif: alimenter la section "Appareils connectés" du profil (persistance Supabase).
+   */
+  const registerUserSession = useCallback(async (userId: string, authSession: any) => {
+    try {
+      if (!userId || !authSession?.access_token) return
+
+      const token = String(authSession.access_token)
+      const tokenPrefix = token.slice(0, 24)
+      const nowIso = new Date().toISOString()
+
+      // Dé-duplication: si une session active existe déjà avec ce token,
+      // on met juste à jour last_activity_at au lieu de créer une nouvelle ligne.
+      const { data: existing } = await supabase
+        .from('user_sessions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('session_token', tokenPrefix)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (existing?.id) {
+        await supabase
+          .from('user_sessions')
+          .update({ last_activity_at: nowIso } as any)
+          .eq('id', existing.id)
+        return
+      }
+
+      const { error } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: userId,
+          session_token: token.slice(0, 24),
+          device_info: {
+            platform: typeof navigator !== 'undefined' ? (navigator as any).platform ?? null : null,
+            language: typeof navigator !== 'undefined' ? navigator.language ?? null : null,
+            screen: typeof window !== 'undefined' ? `${(window as any).screen?.width ?? 0}x${(window as any).screen?.height ?? 0}` : null
+          },
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+          is_active: true,
+          last_activity_at: nowIso
+        } as any)
+
+      if (error) {
+        console.warn('⚠️ user_sessions: enregistrement de la session impossible:', error.message)
+      }
+    } catch (error) {
+      // Best-effort: ne jamais bloquer la connexion pour ça.
+      console.warn('⚠️ user_sessions: erreur inattendue lors de l\'enregistrement', error)
+    }
+  }, [])
+
   // Écouter les changements d'authentification
   useEffect(() => {
     /**
@@ -617,6 +671,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
         syncAccessTokenCookie(session?.access_token ?? null)
 
         if (session?.user) {
+          // Enregistre la session dans user_sessions (Appareils connectés)
+          void registerUserSession(session.user.id, session)
+
           const resolvedRole = await resolveUserRole(session.user)
           setUser({
             id: session.user.id,
@@ -650,6 +707,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
         syncAccessTokenCookie(session?.access_token ?? null)
 
         if (session?.user) {
+          // Enregistre la session dans user_sessions (Appareils connectés)
+          if (event === 'SIGNED_IN') {
+            void registerUserSession(session.user.id, session)
+          }
           const resolvedRole = await resolveUserRole(session.user)
           setUser({
             id: session.user.id,

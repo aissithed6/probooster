@@ -304,7 +304,7 @@ export default function ProductManagement({ vendorId, refreshSignal, onCreatePro
         stockQuantity: product.stock,
         metadata: { duplicatedFrom: product.id }
       }
-      const created = await SellerDashboardService.createSellerProduct(payload)
+      const created = await SellerDashboardApi.createProduct(payload as any)
       if (!created) {
         throw new Error('Aucun produit n’a été renvoyé après la duplication.')
       }
@@ -615,8 +615,7 @@ export default function ProductManagement({ vendorId, refreshSignal, onCreatePro
           activate: 'Les produits sélectionnés sont désormais actifs.',
           deactivate: 'Les produits sélectionnés sont désormais inactifs.',
           feature: 'Les produits sélectionnés sont mis en avant.',
-          unfeature: 'Les produits sélectionnés ne sont plus en avant.',
-          delete: ''
+          unfeature: 'Les produits sélectionnés ne sont plus en avant.'
         }
 
         toast({ title: 'Mise à jour effectuée', description: messages[action] })
@@ -1194,7 +1193,7 @@ export default function ProductManagement({ vendorId, refreshSignal, onCreatePro
                             <Star
                               key={i}
                               className={`h-5 w-5 ${
-                                i < Math.floor(viewProductModal.product.rating)
+                                i < Math.floor((viewProductModal.product as any)?.rating ?? 0)
                                   ? 'text-yellow-500 fill-current'
                                   : 'text-gray-300'
                               }`}

@@ -194,7 +194,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Produit introuvable.' }, { status: 404 })
     }
 
-    const item = mapSupabaseProductToSharedProduct(data)
+    const item = mapSupabaseProductToSharedProduct(data as any)
 
     const aggregates = await fetchPaidProductAggregates(supabase, {
       productIds: [item.id],
@@ -263,7 +263,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Erreur lors du chargement des produits vendeur.' }, { status: 500 })
   }
 
-  const baseItems = (data ?? []).map((record) => mapSupabaseProductToSharedProduct(record))
+  const baseItems = (data ?? []).map((record) => mapSupabaseProductToSharedProduct(record as any))
 
   const aggregates = await fetchPaidProductAggregates(supabase, {
     productIds: baseItems.map((item) => item.id),
@@ -333,7 +333,7 @@ export async function POST(request: Request) {
 
   try {
     const product = await upsertFullProduct(supabase, validation.data, vendorId)
-    const shared = mapSupabaseProductToSharedProduct(product)
+    const shared = mapSupabaseProductToSharedProduct(product as any)
     return NextResponse.json({ data: shared }, { status: 201 })
   } catch (error) {
     console.error('❌ POST /api/vendor/products failed', error)
@@ -403,7 +403,7 @@ export async function PUT(request: Request) {
 
   try {
     const product = await upsertFullProduct(supabase, validation.data, vendorId, validation.data.id)
-    const shared = mapSupabaseProductToSharedProduct(product)
+    const shared = mapSupabaseProductToSharedProduct(product as any)
     return NextResponse.json({ data: shared }, { status: 200 })
   } catch (error) {
     console.error('❌ PUT /api/vendor/products failed', error)

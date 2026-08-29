@@ -165,14 +165,14 @@ const mergeAdvancedFilters = (
     const filterKey = key as keyof AdvancedFiltersState
 
     if (Array.isArray(value)) {
-      result[filterKey] = value as AdvancedFiltersState[typeof filterKey]
+      result[filterKey] = value as any
     } else if (value !== null && typeof value === 'object') {
       result[filterKey] = {
         ...(result[filterKey] as Record<string, unknown>),
         ...(value as Record<string, unknown>)
-      } as AdvancedFiltersState[typeof filterKey]
+      } as any
     } else {
-      result[filterKey] = value as AdvancedFiltersState[typeof filterKey]
+      result[filterKey] = value as any
     }
   })
 
@@ -441,7 +441,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
             enabled: feature.enabled ?? true
           }))
         : []
-    }))
+    })) as unknown as ExtendedUser[]
   }, [])
 
   // États pour la création/édition d'utilisateur
@@ -486,7 +486,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   const [customPermissions, setCustomPermissions] = useState<Set<string>>(new Set())
 
   // État pour la gestion des fonctionnalités par rôle
-  const [roleFeatures, setRoleFeatures] = useState({
+  const [roleFeatures, setRoleFeatures] = useState<Record<string, Record<string, string[]>>>({
     client: {
       dashboard: ['overview', 'orders', 'wishlist', 'dashboard_reviews', 'settings', 'profile', 'addresses', 'payment_methods', 'user_notifications', 'preferences'],
       marketplace: ['browse', 'search', 'compare', 'favorites', 'categories', 'brands', 'deals', 'trending', 'recommendations', 'price_alerts'],
@@ -591,7 +591,31 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   const [rolesError, setRolesError] = useState<string | null>(null)
   const [permissions, setPermissions] = useState<SuperAdminPermission[]>([])
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null)
-  
+  const [roleAssignmentUserId, setRoleAssignmentUserId] = useState('')
+
+  /**
+   * Persiste les permissions d'un rôle personnalisé (best-effort côté service).
+   */
+  const handlePersistRolePermissions = async (roleId: string, rolePermissions: string[]) => {
+    try {
+      await SuperAdminDashboardService.updateRole(roleId, { permissions: rolePermissions } as any)
+    } catch (error) {
+      console.warn('⚠️ handlePersistRolePermissions failed:', error)
+    }
+  }
+
+  /**
+   * Met à jour le statut d'un ticket de support.
+   */
+  const handleUpdateTicketStatus = async (ticketId: string, status: 'in_progress' | 'resolved') => {
+    try {
+      await SuperAdminDashboardService.updateSupportTicket(ticketId, { status: status as any })
+      setSupportTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: status as any } : t))
+    } catch (error) {
+      console.warn('⚠️ handleUpdateTicketStatus failed:', error)
+    }
+  }
+
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<any>(null)
   const [roleForm, setRoleForm] = useState({
@@ -1149,10 +1173,10 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     }
 
     if (advancedFilters.lastActiveRange.start) {
-      filtered = filtered.filter(user => user.lastActive >= advancedFilters.lastActiveRange.start)
+      filtered = filtered.filter(user => (user.lastActive ?? '') >= advancedFilters.lastActiveRange.start)
     }
     if (advancedFilters.lastActiveRange.end) {
-      filtered = filtered.filter(user => user.lastActive <= advancedFilters.lastActiveRange.end)
+      filtered = filtered.filter(user => (user.lastActive ?? '9999-12-31') <= advancedFilters.lastActiveRange.end)
     }
 
     if (advancedFilters.lastPurchaseRange.start && advancedFilters.lastPurchaseRange.start) {
@@ -1477,7 +1501,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     try {
       const data = await SuperAdminDashboardService.getUsers({ limit: 200 })
 
-      const extended: ExtendedUser[] = data.map((user) => ({
+      const extended = data.map((user) => ({
         ...user,
         avatar: user.avatar ?? undefined,
         socialMedia: {
@@ -1510,7 +1534,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
               enabled: feature.enabled ?? true
             }))
           : []
-      }))
+      })) as unknown as ExtendedUser[]
       setUsers(extended)
       setFilteredUsers(extended)
     } catch (error) {
@@ -1631,19 +1655,19 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
       loyaltyPoints: user.loyaltyPoints || 0,
       bio: user.bio || '',
       website: user.website || '',
-      socialMedia: user.socialMedia || {
+      socialMedia: (user.socialMedia || {
         facebook: '',
         twitter: '',
         linkedin: '',
         instagram: '',
         whatsapp: ''
-      },
-      preferences,
-      security
+      }) as any,
+      preferences: preferences as any,
+      security: security as any
     })
 
     const secondaryRoles = Array.isArray(user.secondaryRoles) ? user.secondaryRoles : []
-    setSelectedRoles(new Set([user.role, ...secondaryRoles]))
+    setSelectedRoles(new Set<string>([user.role, ...secondaryRoles]) as any)
 
     const features = Array.isArray(user.features) ? user.features : []
     setSelectedFeatures(features.map((feature) => feature.code))
@@ -2060,6 +2084,34 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
       console.log(`Export Excel réussi : ${usersToExport.length} utilisateur(s) exporté(s)`) 
     } catch (error) {
       console.error('Erreur lors de l\'export Excel:', error)
+    }
+  }
+
+  /**
+   * Exporte les utilisateurs en PDF (impression de la liste).
+   */
+  const exportToPDF = (usersToExport: User[]) => {
+    try {
+      const headerHtml = ['Nom', 'Email', 'Rôle', 'Statut']
+        .map((h) => `<th style="text-align:left;padding:6px;">${h}</th>`)
+        .join('')
+      const rowsHtml = usersToExport
+        .map((u) => `<tr><td style="padding:6px;">${u.name ?? ''}</td><td style="padding:6px;">${u.email ?? ''}</td><td style="padding:6px;">${u.role ?? ''}</td><td style="padding:6px;">${u.status ?? ''}</td></tr>`)
+        .join('')
+
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8" /><title>Export utilisateurs</title></head><body><h1>Utilisateurs</h1><table border="1" cellspacing="0"><thead>${headerHtml}</thead><tbody>${rowsHtml}</tbody></table></body></html>`
+
+      const win = window.open('', '_blank')
+      if (!win) {
+        console.warn('Export PDF impossible: fenêtre bloquée par le navigateur')
+        return
+      }
+      win.document.write(html)
+      win.document.close()
+      win.focus()
+      win.print()
+    } catch (error) {
+      console.error('Erreur lors de l\'export PDF:', error)
     }
   }
 
@@ -2545,8 +2597,8 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
       if (aValue === undefined) return sortConfig.direction === 'asc' ? -1 : 1
       if (bValue === undefined) return sortConfig.direction === 'asc' ? 1 : -1
       
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
+      if ((aValue ?? '') < (bValue ?? '')) return sortConfig.direction === 'asc' ? -1 : 1
+      if ((aValue ?? '') > (bValue ?? '')) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
   }
@@ -4304,7 +4356,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                          <Button
                            size="sm"
                            className="bg-[#ff6600] hover:bg-[#ff6600]/90"
-                           onClick={() => handleSendPasswordResetLink(ticket)}
+                           onClick={() => handleSendPasswordResetLink((ticket as any).authorId ?? ticket.id)}
                          >
                            <Mail className="h-4 w-4 mr-2" />
                            Envoyer lien
@@ -5484,7 +5536,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                           className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                         />
                         <span className="text-sm capitalize">
-                          {role === 'buyer' && '👤 Acheteur'}
+                          {((role as string) === 'buyer') && '👤 Acheteur'}
                           {role === 'vendor' && '🏪 Vendeur'}
                           {role === 'admin' && '👑 Administrateur'}
                           {role === 'super_admin' && '⭐ Super Admin'}

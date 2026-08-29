@@ -957,7 +957,7 @@ export async function fetchUsersAdmin(options: FetchUsersAdminOptions = {}): Pro
     return (fallbackData ?? []).map((row) => mapUserToSummary(row as DbUserRecord))
   }
 
-  return (data ?? []).map((row) => mapUserToSummary(row as DbUserRecord))
+  return (data ?? []).map((row) => mapUserToSummary(row as unknown as DbUserRecord))
 }
 
 /**
@@ -1066,7 +1066,9 @@ export async function createUserAdmin(payload: CreateSuperAdminUserInput): Promi
     userId = userRow.id
   }
 
-  await syncUserProfile(supabase, userId, {
+  const resolvedUserId: string = userId as string
+
+  await syncUserProfile(supabase, resolvedUserId, {
     name: payload.name,
     email: payload.email,
     phone: payload.phone ?? null,
@@ -1078,13 +1080,13 @@ export async function createUserAdmin(payload: CreateSuperAdminUserInput): Promi
     preferences: payload.preferences ?? null
   })
 
-  await syncPrimaryRoleAssignment(supabase, userId, payload.role)
-  await syncSecondaryRoles(supabase, userId, payload.secondaryRoles)
-  await syncCustomPermissions(supabase, userId, payload.customPermissions)
-  await syncUserFeatures(supabase, userId, payload.features)
-  await syncUserSecuritySettings(supabase, userId, payload.security)
+  await syncPrimaryRoleAssignment(supabase, resolvedUserId, payload.role)
+  await syncSecondaryRoles(supabase, resolvedUserId, payload.secondaryRoles)
+  await syncCustomPermissions(supabase, resolvedUserId, payload.customPermissions)
+  await syncUserFeatures(supabase, resolvedUserId, payload.features)
+  await syncUserSecuritySettings(supabase, resolvedUserId, payload.security)
 
-  return loadUserSummaryById(supabase, userId)
+  return loadUserSummaryById(supabase, resolvedUserId)
 }
 
 /**

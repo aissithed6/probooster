@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ticketId: data.parent_message_id,
       authorId: data.sender_id ?? null,
       message: data.content ?? '',
-      visibility: (insertPayload.category === 'ticket_public' ? 'public' : 'internal') as const,
+      visibility: insertPayload.category === 'ticket_public' ? 'public' as const : 'internal' as const,
       createdAt: data.created_at
     }
 

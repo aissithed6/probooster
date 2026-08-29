@@ -6,6 +6,12 @@ import { getSupabaseAdmin } from '@/lib/supabase'
 const buildUnauthorizedResponse = () =>
   NextResponse.json({ error: 'Authentification requise.' }, { status: 401 })
 
+const normalizeRole = (raw: unknown) =>
+  String(raw ?? '')
+    .toLowerCase()
+    .replace(/-/g, '_')
+    .trim()
+
 const resolveAccessToken = (cookieStore: Awaited<ReturnType<typeof cookies>>, headerList: Awaited<ReturnType<typeof headers>>) => {
   const direct = cookieStore.get('sb-access-token')?.value
   if (direct) return direct

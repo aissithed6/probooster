@@ -121,7 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const senderNextBalance = Math.max(0, Number((senderLp as any)?.points_balance ?? 0) + pointsAmount)
   const senderNextEarned = Math.max(0, Number((senderLp as any)?.points_earned ?? 0) + pointsAmount)
-  const senderNextFcfa = Math.max(0, Number(Number((senderLp as any)?.fcfa_value ?? 0) + fcfaValue).toFixed(2))
+  const senderNextFcfa = Number(Math.max(0, Number((senderLp as any)?.fcfa_value ?? 0) + Number(fcfaValue)).toFixed(2))
 
   const { error: senderUpErr } = await supabase
     .from('loyalty_points')
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Débit destinataire
   const recipientNextBalance = Math.max(0, recipientBalance - pointsAmount)
-  const recipientNextFcfa = Math.max(0, Number(Number((recipientLp as any)?.fcfa_value ?? 0) - fcfaValue).toFixed(2))
+  const recipientNextFcfa = Number(Math.max(0, Number((recipientLp as any)?.fcfa_value ?? 0) - Number(fcfaValue)).toFixed(2))
 
   const { error: recipientUpErr2 } = await supabase
     .from('loyalty_points')

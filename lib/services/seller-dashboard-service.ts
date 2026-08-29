@@ -1130,8 +1130,8 @@ export class SellerDashboardService {
         : {}
 
     const verificationRaw =
-      profile?.verification && typeof profile.verification === 'object' && !Array.isArray(profile.verification)
-        ? (profile.verification as Record<string, unknown>)
+      (profile as any)?.verification && typeof (profile as any).verification === 'object' && !Array.isArray((profile as any).verification)
+        ? ((profile as any).verification as Record<string, unknown>)
         : {}
 
     const stats = params.stats ?? {}
@@ -1159,7 +1159,7 @@ export class SellerDashboardService {
         linkedin: String(socialRaw.linkedin ?? '')
       },
       verification: {
-        isVerified: Boolean(verificationRaw.isVerified ?? (verificationRaw.status === 'approved') ?? params.isVerified),
+        isVerified: Boolean(verificationRaw.isVerified ?? (verificationRaw.status === 'approved') || params.isVerified),
         documents: Array.isArray(verificationRaw.documents) ? verificationRaw.documents : []
       },
       preferences: {

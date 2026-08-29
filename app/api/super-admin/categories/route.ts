@@ -161,7 +161,7 @@ async function fetchCategoryInsights(categoryIds: string[]): Promise<ProductCate
 
   for (const row of data ?? []) {
     const categoryId = row.category_id as string | null
-    const product = row.user_products as
+    const product = row.user_products as unknown as
       | {
           id: string | null
           vendor_id: string | null

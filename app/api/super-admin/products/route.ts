@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       }
 
       try {
-        const sharedProduct = mapSupabaseProductToSharedProduct(data)
+        const sharedProduct = mapSupabaseProductToSharedProduct(data as any)
         return NextResponse.json({ data: sharedProduct }, { status: 200 })
       } catch (mappingError) {
         console.error('❌ GET /products?id mapping failed', {
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
 
     const rawItems = data ?? []
     const normalizedItems = rawItems.map((item) => ({
-      ...item,
+      ...(item as any),
       // Alias camelCase pour l'UI (modal), tout en conservant les champs DB (snake_case).
       warranty: (item as any)?.warranty ?? null,
       returnPolicy: (item as any)?.return_policy ?? null,
@@ -329,7 +329,7 @@ export async function PUT(request: NextRequest) {
   try {
     console.log('🔍 Début mise à jour produit avec payload:', JSON.stringify(normalizedPayload, null, 2))
     const product = await upsertFullProduct(supabase, normalizedPayload, userId, normalizedPayload.id)
-    console.log('✅ Produit mis à jour avec succès:', product?.id)
+    console.log('✅ Produit mis à jour avec succès:', (product as any)?.id)
 
     if (process.env.NODE_ENV !== 'production') {
       const { data: persisted, error: persistedError } = await supabase

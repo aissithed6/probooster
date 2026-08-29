@@ -252,7 +252,7 @@ export default function MarketingPromotionsClean() {
     const totalClicks = activeCampaigns.reduce((sum, c) => sum + (c.performance?.clicks || 0), 0)
     const totalConversions = activeCampaigns.reduce((sum, c) => sum + (c.performance?.conversions || 0), 0)
     const totalSpend = activeCampaigns.reduce((sum, c) => sum + (c.total_cost || 0), 0)
-    const totalRevenue = activeCampaigns.reduce((sum, c) => sum + (c.performance?.revenue || 0), 0)
+    const totalRevenue = activeCampaigns.reduce((sum, c) => sum + ((c.performance as any)?.revenue || 0), 0)
     
     const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0
     const conversionRate = totalClicks > 0 ? (totalConversions / totalClicks) * 100 : 0

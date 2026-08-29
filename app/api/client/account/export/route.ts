@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const safeSingle = async (table: string, where: { key: string; value: string }, select = '*') => {
       try {
-        const { data, error } = await supabase.from(table as any).select(select as any).eq(where.key as any, where.value as any).maybeSingle()
+        const { data, error } = await (supabase.from(table as any) as any).select(select).eq(where.key, where.value).maybeSingle()
         if (error) return { data: null, error }
         return { data, error: null }
       } catch (e) {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     const safeList = async (table: string, where: { key: string; value: string }, select = '*') => {
       try {
-        const { data, error } = await supabase.from(table as any).select(select as any).eq(where.key as any, where.value as any)
+        const { data, error } = await (supabase.from(table as any) as any).select(select).eq(where.key, where.value)
         if (error) return { data: null, error }
         return { data, error: null }
       } catch (e) {

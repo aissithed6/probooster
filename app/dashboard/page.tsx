@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useUserPreferences } from "@/contexts/UserPreferencesContext"
 import { getClientAccessTokenSafe, supabase } from '@/lib/supabase'
 import { ChatService } from "@/lib/services/chat-service"
+import { ShareEngagementService } from '@/lib/services/share-engagement-service'
+import AdvancedProductCard from '@/components/product/advanced-product-card'
 import { useMoney } from '@/lib/hooks/use-money'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -1110,6 +1112,9 @@ function DashboardPageContent() {
   const [isSigningOutOtherSessions, setIsSigningOutOtherSessions] = useState(false)
   const [isExportingAccountData, setIsExportingAccountData] = useState(false)
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
+  const [showDeactivateAccountModal, setShowDeactivateAccountModal] = useState(false)
+  const [deactivateConfirmText, setDeactivateConfirmText] = useState('')
+  const [isDeactivatingAccount, setIsDeactivatingAccount] = useState(false)
   const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false)
   const [showTermsModal, setShowTermsModal] = useState(false)
   const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState('')
@@ -1893,7 +1898,83 @@ function DashboardPageContent() {
   }, [showTwoFactorSetup])
 
   /**
-   * Supprime (soft delete) réellement le compte client via l'API.
+   * Désactive (soft delete) le compte client via l'API.
+   * Le compte est marqué 'deleted' mais les données restent récupérables côté admin.
+   */
+  const handleDeactivateAccountSubmit = async () => {
+    if (isDeactivatingAccount) return
+
+    if (deactivateConfirmText.trim().toUpperCase() !== 'DESACTIVER') {
+      toast({
+        title: 'Confirmation requise',
+        description: 'Tapez DESACTIVER pour confirmer.',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    setIsDeactivatingAccount(true)
+
+    try {
+      const accessToken = await getClientAccessTokenSafe()
+      const headers: Record<string, string> = { accept: 'application/json' }
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+
+      const resp = await fetch('/api/client/account/delete', {
+        method: 'POST',
+        headers
+      })
+
+      const body = await resp.json().catch(() => null)
+      if (!resp.ok) {
+        const msg = body?.error ? String(body.error) : 'Désactivation impossible.'
+        toast({
+          title: 'Échec de la désactivation',
+          description: msg,
+          variant: 'destructive'
+        })
+        addNotification({
+          type: 'error',
+          title: 'Désactivation impossible',
+          message: msg
+        })
+        return
+      }
+
+      toast({
+        title: 'Compte désactivé',
+        description: 'Votre compte a été désactivé avec succès. Vous allez être déconnecté.',
+        variant: 'default'
+      })
+
+      addNotification({
+        type: 'success',
+        title: 'Compte désactivé',
+        message: 'Votre compte a été désactivé. Contactez le support pour le réactiver.'
+      })
+
+      setShowDeactivateAccountModal(false)
+      setDeactivateConfirmText('')
+
+      await signOut()
+
+      if (typeof window !== 'undefined') {
+        window.location.href = '/'
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      toast({
+        title: 'Erreur inattendue',
+        description: message,
+        variant: 'destructive'
+      })
+    } finally {
+      setIsDeactivatingAccount(false)
+    }
+  }
+
+  /**
+   * Supprime définitivement le compte client de Supabase (auth + base de données).
    */
   const handleDeleteAccountSubmit = async () => {
     if (isDeletingAccount) return
@@ -1914,7 +1995,7 @@ function DashboardPageContent() {
       const headers: Record<string, string> = { accept: 'application/json' }
       if (accessToken) headers.Authorization = `Bearer ${accessToken}`
 
-      const resp = await fetch('/api/client/account/delete', {
+      const resp = await fetch('/api/client/account/delete-permanent', {
         method: 'POST',
         headers
       })
@@ -1927,13 +2008,24 @@ function DashboardPageContent() {
           description: msg,
           variant: 'destructive'
         })
+        addNotification({
+          type: 'error',
+          title: 'Suppression impossible',
+          message: msg
+        })
         return
       }
 
       toast({
-        title: 'Compte désactivé',
-        description: 'Votre compte a été désactivé. Vous allez être déconnecté.',
+        title: 'Compte supprimé définitivement',
+        description: 'Votre compte et toutes vos données ont été supprimés de la base de données. Vous allez être déconnecté.',
         variant: 'default'
+      })
+
+      addNotification({
+        type: 'success',
+        title: 'Compte supprimé définitivement',
+        message: 'Toutes vos données personnelles ont été supprimées de la base de données Supabase.'
       })
 
       setShowDeleteAccountModal(false)
@@ -3228,7 +3320,7 @@ function DashboardPageContent() {
         subject: editInternalMessageSubject,
         content: editInternalMessageContent,
         category: selectedInternalMessage.category,
-        priority: selectedInternalMessage.priority
+        priority: selectedInternalMessage.priority as any
       })
 
       if (updated?.id) {
@@ -3341,7 +3433,7 @@ function DashboardPageContent() {
         const sessions = Array.isArray(realChatSessions) ? realChatSessions : []
         const sessionPartnerIds = sessions
           .map((session) => {
-            const isParticipant1 = session.participant1_id === user.id
+            const isParticipant1 = session.participant1_id === (user?.id ?? '')
             const pid = isParticipant1 ? session.participant2_id : session.participant1_id
             return String(pid ?? '').trim()
           })
@@ -4731,7 +4823,7 @@ function DashboardPageContent() {
     }
 
     if (dashboardData?.pointsSummary) {
-      setUserTier(dashboardData.pointsSummary.tier ?? '')
+      setUserTier((dashboardData.pointsSummary as any)?.tier ?? '')
     }
 
     if (dashboardData?.notifications) {
@@ -5044,7 +5136,7 @@ function DashboardPageContent() {
         recipientId: null,
         subject: newMessageSubject.trim(),
         content: newMessageContent.trim(),
-        category: normalizedCategory,
+        category: normalizedCategory as any,
         priority: (newMessagePriority as InternalMessage['priority']) ?? 'medium',
         attachments: newMessageAttachments.map((item) => item.url)
       })
@@ -7659,13 +7751,13 @@ Pro Booster - Votre marketplace de confiance
                         <div key={request.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                           <div>
                             <p className="text-xs font-medium">{request.id}</p>
-                            <p className="text-xs text-gray-500">{request.date}</p>
+                            <p className="text-xs text-gray-500">{request.created_at ? new Date(request.created_at).toLocaleDateString('fr-FR') : ''}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs font-medium">{formatCurrency(request.amount)}</p>
-                            <Badge 
-                              variant={request.status === 'Approuvée' ? 'default' : 
-                                     request.status === 'En cours' ? 'secondary' : 'outline'}
+                            <p className="text-xs font-medium">{formatCurrency((request as any).payout_amount ?? 0)}</p>
+                            <Badge
+                              variant={request.status === 'approved' ? 'default' :
+                                       request.status === 'pending' ? 'secondary' : 'outline'}
                               className="text-xs"
                             >
                               {request.status}
@@ -10123,7 +10215,7 @@ Pro Booster - Votre marketplace de confiance
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between">
-                        <div className="text-2xl font-bold text-orange-900">{withdrawalFeeConfig?.percentage ?? dashboardData?.stats?.withdrawalFee ?? 0}%</div>
+                        <div className="text-2xl font-bold text-orange-900">{(withdrawalFeeConfig as any)?.percentage ?? dashboardData?.stats?.withdrawalFee ?? 0}%</div>
                         <Percent className="w-8 h-8 text-orange-600" />
                       </div>
                       <p className="text-xs text-orange-600 mt-2">Par transaction</p>
@@ -10295,9 +10387,9 @@ Pro Booster - Votre marketplace de confiance
                           </div>
                         </div>
 
-                        {Array.isArray(dashboardData?.pointsOffers) && dashboardData?.pointsOffers?.length > 0 ? (
+                        {Array.isArray((dashboardData as any)?.pointsOffers) && (dashboardData as any)?.pointsOffers?.length > 0 ? (
                           <div className="space-y-3">
-                            {(dashboardData?.pointsOffers || []).map((offer, index) => (
+                            {((dashboardData as any)?.pointsOffers || []).map((offer: any, index: number) => (
                               <div
                                 key={index}
                                 className="flex items-center justify-between gap-3 p-4 border dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/40"
@@ -10341,7 +10433,7 @@ Pro Booster - Votre marketplace de confiance
                         <Button
                           className="w-full bg-[#ff6600] hover:bg-[#e55a00] text-white"
                           onClick={() => {
-                            const offers = (dashboardData?.pointsOffers || []) as any[]
+                            const offers = ((dashboardData as any)?.pointsOffers || []) as any[]
 
                             const sanitizeNumber = (raw: string): number => {
                               const cleaned = String(raw ?? '').replace(',', '.').trim()
@@ -10382,7 +10474,7 @@ Pro Booster - Votre marketplace de confiance
                             setShowPointsPurchaseModal(true)
                           }}
                           disabled={(() => {
-                            const hasOffers = Array.isArray(dashboardData?.pointsOffers) && (dashboardData?.pointsOffers?.length ?? 0) > 0
+                            const hasOffers = Array.isArray((dashboardData as any)?.pointsOffers) && ((dashboardData as any)?.pointsOffers?.length ?? 0) > 0
                             const amount = Number(String(customPointsPurchaseAmountInput ?? '').replace(',', '.'))
                             const points = Number(String(customPointsPurchasePointsInput ?? '').replace(',', '.'))
                             const hasAmount = Number.isFinite(amount) && amount > 0
@@ -10944,14 +11036,34 @@ Pro Booster - Votre marketplace de confiance
                         </Button>
                       </div>
 
+                      <div className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                            <XCircle className="w-5 h-5 text-orange-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-gray-900 dark:text-gray-900">Désactiver mon compte</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-600">Suspend temporairement votre compte (réversible)</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDeactivateAccountModal(true)}
+                          className="hover:bg-orange-100 hover:text-orange-700 hover:border-orange-300 transition-colors"
+                        >
+                          Désactiver
+                        </Button>
+                      </div>
+
                       <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                             <Trash2 className="w-5 h-5 text-red-600" />
                           </div>
                           <div>
-                            <h4 className="font-medium text-gray-900 dark:text-gray-900">Supprimer mon compte</h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-600">Cette action est irréversible</p>
+                            <h4 className="font-medium text-gray-900 dark:text-gray-900">Supprimer définitivement mon compte</h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-600">Supprime votre compte et toutes vos données de la base — irréversible</p>
                           </div>
                         </div>
                         <Button 
@@ -11506,7 +11618,7 @@ Pro Booster - Votre marketplace de confiance
                         <div className="flex items-center space-x-3 pb-3 border-b">
                           <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center">
                             <span className="text-sm font-semibold text-blue-700">
-                              {String((selectedInternalMessage.from === 'admin' ? 'A' : 'V') ?? 'A')}
+                              {String(selectedInternalMessage.from === 'admin' ? 'A' : 'V')}
                             </span>
                           </div>
                           <div>
@@ -11980,7 +12092,7 @@ Pro Booster - Votre marketplace de confiance
                                       color: 'blue',
                                       seller: product.seller || 'Boutique',
                                       inStock: true,
-                                      discount: product.promotion ? 10 : 0,
+                                      discount: (product as any).promotion ? 10 : 0,
                                       rating: product.rating || 5,
                                       reviews: product.reviews || 0,
                                       image: product.image || '/placeholder.svg',
@@ -15144,13 +15256,88 @@ Pro Booster - Votre marketplace de confiance
         </DialogContent>
       </Dialog>
 
+      {/* Modal de désactivation de compte */}
+      <Dialog open={showDeactivateAccountModal} onOpenChange={setShowDeactivateAccountModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <XCircle className="w-5 h-5 text-orange-600" />
+              <span>Désactiver mon compte</span>
+            </DialogTitle>
+            <DialogDescription>
+              Votre compte sera suspendu temporairement. Cette action est réversible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-orange-700">Ce qui va se passer</p>
+                  <ul className="text-xs text-orange-600 mt-2 list-disc list-inside space-y-1">
+                    <li>Votre accès au compte sera immédiatement suspendu</li>
+                    <li>Vos données (commandes, points, profil) sont conservées</li>
+                    <li>La désactivation peut être annulée en contactant le support</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deactivate-confirm">Tapez "DESACTIVER" pour confirmer</Label>
+              <Input
+                id="deactivate-confirm"
+                placeholder="DESACTIVER"
+                className="uppercase"
+                value={deactivateConfirmText}
+                onChange={(e) => setDeactivateConfirmText(e.target.value)}
+              />
+            </div>
+
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  if (isDeactivatingAccount) return
+                  setShowDeactivateAccountModal(false)
+                  setDeactivateConfirmText('')
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+                disabled={isDeactivatingAccount || deactivateConfirmText.trim().toUpperCase() !== 'DESACTIVER'}
+                onClick={() => void handleDeactivateAccountSubmit()}
+              >
+                {isDeactivatingAccount ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Désactivation...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Désactiver mon compte
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal de suppression de compte */}
       <Dialog open={showDeleteAccountModal} onOpenChange={setShowDeleteAccountModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Supprimer mon compte</DialogTitle>
+            <DialogTitle className="flex items-center space-x-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              <span>Supprimer définitivement mon compte</span>
+            </DialogTitle>
             <DialogDescription>
-              Cette action est irréversible et supprimera définitivement votre compte
+              Cette action est <strong>irréversible</strong> et supprimera définitivement votre compte et toutes vos données de la base de données.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -16295,16 +16482,16 @@ Pro Booster - Votre marketplace de confiance
                   const currentPrice = Number(product.price) || 0
                   const basePrice = Number(product.original_price ?? product.price) || currentPrice
                   const discount = basePrice > currentPrice ? Math.round(((basePrice - currentPrice) / basePrice) * 100) : 0
-                  const availableStock = product.stock_quantity ?? product.inventory ?? 0
-                  const isAvailable = availableStock > 0 || product.in_stock === true
+                  const availableStock = (product as any).stock_quantity ?? (product as any).inventory ?? 0
+                  const isAvailable = availableStock > 0 || (product as any).in_stock === true
 
                   return (
                     <Card key={product.id} className="hover:shadow-lg transition-shadow">
                       <CardContent className="p-4">
                         <div className="relative mb-3">
-                          {product.thumbnail_url ? (
+                          {(product as any).thumbnail_url ? (
                             <img
-                              src={product.thumbnail_url}
+                              src={(product as any).thumbnail_url}
                               alt={product.name}
                               className="h-32 w-full rounded-lg object-cover"
                             />

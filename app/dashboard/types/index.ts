@@ -58,6 +58,14 @@ export interface OrderItem {
   quantity: number;
   price: number;
   image?: string;
+  product?: {
+    name?: string;
+    image?: string;
+    warranty?: string;
+    returnPolicy?: string;
+  };
+  selectedSize?: string;
+  selectedColor?: string;
 }
 
 // Statuts de commande
@@ -76,6 +84,8 @@ export interface Order {
     city: string;
     postalCode: string;
     country: string;
+    address?: string;
+    phone?: string;
   };
   paymentMethod: string;
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
@@ -83,6 +93,8 @@ export interface Order {
   updatedAt: string;
   trackingNumber?: string;
   estimatedDelivery?: string;
+  orderDate?: string;
+  deliveryDate?: string;
 }
 
 // Types pour l'utilisateur
@@ -127,6 +139,7 @@ export interface UserPreferences {
 export interface UserProfile {
   id: string;
   email: string;
+  name?: string;
   firstName: string;
   lastName: string;
   phone: string;

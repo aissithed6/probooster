@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -38,12 +38,12 @@ export function OrdersTab({ orders = [], isLoading = false }: OrdersTabProps) {
   // Filtrer les commandes
   const filteredOrders = orders.filter((order) => {
     const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.items.some(item => item.product.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      order.items.some(item => item.product?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     
     const now = new Date();
-    const orderDate = new Date(order.orderDate);
+    const orderDate = new Date(order.orderDate ?? order.createdAt);
     let matchesDate = true;
     
     if (dateFilter === 'today') {
@@ -65,7 +65,7 @@ export function OrdersTab({ orders = [], isLoading = false }: OrdersTabProps) {
 
   // Trier les commandes par date (du plus récent au plus ancien)
   const sortedOrders = [...filteredOrders].sort((a, b) => 
-    new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
+    new Date(b.orderDate ?? b.createdAt).getTime() - new Date(a.orderDate ?? a.createdAt).getTime()
   );
 
   // Formater la date
@@ -176,15 +176,15 @@ export function OrdersTab({ orders = [], isLoading = false }: OrdersTabProps) {
               {sortedOrders.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-medium">#{order.id}</TableCell>
-                  <TableCell>{formatDate(order.orderDate)}</TableCell>
+                  <TableCell>{formatDate(order.orderDate ?? order.createdAt)}</TableCell>
                   <TableCell>
                     <div className="flex -space-x-2">
                       {order.items.slice(0, 3).map((item, i) => (
                         <div key={i} className="h-8 w-8 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden">
-                          {item.product.image ? (
+                          {item.product?.image ? (
                             <img 
-                              src={item.product.image} 
-                              alt={item.product.name} 
+                              src={item.product?.image} 
+                              alt={item.product?.name ?? item.name} 
                               className="h-full w-full object-cover"
                             />
                           ) : (
@@ -226,7 +226,7 @@ export function OrdersTab({ orders = [], isLoading = false }: OrdersTabProps) {
                 <div>
                   <CardTitle>Commande #{selectedOrder.id}</CardTitle>
                   <CardDescription>
-                    Passée le {formatDate(selectedOrder.orderDate)}
+                    Passée le {formatDate(selectedOrder.orderDate ?? selectedOrder.createdAt)}
                   </CardDescription>
                 </div>
                 <Button 
@@ -302,10 +302,10 @@ export function OrdersTab({ orders = [], isLoading = false }: OrdersTabProps) {
                           <TableCell className="font-medium">
                             <div className="flex items-center space-x-4">
                               <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-md border">
-                                {item.product.image ? (
+                                {item.product?.image ? (
                                   <img 
-                                    src={item.product.image} 
-                                    alt={item.product.name}
+                                    src={item.product?.image} 
+                                    alt={item.product?.name ?? item.name}
                                     className="h-full w-full object-cover"
                                   />
                                 ) : (
@@ -315,7 +315,7 @@ export function OrdersTab({ orders = [], isLoading = false }: OrdersTabProps) {
                                 )}
                               </div>
                               <div>
-                                <p className="font-medium">{item.product.name}</p>
+                                <p className="font-medium">{item.product?.name ?? item.name}</p>
                                 <p className="text-sm text-gray-500">
                                   {item.selectedSize && `Taille: ${item.selectedSize} `}
                                   {item.selectedColor && `Couleur: ${item.selectedColor}`}

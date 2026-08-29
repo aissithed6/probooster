@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
 
       const stockQuantity = row.stock_quantity === null || row.stock_quantity === undefined ? null : Number(row.stock_quantity)
       const manageStock = row.manage_stock === null || row.manage_stock === undefined ? null : Boolean(row.manage_stock)
-      const inStock = manageStock ? (Number.isFinite(stockQuantity) ? stockQuantity > 0 : true) : true
+      const inStock = manageStock ? (stockQuantity !== null && Number.isFinite(stockQuantity) ? stockQuantity > 0 : true) : true
 
       const categoryIds = Array.isArray(row?.product_category_assignments)
         ? row.product_category_assignments
