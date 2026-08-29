@@ -1189,6 +1189,12 @@ function DashboardPageContent() {
     orders: number
   }>(null)
   const [notificationStatsLoading, setNotificationStatsLoading] = useState(false)
+  const [messageStats, setMessageStats] = useState<null | {
+    total: number
+    unread: number
+    admin: number
+    fromUser: number
+  }>(null)
   const [showAllNotifications, setShowAllNotifications] = useState(false)
 
   useEffect(() => {
@@ -2103,17 +2109,21 @@ function DashboardPageContent() {
     () => getFilteredInternalMessages(messageFilterCategory, messageFilterPriority, messageSearchTerm),
     [getFilteredInternalMessages, messageFilterCategory, messageFilterPriority, messageSearchTerm]
   )
+  const internalMessagesTotal = useMemo<number>(
+    () => messageStats?.total ?? internalMessages.length,
+    [internalMessages, messageStats]
+  )
   const unreadInternalMessagesCount = useMemo<number>(
-    () => internalMessages.filter(message => !message.isRead).length,
-    [internalMessages]
+    () => messageStats?.unread ?? internalMessages.filter(message => !message.isRead).length,
+    [internalMessages, messageStats]
   )
   const adminInternalMessagesCount = useMemo<number>(
-    () => internalMessages.filter(message => message.from === 'admin').length,
-    [internalMessages]
+    () => messageStats?.admin ?? internalMessages.filter(message => message.from === 'admin').length,
+    [internalMessages, messageStats]
   )
   const userInternalMessagesCount = useMemo<number>(
-    () => internalMessages.filter(message => message.from !== 'admin').length,
-    [internalMessages]
+    () => messageStats?.fromUser ?? internalMessages.filter(message => message.from !== 'admin').length,
+    [internalMessages, messageStats]
   )
 
   // États pour les fonctionnalités du chat
@@ -2391,6 +2401,16 @@ function DashboardPageContent() {
     }
   }, [user?.id])
 
+  const loadMessageStats = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const next = await DashboardService.getUserMessageStats(user.id)
+      setMessageStats(next)
+    } catch {
+      // ignore (best-effort): on garde le fallback basé sur la liste chargée
+    }
+  }, [user?.id])
+
   const refreshInAppNotificationsOnly = useCallback(async () => {
     if (!user?.id) return
     try {
@@ -2412,6 +2432,11 @@ function DashboardPageContent() {
     void loadNotificationStats()
     void refreshInAppNotificationsOnly()
   }, [activeTab, loadNotificationStats, refreshInAppNotificationsOnly])
+
+  useEffect(() => {
+    if (activeTab !== 'messaging') return
+    void loadMessageStats()
+  }, [activeTab, loadMessageStats])
 
   useEffect(() => {
     setUserPoints(resolvedPointsBalance)
@@ -3160,10 +3185,11 @@ function DashboardPageContent() {
               item.id === message.id ? { ...item, isRead: true, status: 'read' } : item
             )
           )
+          void loadMessageStats()
         }
       }
     },
-    []
+    [loadMessageStats]
   )
 
   const handleOpenInternalMessageEdit = useCallback((message: InternalMessage) => {
@@ -3201,11 +3227,12 @@ function DashboardPageContent() {
           )
         )
         setShowInternalMessageEditModal(false)
+        void loadMessageStats()
       }
     } finally {
       setIsUpdatingInternalMessage(false)
     }
-  }, [editInternalMessageContent, editInternalMessageSubject, selectedInternalMessage])
+  }, [editInternalMessageContent, editInternalMessageSubject, selectedInternalMessage, loadMessageStats])
 
   const handleToggleInternalMessageImportant = useCallback(async (message: InternalMessage) => {
     if (!message) return
@@ -3216,8 +3243,9 @@ function DashboardPageContent() {
         (prev ?? []).map((item) => (item.id === message.id ? { ...item, isImportant: desired } : item))
       )
       setSelectedInternalMessage((prev) => (prev?.id === message.id ? { ...prev, isImportant: desired } : prev))
+      void loadMessageStats()
     }
-  }, [])
+  }, [loadMessageStats])
 
   const handleArchiveInternalMessage = useCallback(async (message: InternalMessage) => {
     if (!message) return
@@ -3225,8 +3253,9 @@ function DashboardPageContent() {
     if (ok) {
       setInternalMessages((prev) => (prev ?? []).filter((item) => item.id !== message.id))
       setShowInternalMessageModal(false)
+      void loadMessageStats()
     }
-  }, [])
+  }, [loadMessageStats])
 
   const handleDeleteInternalMessage = useCallback(async (message: InternalMessage) => {
     if (!message) return
@@ -3236,8 +3265,9 @@ function DashboardPageContent() {
     if (ok) {
       setInternalMessages((prev) => (prev ?? []).filter((item) => item.id !== message.id))
       setShowInternalMessageModal(false)
+      void loadMessageStats()
     }
-  }, [])
+  }, [loadMessageStats])
 
   const realMessages = useMemo<InternalMessage[]>(() => {
     const sourceMessages = dashboardData?.messages ?? []
@@ -5017,6 +5047,8 @@ function DashboardPageContent() {
       setNewMessageAttachments([])
       setShowNewMessageModal(false)
 
+      void loadMessageStats()
+
       toast({
         title: 'Message envoyé',
         description: 'Votre message a été envoyé avec succès.',
@@ -5032,7 +5064,7 @@ function DashboardPageContent() {
     } finally {
       setIsSendingMessage(false)
     }
-  }, [user?.id, newMessageAttachments, newMessageCategory, newMessageContent, newMessagePriority, newMessageSubject, toast, mapSupabaseMessageToInternal])
+  }, [user?.id, newMessageAttachments, newMessageCategory, newMessageContent, newMessagePriority, newMessageSubject, toast, mapSupabaseMessageToInternal, loadMessageStats])
 
   /**
    * Upload un fichier dans Supabase Storage (bucket chat-uploads) et retourne l'URL publique.
@@ -10998,7 +11030,7 @@ Pro Booster - Votre marketplace de confiance
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between">
-                        <span className="text-3xl font-semibold text-blue-900">{internalMessages.length}</span>
+                        <span className="text-3xl font-semibold text-blue-900">{internalMessagesTotal}</span>
                         <Mail className="h-8 w-8 text-blue-600" />
                       </div>
                       <p className="mt-2 text-xs text-blue-700">Correspondances totales</p>

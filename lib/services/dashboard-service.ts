@@ -940,6 +940,40 @@ export class DashboardService {
     }
   }
 
+  /**
+   * Compteurs de messagerie synchronisés avec la base (comptes SQL exacts),
+   * indépendants du `limit` de getUserMessages.
+   */
+  static async getUserMessageStats(userId: string): Promise<{
+    total: number
+    unread: number
+    admin: number
+    fromUser: number
+  }> {
+    const fallback = { total: 0, unread: 0, admin: 0, fromUser: 0 }
+    if (!userId) return fallback
+    try {
+      const base = supabase.from('user_messages').neq('status', 'deleted')
+
+      const [totalResp, unreadResp, adminResp, fromUserResp] = await Promise.all([
+        base.select('id', { count: 'exact', head: true }).or(`sender_id.eq.${userId},recipient_id.eq.${userId}`),
+        base.select('id', { count: 'exact', head: true }).eq('recipient_id', userId).eq('is_read', false),
+        base.select('id', { count: 'exact', head: true }).eq('recipient_id', userId).neq('sender_id', userId),
+        base.select('id', { count: 'exact', head: true }).eq('sender_id', userId)
+      ])
+
+      return {
+        total: Number(totalResp.count ?? 0),
+        unread: Number(unreadResp.count ?? 0),
+        admin: Number(adminResp.count ?? 0),
+        fromUser: Number(fromUserResp.count ?? 0)
+      }
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des stats messagerie:', error)
+      return fallback
+    }
+  }
+
   // Récupérer les produits recommandés par IA
   static async getRecommendedProducts(userId: string): Promise<RecommendedProduct[]> {
     try {
