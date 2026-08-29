@@ -594,14 +594,14 @@ export class DashboardService {
   }
 
   // Récupérer les notifications de l'utilisateur
-  static async getUserNotifications(userId: string): Promise<UserNotification[]> {
+  static async getUserNotifications(userId: string, limit = 50): Promise<UserNotification[]> {
     try {
       const { data, error } = await supabase
         .from('user_notifications')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(limit)
 
       if (error) {
         console.error(' Erreur lors de la récupération des notifications:', error)
