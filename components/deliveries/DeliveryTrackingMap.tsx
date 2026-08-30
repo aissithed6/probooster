@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // module soit `undefined` sous certains tree-shaking/bundlers, cause de
 // "Cannot read properties of undefined (reading 'Map')").
 import * as maplibregl from 'maplibre-gl'
-import { MapPin, Loader2 } from 'lucide-react'
+import { MapPin, Loader2, Maximize2, Minimize2 } from 'lucide-react'
 
 export type DeliveryTrackingPoint = {
   lat: number
@@ -123,6 +123,31 @@ export default function DeliveryTrackingMap({
   // La lib est-elle disponible au runtime ? (guard anti-crash "reading 'Map'")
   const [libReady, setLibReady] = useState<boolean>(() => Boolean(maplibregl && maplibregl.Map))
   const [mapFailed, setMapFailed] = useState<boolean>(false)
+
+  // Mode « Voir en grand » : la carte passe en plein écran (fixed inset-0).
+  // z-[45] : en dessous des modals/chat (z-50+) pour que le chat reste accessible.
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const fitRouteRef = useRef<(() => void) | null>(null)
+
+  // Au basculement plein écran, forcer un resize + recentrage (le canvas a changé de taille).
+  useEffect(() => {
+    if (!isFullscreen) return
+    const t1 = window.setTimeout(() => {
+      try {
+        mapRef.current?.resize()
+      } catch { /* ignore */ }
+    }, 100)
+    const t2 = window.setTimeout(() => {
+      try {
+        mapRef.current?.resize()
+        fitRouteRef.current?.()
+      } catch { /* ignore */ }
+    }, 400)
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [isFullscreen])
 
   // --- Montage unique (évite la recompilation WebGL). Le style (thème) est
   //     réappliqué dynamiquement par l'effet dédié ci-dessous.
@@ -318,11 +343,30 @@ export default function DeliveryTrackingMap({
     fitRoute()
   }, [driverPoint, destinationPoint, fitRoute, hasAnyCoords, resolvedTheme, styleReady])
 
+  // Toujours exposer la dernière version de fitRoute au mode plein écran.
+  useEffect(() => {
+    fitRouteRef.current = fitRoute
+  }, [fitRoute])
+
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5 ${heightClassName}`}
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[45] flex flex-col bg-white dark:bg-gray-950'
+          : `relative w-full overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/10 dark:bg-white/5 ${heightClassName}`
+      }
     >
-      <div ref={containerRef} className="h-full w-full" />
+      {/* Bouton « Voir en grand » / « Réduire » — toujours visible dès qu'il y a une carte */}
+      <button
+        type="button"
+        onClick={() => setIsFullscreen((v) => !v)}
+        className="absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-md ring-1 ring-gray-200 backdrop-blur transition hover:bg-white hover:text-orange-600 dark:bg-gray-900/95 dark:text-gray-200 dark:ring-white/10 dark:hover:text-orange-400"
+        title={isFullscreen ? 'Réduire la carte' : 'Voir en grand'}
+      >
+        {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        {isFullscreen ? 'Réduire' : 'Voir en grand'}
+      </button>
+      <div ref={containerRef} className={isFullscreen ? 'min-h-0 w-full flex-1' : 'h-full w-full'} />
       {!hasAnyCoords && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/80 p-4 text-center backdrop-blur-sm dark:bg-gray-900/80">
           <MapPin className="h-7 w-7 text-gray-400" />
@@ -363,7 +407,7 @@ export default function DeliveryTrackingMap({
             <iframe
               title="Carte de suivi"
               loading="lazy"
-              className="mt-2 h-44 w-full rounded-lg border border-gray-200 dark:border-white/10"
+              className={`mt-2 w-full rounded-lg border border-gray-200 dark:border-white/10 ${isFullscreen ? 'h-full min-h-0 flex-1' : 'h-44'}`}
               src={osmFallbackEmbedUrl(driverPoint, destinationPoint)}
             />
           ) : (

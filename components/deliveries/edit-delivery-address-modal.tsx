@@ -248,7 +248,9 @@ export function EditDeliveryAddressModal({
       setPaymentStep('done')
       onUpdated({
         shippingAddress: data?.shippingAddress ?? null,
-        destinationCoordinates: data?.destinationCoordinates ?? null
+        // L'API update-address renvoie `coordinates` (et non `destinationCoordinates`) :
+        // sans ce fallback, la carte de tracking ne se rafraîchissait qu'à la réouverture.
+        destinationCoordinates: data?.destinationCoordinates ?? data?.coordinates ?? null
       })
       setTimeout(() => onOpenChange(false), 600)
     } catch {
