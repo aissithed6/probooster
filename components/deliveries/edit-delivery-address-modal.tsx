@@ -125,7 +125,16 @@ export function EditDeliveryAddressModal({
       department: department.trim() || null,
       localDistrict: zone === 'local' ? address.trim() || null : null,
       regionDepartment: zone === 'regional' ? department.trim() || null : null,
-      country: country.trim() || null
+      country: country.trim() || null,
+      // Le serveur lit les critères de zone dans `geo` (body?.geo?.*) :
+      // sans cet objet imbriqué, la zone retombait toujours sur "local".
+      geo: {
+        city: city.trim() || null,
+        department: department.trim() || null,
+        localDistrict: zone === 'local' ? address.trim() || null : null,
+        regionDepartment: zone === 'regional' ? department.trim() || null : null,
+        country: country.trim() || null
+      }
     }),
     [address, lat, lng, zone, city, department, country]
   )

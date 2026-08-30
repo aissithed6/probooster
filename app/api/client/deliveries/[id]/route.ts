@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           shipping_methods:shipping_method_id (*),
           carrier:carrier_id (*),
           delivery_events (*),
-          orders!inner (id, payment_method, payment_status, vendor_id, shipping_lat, shipping_lng)
+          orders:orders!deliveries_order_id_fkey!inner (id, payment_method, payment_status, vendor_id, shipping_lat, shipping_lng)
         `
       )
       .eq('id', params.id)

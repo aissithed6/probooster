@@ -17,6 +17,9 @@ type QuotePayload = {
 }
 
 function toFiniteNumber(value: unknown): number | null {
+  // null / undefined / '' => null (et non 0 : Number(null) === 0 sinon l'adresse
+  // seule serait transformée en coordonnées 0,0 et rejetée à tort).
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : null
 }

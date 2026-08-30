@@ -28,6 +28,9 @@ type FeexpayVerifyResponse = {
 }
 
 function toFiniteNumber(value: unknown): number | null {
+  // null / undefined / '' => null (et non 0 : Number(null) === 0 sinon l'adresse
+  // seule serait transformée en coordonnées 0,0 et rejetée à tort).
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : null
 }
@@ -141,7 +144,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const { data: delivery, error: deliveryError } = await supabase
       .from('deliveries')
-      .select('id, order_id, customer_id, vendor_id, driver_id, status, metadata, orders!inner (payment_method)')
+      .select('id, order_id, customer_id, vendor_id, driver_id, status, metadata, orders:orders!deliveries_order_id_fkey!inner (payment_method)')
       .eq('id', deliveryId)
       .eq('customer_id', customerId)
       .maybeSingle()
