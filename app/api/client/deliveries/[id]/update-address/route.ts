@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 import { assertCustomer, isClientAuthError } from '../../../_helpers/auth'
 import { getSupabaseAdmin } from '../../../../../../lib/supabase'
-import { computeShippingCost, fetchDeliveryRules, resolveZoneFromGeo, type DeliveryChangeContext } from '@/lib/server/delivery-pricing'
+import { computeShippingCost, fetchDeliveryRules, resolveZoneFromGeo, resolveOrderShippingContext, type DeliveryChangeContext } from '@/lib/server/delivery-pricing'
 
 type UpdateAddressPayload = {
   shippingAddress?: string | null
@@ -166,7 +166,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const checkoutMeta = (meta?.checkout ?? {}) as Record<string, unknown>
     const oldShippingCost = toFiniteNumber(checkoutMeta?.shippingCost) ?? toFiniteNumber(meta?.shippingCost) ?? 0
 
-    const rules = await fetchDeliveryRules()
     const geo: DeliveryChangeContext['geo'] = {
       country: body?.geo?.country ?? null,
       regionDepartment: body?.geo?.regionDepartment ?? null,
@@ -179,14 +178,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const mode = String(body?.mode ?? 'standard') === 'express' ? 'express' : 'standard'
     const zone = resolveZoneFromGeo(geo)
 
+    const rules = await fetchDeliveryRules()
+
+    // Contexte produit réel de la commande (livraison gratuite par produit + config admin,
+    // quantité et poids réels des order_items) — mêmes règles que le checkout.
+    const orderCtx = delivery.order_id
+      ? await resolveOrderShippingContext({ orderId: String(delivery.order_id), zone, geo, mode })
+      : { allFree: false, quantity: Math.max(1, Math.floor(toFiniteNumber(body?.quantity) ?? 1)), weightKg: toFiniteNumber(body?.weightKg), itemCount: 0 }
+
+    // La livraison gratuite configurée s'applique uniquement en mode standard (comme au checkout).
+    const freeShipping = mode === 'standard' ? Boolean(orderCtx.allFree) : false
+
     const newShippingCost = computeShippingCost({
       deliveryRules: rules,
       mode,
       zone,
       geo,
-      quantity: Math.max(1, Math.floor(toFiniteNumber(body?.quantity) ?? 1)),
-      weightKg: toFiniteNumber(body?.weightKg),
-      freeShipping: Boolean(body?.freeShipping)
+      quantity: orderCtx.quantity,
+      weightKg: orderCtx.weightKg,
+      freeShipping
     })
 
     const supplement = Math.max(0, newShippingCost - oldShippingCost)
