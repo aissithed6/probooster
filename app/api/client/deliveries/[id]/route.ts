@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const customerId = await assertCustomer(request)
     const supabase = getSupabaseAdmin()
 
-    const { data: delivery, error } = await supabase
+        const { data: delivery, error } = await supabase
       .from('deliveries')
       .select(
         `
@@ -20,7 +20,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           shipping_methods:shipping_method_id (*),
           carrier:carrier_id (*),
           delivery_events (*),
-          orders!inner (id)
+          orders!inner (id, payment_method, payment_status, vendor_id, shipping_lat, shipping_lng),
+          vendor_profile:user_id!left (first_name, last_name, metadata)
         `
       )
       .eq('id', params.id)
@@ -47,6 +48,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       deliveredAt: delivery.delivered_at,
       cancelledAt: delivery.cancelled_at,
       currentLocation: delivery.current_location,
+      paymentMethod: delivery.orders?.payment_method ?? 'cod',
+      paymentStatus: delivery.orders?.payment_status ?? 'pending',
+            vendor: delivery.vendor_profile
+        ? (() => {
+            const prefs = (delivery.vendor_profile.metadata as any)?.preferences ?? {}
+            const name = prefs?.business_name ?? prefs?.store_name ?? prefs?.company ?? null
+            const fallback = [delivery.vendor_profile.first_name, delivery.vendor_profile.last_name]
+              .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+              .join(' ')
+            return {
+              name: typeof name === 'string' && name.trim().length > 0 ? name.trim() : (fallback || null),
+              id: delivery.orders?.vendor_id ?? null
+            }
+          })()
+        : null,
       driver: delivery.driver_name
         ? {
             name: delivery.driver_name,
@@ -83,6 +99,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             metadata: delivery.carrier.metadata
           }
         : null,
+            destinationCoordinates:
+        delivery.orders?.shipping_lat !== null && delivery.orders?.shipping_lat !== undefined &&
+        delivery.orders?.shipping_lng !== null && delivery.orders?.shipping_lng !== undefined
+          ? { lat: Number(delivery.orders.shipping_lat), lng: Number(delivery.orders.shipping_lng) }
+          : null,
       events: (delivery.delivery_events ?? [])
         .sort((a: any, b: any) => new Date(a.occurred_at ?? a.created_at ?? '').getTime() - new Date(b.occurred_at ?? b.created_at ?? '').getTime())
         .map((event: any) => ({

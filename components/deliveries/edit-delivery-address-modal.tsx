@@ -23,6 +23,7 @@ import {
 export interface AddressChangeDelivery {
   id: string
   status?: string
+  paymentMethod?: string | null
   deliveryAddress?: string | null
   destinationCoordinates?: { lat?: number; lng?: number } | null
   shippingMethod?: { basePrice?: number | null } | null
@@ -70,10 +71,15 @@ export function EditDeliveryAddressModal({
   const [isDetectingGps, setIsDetectingGps] = useState(false)
   const [paymentStep, setPaymentStep] = useState<'form' | 'paying' | 'done'>('form')
 
-  const isEditable = useMemo(() => {
+     const isEditable = useMemo(() => {
     const status = String((delivery as any)?.status ?? '').toLowerCase()
     return EDITABLE_STATUSES.includes(status)
   }, [delivery])
+
+  // Mode de paiement de la commande : si COD, le supplément est payé à la livraison.
+  const paymentMethod = String((delivery as any)?.paymentMethod ?? '').toLowerCase().trim()
+  const isCod = paymentMethod === 'cod' || paymentMethod === 'cash_on_delivery' || paymentMethod === 'cash'
+
 
   const initializedDeliveryIdRef = useRef<string | null>(null)
 
@@ -195,10 +201,10 @@ export function EditDeliveryAddressModal({
 
     setIsPaying(true)
     try {
-      // 1) Paiement FeexPay si un supplément est dû
+      // 1) Paiement FeexPay si un supplément est dû (désactivé en mode COD)
       let paymentReference: string | null = null
 
-      if (quote?.requiresPayment) {
+      if (quote?.requiresPayment && !isCod) {
         const initResp = await fetch('/api/client/payments/feexpay/initialize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -268,7 +274,14 @@ export function EditDeliveryAddressModal({
         <DialogHeader>
           <DialogTitle>Modifier l&apos;adresse de livraison</DialogTitle>
           <DialogDescription>
-            Le prix de livraison sera recalculé en direct selon les zones configurées par l&apos;admin. Si un supplément est nécessaire, il vous sera demandé avant validation.
+            Le prix de livraison sera recalculé en direct selon les zones configurées par l&apos;admin. Si un supplément est nécessaire, il vous sera demandé avant validation.{' '}
+            {(() => {
+              const pm = String((delivery as any)?.paymentMethod ?? '').toLowerCase().trim()
+              const cod = pm === 'cod' || pm === 'cash_on_delivery' || pm === 'cash'
+              return cod
+                ? 'Mode paiement : paiement à la livraison (COD). Le supplément sera récupéré par le livreur.'
+                : 'Mode paiement : carte en ligne (FeexPay).'
+            })()}
           </DialogDescription>
         </DialogHeader>
 
@@ -384,11 +397,15 @@ export function EditDeliveryAddressModal({
               onClick={handleSubmit}
               disabled={isPaying || isQuoting || !payloadHasChange() || (quote === null && payloadHasChange())}
             >
-              {isPaying
+                          {isPaying
                 ? 'Traitement...'
-                : quote?.requiresPayment
-                  ? `💳 Payer le supplément (${quote.supplement.toLocaleString()} FCFA)`
-                  : "✅ Mettre à jour l'adresse"}
+                : isCod
+                  ? quote?.requiresPayment
+                    ? `🧾 Supplément à payer à la livraison (${quote.supplement.toLocaleString()} FCFA)`
+                    : "✅ Mettre à jour l'adresse"
+                  : quote?.requiresPayment
+                    ? `💳 Payer le supplément (${quote.supplement.toLocaleString()} FCFA)`
+                    : "✅ Mettre à jour l'adresse"}
             </Button>
           )}
         </DialogFooter>

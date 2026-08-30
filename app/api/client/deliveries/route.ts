@@ -116,7 +116,7 @@ interface DeliveryEventRow {
   data: Record<string, unknown> | null
 }
 
-interface DeliveryRelationRow {
+type DeliveryRelationRow = {
   id: string
   order_id: string
   customer_id: string | null
@@ -165,6 +165,14 @@ interface DeliveryRelationRow {
     billing_address?: any | null
     shipping_lat?: number | null
     shipping_lng?: number | null
+    payment_method?: string | null
+    payment_status?: string | null
+    vendor_id?: string | null
+  } | null
+    vendor_profile: {
+    first_name?: string | null
+    last_name?: string | null
+    metadata?: Record<string, unknown> | null
   } | null
 }
 
@@ -222,7 +230,8 @@ export async function GET(request: NextRequest) {
           shipping_methods:shipping_method_id (*),
           carrier:carrier_id (*),
           delivery_events (*),
-          orders:orders!deliveries_order_id_fkey (id, order_number, shipping_address, billing_address, shipping_lat, shipping_lng)
+          orders:orders!deliveries_order_id_fkey (id, order_number, shipping_address, billing_address, shipping_lat, shipping_lng, payment_method, payment_status, vendor_id),
+          vendor_profile:user_id!left (first_name, last_name, metadata)
         `
       )
       .eq('customer_id', userId)
@@ -296,11 +305,26 @@ export async function GET(request: NextRequest) {
         status: normalizeEffectiveDeliveryStatus(delivery.status, delivery.delivery_events),
         priority: delivery.priority,
         eta: delivery.eta,
-        deliveryAddress,
+                 deliveryAddress,
         dispatchedAt: delivery.dispatched_at,
         deliveredAt: delivery.delivered_at,
         cancelledAt: delivery.cancelled_at,
         currentLocation: delivery.current_location,
+        paymentMethod: delivery.orders?.payment_method ?? null,
+        paymentStatus: delivery.orders?.payment_status ?? null,
+                vendor: delivery.vendor_profile
+          ? (() => {
+              const prefs = (delivery.vendor_profile.metadata as any)?.preferences ?? {}
+              const name = prefs?.business_name ?? prefs?.store_name ?? prefs?.company ?? null
+              const fallback = [delivery.vendor_profile.first_name, delivery.vendor_profile.last_name]
+                .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+                .join(' ')
+              return {
+                id: delivery.orders?.vendor_id ?? null,
+                name: typeof name === 'string' && name.trim().length > 0 ? name.trim() : (fallback || null)
+              }
+            })()
+          : null,
         driver: delivery.driver_name
           ? {
               name: delivery.driver_name,

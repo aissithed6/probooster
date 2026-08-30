@@ -480,6 +480,14 @@ const [isEditAddressOpen, setIsEditAddressOpen] = useState(false)
                       <p className="text-xs text-gray-500 dark:text-gray-400">{delivery.driver?.phone ?? "—"}</p>
                     </div>
                     <div>
+                      <p className="text-xs uppercase text-gray-500 dark:text-gray-400">Vendeur</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{delivery?.vendor?.name ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500 dark:text-gray-400">Paiement</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{delivery?.paymentMethod ?? '—'}</p>
+                    </div>
+                    <div>
                       <p className="text-xs uppercase text-gray-500 dark:text-gray-400">Localisation</p>
                       <p className="flex items-center gap-1 text-sm font-medium text-gray-900 dark:text-gray-100">
                         <MapPin className="h-3.5 w-3.5 text-orange-500" />
@@ -570,10 +578,20 @@ const [isEditAddressOpen, setIsEditAddressOpen] = useState(false)
                       <h3 className="text-lg font-semibold text-gray-900">
                         #{selectedDelivery.orderNumber ?? selectedDelivery.orderId}
                       </h3>
+                      {selectedDelivery.vendor?.name ? (
+                        <p className="mt-0.5 text-xs text-gray-500">{selectedDelivery.vendor.name}</p>
+                      ) : null}
                     </div>
-                    <Badge className={`border ${STATUS_META[selectedDelivery.status]?.tone ?? "border-gray-200 bg-gray-50 text-gray-600"}`}>
-                      {STATUS_META[selectedDelivery.status]?.label ?? selectedDelivery.status}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <Badge className={`border ${STATUS_META[selectedDelivery.status]?.tone ?? "border-gray-200 bg-gray-50 text-gray-600"}`}>
+                        {STATUS_META[selectedDelivery.status]?.label ?? selectedDelivery.status}
+                      </Badge>
+                      {selectedDelivery.paymentMethod ? (
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {selectedDelivery.paymentMethod}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
                   <Separator className="my-3" />
                   <dl className="space-y-2 text-sm text-gray-600">
@@ -786,6 +804,7 @@ const [isEditAddressOpen, setIsEditAddressOpen] = useState(false)
             ? {
                 id: selectedDelivery.id,
                 status: selectedDelivery.status,
+                paymentMethod: selectedDelivery?.paymentMethod ?? null,
                 deliveryAddress: selectedDelivery.deliveryAddress ?? null,
                 destinationCoordinates: (selectedDelivery as any)?.destinationCoordinates ?? null
               }

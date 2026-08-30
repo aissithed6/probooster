@@ -141,7 +141,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const { data: delivery, error: deliveryError } = await supabase
       .from('deliveries')
-      .select('id, order_id, customer_id, vendor_id, driver_id, status, metadata')
+      .select('id, order_id, customer_id, vendor_id, driver_id, status, metadata, orders!inner (payment_method)')
       .eq('id', deliveryId)
       .eq('customer_id', customerId)
       .maybeSingle()
@@ -160,6 +160,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         { status: 409 }
       )
     }
+
+    // Mode de paiement de la commande : si COD (payé à la livraison), le
+    // supplément de livraison n'est pas payé en ligne mais à la réception.
+    const paymentMethod = String((delivery as any).orders?.payment_method ?? '').toLowerCase().trim()
+    const isCod = paymentMethod === 'cod' || paymentMethod === 'cash_on_delivery' || paymentMethod === 'cash'
 
     // --- Recalcul serveur du supplément ---
     const meta = (delivery.metadata ?? {}) as Record<string, unknown>
@@ -203,7 +208,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const reference = typeof body?.reference === 'string' ? body.reference.trim() : ''
 
     // --- Vérification paiement si supplément ---
-    if (supplement > 0) {
+    // COD (payé à la livraison) : aucun paiement en ligne n'est demandé ici.
+    // Le supplément sera récupéré par le livreur à la réception.
+    const requiresOnlinePayment = supplement > 0 && !isCod
+
+    if (requiresOnlinePayment) {
       if (!reference) {
         return NextResponse.json(
           { error: `Un supplément de ${supplement} FCFA est requis. Paiement nécessaire.`, supplement, requiresPayment: true },
@@ -299,9 +308,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         newCoordinates: lat !== null && lng !== null ? { lat, lng } : null,
         oldShippingCost,
         newShippingCost,
-        supplement,
+                supplement,
         paymentReference: reference || null,
-        paymentMode: supplement > 0 ? (process.env.FEEXPAY_MODE ?? 'mock') : null
+        paymentMode: isCod
+          ? 'cod'
+          : supplement > 0
+            ? (process.env.FEEXPAY_MODE ?? 'mock')
+            : null
       }
     })
 
@@ -321,7 +334,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             user_id: userId,
             type: 'order',
             title: 'Livraison: adresse modifiée',
-            message: `Le client a modifié l'adresse de livraison (livraison #${deliveryId.slice(0, 8)}).${supplement > 0 ? ` Supplément payé: ${supplement} FCFA.` : ''}`,
+            message: `Le client a modifié l'adresse de livraison (livraison #${deliveryId.slice(0, 8)}).${
+              supplement > 0
+                ? isCod
+                  ? ` Supplément à payer à la livraison: ${supplement} FCFA.`
+                  : ` Supplément payé: ${supplement} FCFA.`
+                : ''
+            }`,
             action_url: '/dashboard?tab=deliveries',
             priority: 'normal'
           }))
@@ -342,7 +361,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           oldShippingCost,
           newShippingCost,
           supplement,
-          paymentProcessed: supplement > 0,
+          paymentProcessed: !isCod && supplement > 0,
+          paymentMode: isCod ? 'cod' : 'online',
           reference: reference || null
         }
       },

@@ -72,11 +72,14 @@ export interface ClientDelivery {
   deliveredAt: string | null
   cancelledAt: string | null
   currentLocation: string | null
-  driver: ClientDeliveryDriver | null
+      driver: ClientDeliveryDriver | null
   trackingNumber: string | null
   progressPercent: number
   coordinates: ClientDeliveryCoordinates | null
   destinationCoordinates?: ClientDeliveryDestinationCoordinates | null
+  paymentMethod?: string | null
+  paymentStatus?: string | null
+  vendor?: { id: string | null; name: string | null } | null
   shippingMethod: ClientDeliveryShippingMethod | null
   carrier: ClientDeliveryCarrier | null
   events: ClientDeliveryEvent[]
