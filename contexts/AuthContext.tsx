@@ -629,16 +629,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
         return
       }
 
+      const device_info_obj = {
+        browser: typeof navigator !== 'undefined' ? (navigator as any).userAgentData?.brands?.[0]?.brand ?? null : null,
+        os: typeof navigator !== 'undefined' ? (navigator as any).userAgentData?.platform ?? null : null,
+        device: typeof navigator !== 'undefined' ? navigator.maxTouchPoints > 0 ? 'Mobile' : 'Desktop' : null,
+        platform: typeof navigator !== 'undefined' ? (navigator as any).platform ?? null : null,
+        language: typeof navigator !== 'undefined' ? navigator.language ?? null : null,
+        screen: typeof window !== 'undefined' ? `${(window as any).screen?.width ?? 0}x${(window as any).screen?.height ?? 0}` : null
+      }
+
       const { error } = await supabase
         .from('user_sessions')
         .insert({
           user_id: userId,
           session_token: token.slice(0, 24),
-          device_info: {
-            platform: typeof navigator !== 'undefined' ? (navigator as any).platform ?? null : null,
-            language: typeof navigator !== 'undefined' ? navigator.language ?? null : null,
-            screen: typeof window !== 'undefined' ? `${(window as any).screen?.width ?? 0}x${(window as any).screen?.height ?? 0}` : null
-          },
+          // device_info est une colonne text : on stocke un objet JSON sérialisé.
+          device_info: JSON.stringify(device_info_obj),
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
           is_active: true,
           last_activity_at: nowIso

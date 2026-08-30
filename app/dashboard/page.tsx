@@ -15119,7 +15119,13 @@ Pro Booster - Votre marketplace de confiance
             {Array.isArray(activeSessions) && activeSessions.length > 0 ? (
               <div className="space-y-2">
                 {activeSessions.map((session: any) => {
-                  const device = session?.device_info ?? null
+                  const rawDevice = session?.device_info ?? null
+                  let device: any = null
+                  if (typeof rawDevice === 'string') {
+                    try { device = JSON.parse(rawDevice) } catch { device = null }
+                  } else if (rawDevice && typeof rawDevice === 'object') {
+                    device = rawDevice
+                  }
                   const deviceName =
                     typeof device === 'object' && device !== null
                       ? [device?.browser, device?.os, device?.device]

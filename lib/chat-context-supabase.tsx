@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { ChatService } from './services/chat-service'
 import type { ChatSession as SupabaseChatSession, ChatMessage as SupabaseChatMessage } from './services/chat-service'
@@ -748,7 +748,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
   /**
    * Créer une nouvelle session de chat
    */
-  const createChatSession = async (sellerId: string, sellerName: string, sellerAvatar?: string): Promise<string> => {
+  const createChatSession = useCallback(async (sellerId: string, sellerName: string, sellerAvatar?: string): Promise<string> => {
     if (!userId) {
       toast({
         title: "Erreur",
@@ -766,18 +766,16 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       return ''
     }
-    
-    // Vérifier si une session existe déjà localement
-    const existingSession =
-      chatSessionsRef.current.find(session => session.sellerId === sellerId) ??
-      chatSessions.find(session => session.sellerId === sellerId)
+
+    // Vérifier si une session existe déjà localement (via ref pour éviter les re-renders)
+    const existingSession = chatSessionsRef.current.find(session => session.sellerId === sellerId)
     if (existingSession) {
       return existingSession.id
     }
-    
+
     // Créer ou récupérer la session depuis Supabase
     const session = await ChatService.getOrCreateChatSession(userId, sellerId)
-    
+
     if (!session) {
       toast({
         title: "Erreur",
@@ -787,7 +785,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       return ''
     }
-    
+
     const fallbackParticipant = await ChatService.getParticipantInfo(sellerId)
     const resolvedName = String(sellerName ?? '').trim() || fallbackParticipant?.name || 'Utilisateur'
     const resolvedAvatar = sellerAvatar || fallbackParticipant?.avatar_url
@@ -809,12 +807,12 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     chatSessionsRef.current = [newSession, ...chatSessionsRef.current.filter(s => s.id !== newSession.id)]
     setChatSessions(prev => [newSession, ...prev])
     return session.id
-  }
+  }, [userId, toast])
   
   /**
    * Ouvrir une session de chat
    */
-  const openChatSession = (sessionId: string, openGlobalUI: boolean = true) => {
+  const openChatSession = useCallback((sessionId: string, openGlobalUI: boolean = true) => {
     // Toujours ouvrir l'UI
     if (openGlobalUI) {
       setIsAnyChatOpen(true)
@@ -877,8 +875,8 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
         })()
       }
     }
-  }
-  
+  }, [userId])
+
   /**
    * Fermer la session active
    */
