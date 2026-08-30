@@ -488,20 +488,23 @@ export default function DeliveryTrackingMap({
   }, [route?.distanceMeters])
 
   // Géocodage inverse de la destination (quartier / rue) — "adresse la plus proche".
+  // Passe par notre route API serveur (Mapbox si clé, sinon Nominatim) afin de
+  // ne pas exposer la clé côté client et de bénéficier des meilleures adresses AO.
   useEffect(() => {
     if (!hasDestinationCoords || !destinationPoint) return
     let cancelled = false
     const ctrl = new AbortController()
-    const timer = window.setTimeout(() => ctrl.abort(), 8000)
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${destinationPoint.lat}&lon=${destinationPoint.lng}&format=jsonv2&zoom=18&addressdetails=1`
+    const timer = window.setTimeout(() => ctrl.abort(), 10000)
+    const url = `/api/client/deliveries/reverse-geocode?lat=${destinationPoint.lat}&lng=${destinationPoint.lng}`
     fetch(url, {
       signal: ctrl.signal,
-      headers: { Accept: 'application/json' }
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' }
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((j: any) => {
-        if (cancelled || !j?.display_name) return
-        setReversedDest(String(j.display_name).slice(0, 140))
+      .then((json: any) => {
+        if (cancelled) return
+        const label = json?.data?.label ?? json?.data?.shortName ?? json?.data?.neighborhood
+        if (label) setReversedDest(String(label).slice(0, 140))
       })
       .catch(() => {
         /* best-effort : on garde destinationHint si fourni */
