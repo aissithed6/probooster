@@ -112,3 +112,134 @@ export async function reverseGeocode(
   if (viaMapbox?.label) return viaMapbox
   return reverseGeocodeNominatim(lat, lng)
 }
+
+/* ------------------------------------------------------------------ */
+/* Géocodage direct (recherche de lieu par texte)                      */
+/* ------------------------------------------------------------------ */
+
+export interface SearchPlaceResult {
+  /** Libellé complet lisible. */
+  label: string
+  /** Nom court (rue / POI). */
+  shortName: string | null
+  neighborhood: string | null
+  city: string | null
+  country: string | null
+  lat: number
+  lng: number
+  provider: 'mapbox' | 'nominatim'
+}
+
+function parseMapboxSearchFeature(feat: any): SearchPlaceResult | null {
+  const center: number[] | undefined = feat?.center
+  if (!Array.isArray(center) || center.length < 2) return null
+  const lng = Number(center[0])
+  const lat = Number(center[1])
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  const context: any[] = Array.isArray(feat?.context) ? feat.context : []
+  const pick = (kind: string): string | null => {
+    for (const c of context) {
+      if (typeof c?.id === 'string' && c.id.includes(kind)) {
+        return typeof c?.text === 'string' ? c.text : null
+      }
+    }
+    return null
+  }
+  const text = typeof feat?.text === 'string' ? feat.text : null
+  return {
+    label: typeof feat?.place_name === 'string' ? feat.place_name : (text ?? ''),
+    shortName: text,
+    neighborhood: pick('neighborhood') ?? pick('locality'),
+    city: pick('place') ?? pick('district'),
+    country: pick('country'),
+    lat,
+    lng,
+    provider: 'mapbox'
+  }
+}
+
+async function searchPlacesMapbox(query: string, proximity?: { lat: number; lng: number }): Promise<SearchPlaceResult[]> {
+  const token = getMapboxToken()
+  if (!token) return []
+  const params = new URLSearchParams({
+    access_token: token,
+    limit: '6',
+    language: 'fr'
+  })
+  if (proximity && Number.isFinite(proximity.lat) && Number.isFinite(proximity.lng)) {
+    params.set('proximity', `${proximity.lng},${proximity.lat}`)
+  }
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?${params}`
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(6500) })
+    if (!r.ok) return []
+    const json: any = await r.json()
+    return (json?.features ?? [])
+      .map(parseMapboxSearchFeature)
+      .filter((f: SearchPlaceResult | null): f is SearchPlaceResult => Boolean(f))
+  } catch {
+    return []
+  }
+}
+
+async function searchPlacesNominatim(query: string, proximity?: { lat: number; lng: number }): Promise<SearchPlaceResult[]> {
+  const params = new URLSearchParams({
+    q: query,
+    format: 'jsonv2',
+    addressdetails: '1',
+    limit: '6',
+    'accept-language': 'fr'
+  })
+  // Biais vers l'Afrique de l'Ouest par défaut (Bénin) si pas de proximité connue.
+  const viewbox = proximity
+    ? `${proximity.lng - 0.15},${proximity.lat + 0.15},${proximity.lng + 0.15},${proximity.lat - 0.15}`
+    : '1.5,12.5,3.2,8.5'
+  params.set('viewbox', viewbox)
+  params.set('bounded', '0')
+  const url = `https://nominatim.openstreetmap.org/search?${params}`
+  try {
+    const r = await fetch(url, {
+      signal: AbortSignal.timeout(6500),
+      headers: { Accept: 'application/json', 'User-Agent': 'probooster-delivery/1.0' }
+    })
+    if (!r.ok) return []
+    const json: any = await r.json()
+    return (Array.isArray(json) ? json : [])
+      .map((j: any): SearchPlaceResult | null => {
+        const lat = Number(j?.lat)
+        const lng = Number(j?.lon)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+        const adr = j.address ?? {}
+        const neighborhood = adr.neighbourhood ?? adr.suburb ?? adr.quarter ?? adr.road ?? null
+        const city = adr.city ?? adr.town ?? adr.village ?? adr.municipality ?? null
+        return {
+          label: String(j?.display_name ?? '').slice(0, 160),
+          shortName: j?.name ?? neighborhood ?? city ?? null,
+          neighborhood,
+          city,
+          country: adr.country ?? null,
+          lat,
+          lng,
+          provider: 'nominatim' as const
+        }
+      })
+      .filter((f: SearchPlaceResult | null): f is SearchPlaceResult => Boolean(f))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Recherche de lieu par texte (saisie utilisateur), Mapbox d'abord puis
+ * Nominatim. `proximity` biaise les résultats vers la zone du client.
+ */
+export async function searchPlaces(
+  query: string,
+  proximity?: { lat: number; lng: number }
+): Promise<SearchPlaceResult[]> {
+  const q = query.trim()
+  if (q.length < 3) return []
+  const viaMapbox = await searchPlacesMapbox(q, proximity)
+  if (viaMapbox.length > 0) return viaMapbox
+  return searchPlacesNominatim(q, proximity)
+}

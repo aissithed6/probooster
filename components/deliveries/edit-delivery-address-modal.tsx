@@ -70,6 +70,13 @@ export function EditDeliveryAddressModal({
   const [error, setError] = useState('')
   const [isDetectingGps, setIsDetectingGps] = useState(false)
   const [paymentStep, setPaymentStep] = useState<'form' | 'paying' | 'done'>('form')
+  // Recherche de lieu exact (géocodage direct) : saisie → suggestions → point précis.
+  const [placeQuery, setPlaceQuery] = useState('')
+  const [placeResults, setPlaceResults] = useState<
+    Array<{ label: string; lat: number; lng: number; neighborhood: string | null; city: string | null; country: string | null }>
+  >([])
+  const [isSearchingPlaces, setIsSearchingPlaces] = useState(false)
+  const [showPlaceResults, setShowPlaceResults] = useState(false)
 
      const isEditable = useMemo(() => {
     const status = String((delivery as any)?.status ?? '').toLowerCase()
@@ -190,6 +197,48 @@ export function EditDeliveryAddressModal({
     )
   }
 
+  // Recherche de lieu debouncée (≥3 caractères) : suggestions en direct.
+  useEffect(() => {
+    if (!open || !isEditable) return
+    const q = placeQuery.trim()
+    if (q.length < 3) {
+      setPlaceResults([])
+      setShowPlaceResults(false)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingPlaces(true)
+      try {
+        const resp = await fetch(
+          `/api/client/deliveries/search-places?q=${encodeURIComponent(q)}${
+            lat.trim() && lng.trim() ? `&lat=${encodeURIComponent(lat.trim())}&lng=${encodeURIComponent(lng.trim())}` : ''
+          }`
+        )
+        const json = await resp.json().catch(() => null)
+        const results: Array<any> = Array.isArray(json?.data) ? json.data : []
+        setPlaceResults(results)
+        setShowPlaceResults(true)
+      } catch {
+        setPlaceResults([])
+      } finally {
+        setIsSearchingPlaces(false)
+      }
+    }, 450)
+
+    return () => clearTimeout(timer)
+  }, [placeQuery, open, isEditable, lat, lng])
+
+  // Sélection d'un lieu suggéré : remplit adresse + GPS + ville/pays automatiquement.
+  const handleSelectPlace = useCallback((place: { label: string; lat: number; lng: number; neighborhood: string | null; city: string | null; country: string | null }) => {
+    setAddress(place.label)
+    setLat(String(place.lat))
+    setLng(String(place.lng))
+    if (place.city) setCity(place.city)
+    if (place.country) setCountry(place.country)
+    setShowPlaceResults(false)
+  }, [])
+
   const handleSubmit = async () => {
     if (!delivery) return
     setError('')
@@ -301,6 +350,47 @@ export function EditDeliveryAddressModal({
               />
             </div>
 
+            {/* Recherche de lieu exact : suggestions → point précis (Mapbox/Nominatim) */}
+            <div className="relative space-y-2">
+              <Label htmlFor="edit-place-search">Rechercher un lieu exact</Label>
+              <Input
+                id="edit-place-search"
+                value={placeQuery}
+                onChange={(e) => setPlaceQuery(e.target.value)}
+                onFocus={() => placeResults.length > 0 && setShowPlaceResults(true)}
+                placeholder="Ex: Fidjrossè, Cotonou — nom de lieu, quartier, repère..."
+                autoComplete="off"
+              />
+              {isSearchingPlaces && (
+                <p className="text-xs text-gray-500">Recherche en cours...</p>
+              )}
+              {showPlaceResults && placeResults.length > 0 && (
+                <ul className="absolute z-30 max-h-52 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                  {placeResults.map((place, idx) => (
+                    <li key={`${place.lat}-${place.lng}-${idx}`}>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                        onClick={() => handleSelectPlace(place)}
+                      >
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{place.label}</span>
+                        {(place.neighborhood || place.city) && (
+                          <span className="block text-xs text-gray-500 dark:text-gray-400">
+                            {[place.neighborhood, place.city, place.country].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {showPlaceResults && !isSearchingPlaces && placeQuery.trim().length >= 3 && placeResults.length === 0 && (
+                <p className="text-xs text-gray-400">Aucun lieu trouvé. Essayez un autre terme.</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Zone de livraison</Label>
             <div className="space-y-2">
               <Label>Zone de livraison</Label>
               <Select value={zone} onValueChange={setZone}>
