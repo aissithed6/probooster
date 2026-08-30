@@ -4105,6 +4105,16 @@ function DashboardPageContent() {
     try {
       setIsPlacingOrder(true)
 
+      if (orderShippingLat === null || orderShippingLng === null) {
+        toast({
+          title: 'Localisation requise',
+          description:
+            "Les coordonnées GPS n'ont pas été détectées. Vérifiez que la géolocalisation est activée puis rouvrez le modal de commande.",
+          variant: 'destructive'
+        })
+        return
+      }
+
       const accessToken = await getClientAccessTokenSafe()
 
       const payload: any = {

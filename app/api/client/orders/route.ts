@@ -524,6 +524,19 @@ export async function POST(request: NextRequest) {
     const shippingLat = toOptionalCoordinate((payload as any)?.shippingLat ?? payload?.shippingAddress?.lat ?? payload?.shippingAddress?.latitude)
     const shippingLng = toOptionalCoordinate((payload as any)?.shippingLng ?? payload?.shippingAddress?.lng ?? payload?.shippingAddress?.longitude)
 
+    // (0,0) = coordonnée invalide (GPS non activé / valeur par défaut). On la traite comme absente
+    // pour que la validation ci-dessous renvoie un message explicite au lieu d'enregistrer 0/0 en base.
+    const isZeroZero = shippingLat === 0 && shippingLng === 0
+    if (isZeroZero) {
+      return NextResponse.json(
+        {
+          error:
+            'Coordonnées GPS invalides (0,0). Activez la géolocalisation du navigateur et réessayez.'
+        },
+        { status: 400 }
+      )
+    }
+
     if (!noDeliveryRequested && requiresCoords && (shippingLat === null || shippingLng === null)) {
       return NextResponse.json(
         {

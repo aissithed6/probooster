@@ -112,6 +112,8 @@ export function normalizeCoordinates(raw: unknown): { lat: number; lng: number }
   const lat = typeof obj.lat === 'number' ? obj.lat : typeof obj.latitude === 'number' ? obj.latitude : undefined
   const lng = typeof obj.lng === 'number' ? obj.lng : typeof obj.longitude === 'number' ? obj.longitude : undefined
   if (lat !== undefined && lng !== undefined && Number.isFinite(lat) && Number.isFinite(lng)) {
+    // (0,0) = coordonnée invalide (GPS absent / valeur par défaut): évite un pin au milieu de l'océan.
+    if (lat === 0 && lng === 0) return null
     return { lat, lng }
   }
 
