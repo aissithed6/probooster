@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -75,8 +75,23 @@ export function EditDeliveryAddressModal({
     return EDITABLE_STATUSES.includes(status)
   }, [delivery])
 
+  const initializedDeliveryIdRef = useRef<string | null>(null)
+
+  // À la fermeture, on oublie la livraison initialisée pour que la prochaine ouverture
+  // recharge les valeurs à jour (notamment après une modification réussie).
+  useEffect(() => {
+    if (!open) {
+      initializedDeliveryIdRef.current = null
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open || !delivery) return
+    // Ne (ré)initialiser le formulaire QUE quand on ouvre le modal pour une NOUVELLE livraison.
+    // Le parent recrée l'objet `delivery` à chaque render (objet inline) : sans ce garde,
+    // chaque re-render du parent effacerait les champs (GPS/adresse) et le prix en direct.
+    if (initializedDeliveryIdRef.current === delivery.id) return
+    initializedDeliveryIdRef.current = delivery.id
     setAddress(String(delivery.deliveryAddress ?? ''))
     const coords = delivery.destinationCoordinates
     setLat(coords?.lat !== undefined && coords?.lat !== null ? String(coords.lat) : '')
