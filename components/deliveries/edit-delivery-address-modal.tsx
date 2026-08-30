@@ -391,8 +391,6 @@ export function EditDeliveryAddressModal({
 
             <div className="space-y-2">
               <Label>Zone de livraison</Label>
-            <div className="space-y-2">
-              <Label>Zone de livraison</Label>
               <Select value={zone} onValueChange={setZone}>
                 <SelectTrigger>
                   <SelectValue />
