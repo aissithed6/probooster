@@ -33,6 +33,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useNotifications } from "@/components/ui/modern-notification"
 import { DeliveryChatReplacement } from "@/components/chat/DeliveryChatReplacement"
+import { EditDeliveryAddressModal } from "@/components/deliveries/edit-delivery-address-modal"
 
 const DeliveryTrackingMap = dynamic(() => import("@/components/deliveries/DeliveryTrackingMap"), { ssr: false })
 import {
@@ -148,6 +149,7 @@ export function ClientDeliveryManagement(): JSX.Element {
   const [selectedDelivery, setSelectedDelivery] = useState<ClientDelivery | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isConfirmingReceived, setIsConfirmingReceived] = useState(false)
+const [isEditAddressOpen, setIsEditAddressOpen] = useState(false)
   const [deliveryProofs, setDeliveryProofs] = useState<Array<{ id: string; public_url: string | null; created_at: string | null }>>([])
   const [isLoadingProofs, setIsLoadingProofs] = useState(false)
 
@@ -734,6 +736,20 @@ export function ClientDeliveryManagement(): JSX.Element {
                 </Button>
               ) : null}
 
+              {selectedDelivery &&
+              ['pending', 'confirmed', 'processing', 'preparing'].includes(
+                String(selectedDelivery.status).toLowerCase()
+              ) ? (
+                <Button
+                  type="button"
+                  className="bg-orange-600 text-white hover:bg-orange-700"
+                  onClick={() => setIsEditAddressOpen(true)}
+                >
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Modifier l'adresse
+                </Button>
+              ) : null}
+
               {selectedDelivery && String(selectedDelivery.status).toLowerCase() === 'delivered' ? (
                 <Button
                   type="button"
@@ -763,6 +779,43 @@ export function ClientDeliveryManagement(): JSX.Element {
           onClose={() => setIsChatOpen(false)}
         />
       ) : null}
+
+      <EditDeliveryAddressModal
+        delivery={
+          selectedDelivery
+            ? {
+                id: selectedDelivery.id,
+                status: selectedDelivery.status,
+                deliveryAddress: selectedDelivery.deliveryAddress ?? null,
+                destinationCoordinates: (selectedDelivery as any)?.destinationCoordinates ?? null
+              }
+            : null
+        }
+        open={isEditAddressOpen && Boolean(selectedDelivery)}
+        onOpenChange={(open) => {
+          if (!open) setIsEditAddressOpen(false)
+        }}
+        onUpdated={(result) => {
+          setIsEditAddressOpen(false)
+          setSelectedDelivery((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  deliveryAddress: result.shippingAddress ?? prev.deliveryAddress,
+                  ...(result.destinationCoordinates
+                    ? { destinationCoordinates: result.destinationCoordinates }
+                    : {})
+                }
+              : prev
+          )
+          addNotification({
+            type: 'success',
+            title: 'Adresse mise à jour',
+            message: 'Votre adresse de livraison a été mise à jour partout (carte incluse).'
+          })
+          void refreshDeliveries?.()
+        }}
+      />
 
       <Dialog open={isPreferencesModalOpen} onOpenChange={setIsPreferencesModalOpen}>
         <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
