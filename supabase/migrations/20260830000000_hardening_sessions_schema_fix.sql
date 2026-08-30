@@ -17,7 +17,20 @@ alter table public.user_sessions
   add column if not exists ip_address text,
   add column if not exists is_active boolean not null default true,
   add column if not exists last_activity_at timestamptz,
-  add column if not exists updated_at timestamptz not null default now();
+  add column if not exists updated_at timestamptz not null default now(),
+  add column if not exists expires_at timestamptz;
+
+-- Certaines installations ont une colonne expires_at NOT NULL sans défaut : on lui donne
+-- une valeur par défaut pour que les INSERT sans expires_at ne violent plus la contrainte.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'user_sessions' and column_name = 'expires_at'
+  ) then
+    alter table public.user_sessions alter column expires_at set default now() + interval '30 days';
+  end if;
+end $$;
 
 create index if not exists idx_user_sessions_user_id on public.user_sessions (user_id);
 create index if not exists idx_user_sessions_active on public.user_sessions (user_id, is_active);

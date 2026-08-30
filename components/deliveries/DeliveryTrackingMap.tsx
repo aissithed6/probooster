@@ -92,6 +92,8 @@ export default function DeliveryTrackingMap({
   // Style MapLibre chargé ? (addSource/addLayer exigent un style chargé,
   // sinon MapLibre throw "Style is not done loading")
   const [styleReady, setStyleReady] = useState(false)
+  const styleReadyRef = useRef(false)
+  useEffect(() => { styleReadyRef.current = styleReady }, [styleReady])
 
   // La lib est-elle disponible au runtime ? (guard anti-crash "reading 'Map'")
   const [libReady, setLibReady] = useState<boolean>(() => Boolean(maplibregl && maplibregl.Map))
@@ -119,11 +121,33 @@ export default function DeliveryTrackingMap({
       canvasContextAttributes: { antialias: true }
     })
 
-    map.on('error', (e) => {
-      // Les tuiles peuvent échouer (hors-ligne/refus CDN) sans casser l'UI.
-      // On ne marque un vrai échec que si le conteneur WebGL est indisponible.
-      if (e?.error && /webgl|context/i.test(String(e.error.message ?? ''))) {
+    // Timeout de récupération : si le style/tuiles n'arrivent pas sous 15s,
+    // le canvas WebGL opaque resterait noir -> on bascule en fallback.
+    const recoverTimer = window.setTimeout(() => {
+      if (!styleReadyRef.current) {
         setMapFailed(true)
+      }
+    }, 15_000)
+
+    let hasFailedOnce = false
+    map.on('error', (e) => {
+      const msg = String(e?.error?.message ?? '')
+      // Échec irrécupérable (contexte WebGL) : on bascule en fallback.
+      if (/webgl|context/i.test(msg)) {
+        setMapFailed(true)
+        return
+      }
+      // Les échecs de chargement du style/de la source (réseau, CDN, CSP) laissent
+      // le canvas opaque par défaut -> écran noir. On affiche le fallback à la place.
+      if (/failed to (fetch|load)|style|tile|source|network|timeout|resolve/i.test(msg)) {
+        if (!hasFailedOnce) {
+          hasFailedOnce = true
+          // Petite latence : une tuile qui rate seul n'est pas fatale, on laisse
+          // une chance au reste du style de charger.
+          window.setTimeout(() => {
+            if (!styleReadyRef.current) setMapFailed(true)
+          }, 4000)
+        }
       }
     })
 
@@ -132,6 +156,15 @@ export default function DeliveryTrackingMap({
     map.on('load', () => setStyleReady(true))
 
     mapRef.current = map
+
+    // --- Resize différé : si la carte est montée dans un modal (portal) ou pendant
+    //     une animation, le conteneur peut avoir une hauteur 0 -> canvas noir.
+    //     On force plusieurs resize juste après le montage. ---
+    const fixTimers: number[] = []
+    fixTimers.push(
+      window.setTimeout(() => { try { map.resize() } catch { /* ignore */ } }, 250),
+      window.setTimeout(() => { try { map.resize() } catch { /* ignore */ } }, 800)
+    )
 
     const resizeObserver = new ResizeObserver(() => {
       try {
@@ -144,6 +177,8 @@ export default function DeliveryTrackingMap({
 
     return () => {
       resizeObserver.disconnect()
+      window.clearTimeout(recoverTimer)
+      fixTimers.forEach((id) => window.clearTimeout(id))
       driverMarkerRef.current?.remove()
       destinationMarkerRef.current?.remove()
       driverMarkerRef.current = null
@@ -276,6 +311,14 @@ export default function DeliveryTrackingMap({
       )}
       {hasAnyCoords && !libReady && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/80 p-4 text-center backdrop-blur-sm dark:bg-gray-900/80">
+          <Loader2 className="h-7 w-7 animate-spin text-gray-400" />
+          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Chargement de la carte…</p>
+        </div>
+      )}
+      {/* Le canvas WebGL MapLibre est opaque (noir) tant que le style n'est pas rendu :
+          on le masque par un overlay de chargement pour éviter un écran noir. */}
+      {hasAnyCoords && libReady && !mapFailed && !styleReady && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/85 p-4 text-center backdrop-blur-sm dark:bg-gray-900/85">
           <Loader2 className="h-7 w-7 animate-spin text-gray-400" />
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Chargement de la carte…</p>
         </div>
