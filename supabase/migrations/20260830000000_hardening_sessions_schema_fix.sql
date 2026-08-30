@@ -21,7 +21,8 @@ alter table public.user_sessions
   add column if not exists expires_at timestamptz;
 
 -- Certaines installations ont une colonne expires_at NOT NULL sans défaut : on lui donne
--- une valeur par défaut pour que les INSERT sans expires_at ne violent plus la contrainte.
+-- une valeur par défaut et on retire la contrainte NOT NULL pour que TOUTE insertion
+-- (avec ou sans expires_at) ne puisse plus violer la contrainte.
 do $$
 begin
   if exists (
@@ -29,6 +30,7 @@ begin
     where table_schema = 'public' and table_name = 'user_sessions' and column_name = 'expires_at'
   ) then
     alter table public.user_sessions alter column expires_at set default now() + interval '30 days';
+    alter table public.user_sessions alter column expires_at drop not null;
   end if;
 end $$;
 
