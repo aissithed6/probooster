@@ -549,7 +549,17 @@ const [isEditAddressOpen, setIsEditAddressOpen] = useState(false)
                     Carte
                   </Badge>
                 </div>
-                <DeliveryTrackingMap driverPoint={driverPoint} destinationPoint={destinationPoint} />
+                <DeliveryTrackingMap
+                  driverPoint={driverPoint}
+                  destinationPoint={destinationPoint}
+                  driverInfo={{
+                    name: selectedDelivery?.driver?.name ?? null,
+                    vehiclePlate: selectedDelivery?.driver?.vehiclePlate ?? null,
+                    transportMode: null,
+                    vehicleColor: null
+                  }}
+                  destinationHint={selectedDelivery?.deliveryAddress ?? null}
+                />
                 <div className="mt-3 space-y-2 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-500">Coordonnées destination</span>
