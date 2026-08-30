@@ -169,11 +169,6 @@ type DeliveryRelationRow = {
     payment_status?: string | null
     vendor_id?: string | null
   } | null
-    vendor_profile: {
-    first_name?: string | null
-    last_name?: string | null
-    metadata?: Record<string, unknown> | null
-  } | null
 }
 
 function normalizeEffectiveDeliveryStatus(status: string, events: DeliveryEventRow[] | null | undefined): string {
@@ -230,8 +225,7 @@ export async function GET(request: NextRequest) {
           shipping_methods:shipping_method_id (*),
           carrier:carrier_id (*),
           delivery_events (*),
-          orders:orders!deliveries_order_id_fkey (id, order_number, shipping_address, billing_address, shipping_lat, shipping_lng, payment_method, payment_status, vendor_id),
-          vendor_profile:user_id!left (first_name, last_name, metadata)
+          orders:orders!deliveries_order_id_fkey (id, order_number, shipping_address, billing_address, shipping_lat, shipping_lng, payment_method, payment_status, vendor_id)
         `
       )
       .eq('customer_id', userId)
@@ -277,6 +271,41 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Résolution du nom des vendeurs via orders.vendor_id (profiles dans user_profiles).
+    // On indexe par `id` ET `user_id` pour couvrir les deux conventions.
+    const vendorIds = Array.from(
+      new Set(
+        ((deliveries ?? []) as DeliveryRelationRow[])
+          .map((d) => d.orders?.vendor_id ?? null)
+          .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      )
+    )
+    const vendorByVendorId = new Map<string, { id: string | null; name: string | null }>()
+    if (vendorIds.length > 0) {
+      const [byIdRes, byUserIdRes] = await Promise.all([
+        supabase.from('user_profiles').select('id, user_id, first_name, last_name, metadata').in('id', vendorIds as any),
+        supabase.from('user_profiles').select('id, user_id, first_name, last_name, metadata').in('user_id', vendorIds as any)
+      ])
+      const profiles = [...(byIdRes.data ?? []), ...(byUserIdRes.data ?? [])] as Array<{
+        user_id?: string | null
+        first_name?: string | null
+        last_name?: string | null
+        metadata?: Record<string, unknown> | null
+      }>
+      for (const profile of profiles) {
+        if (!profile) continue
+        const profileUserId = profile.user_id ?? null
+        const prefs = (profile.metadata as any)?.preferences ?? {}
+        const rawName = prefs?.business_name ?? prefs?.store_name ?? prefs?.company ?? null
+        const fallback = [profile.first_name, profile.last_name]
+          .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+          .join(' ')
+        const name =
+          typeof rawName === 'string' && rawName.trim().length > 0 ? rawName.trim() : (fallback || null)
+        if (profileUserId) vendorByVendorId.set(profileUserId, { id: profileUserId, name })
+      }
+    }
+
     const normalized = ((deliveries ?? []) as DeliveryRelationRow[]).map(delivery => {
       const sortedEvents = [...(delivery.delivery_events ?? [])].sort((a: DeliveryEventRow, b: DeliveryEventRow) => {
         const first = new Date(a.occurred_at ?? a.created_at ?? '').getTime()
@@ -312,19 +341,12 @@ export async function GET(request: NextRequest) {
         currentLocation: delivery.current_location,
         paymentMethod: delivery.orders?.payment_method ?? null,
         paymentStatus: delivery.orders?.payment_status ?? null,
-                vendor: delivery.vendor_profile
-          ? (() => {
-              const prefs = (delivery.vendor_profile.metadata as any)?.preferences ?? {}
-              const name = prefs?.business_name ?? prefs?.store_name ?? prefs?.company ?? null
-              const fallback = [delivery.vendor_profile.first_name, delivery.vendor_profile.last_name]
-                .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
-                .join(' ')
-              return {
-                id: delivery.orders?.vendor_id ?? null,
-                name: typeof name === 'string' && name.trim().length > 0 ? name.trim() : (fallback || null)
-              }
-            })()
-          : null,
+        vendor: (() => {
+          const vid = delivery.orders?.vendor_id ?? null
+          if (!vid) return null
+          const found = vendorByVendorId.get(vid)
+          return found ?? { id: vid, name: null }
+        })(),
         driver: delivery.driver_name
           ? {
               name: delivery.driver_name,

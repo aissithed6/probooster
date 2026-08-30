@@ -20,8 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           shipping_methods:shipping_method_id (*),
           carrier:carrier_id (*),
           delivery_events (*),
-          orders!inner (id, payment_method, payment_status, vendor_id, shipping_lat, shipping_lng),
-          vendor_profile:user_id!left (first_name, last_name, metadata)
+          orders!inner (id, payment_method, payment_status, vendor_id, shipping_lat, shipping_lng)
         `
       )
       .eq('id', params.id)
@@ -37,6 +36,37 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Livraison introuvable.' }, { status: 404 })
     }
 
+    // Résolution du nom du vendeur via orders.vendor_id (les profiles vendeur sont dans
+    // user_profiles, indexé par id ou user_id selon la convention enregistrée).
+    let vendorInfo: { id: string | null; name: string | null } | null = null
+    const vendorIdValue = (delivery as any)?.orders?.vendor_id ?? (delivery as any)?.vendor_id ?? null
+    if (typeof vendorIdValue === 'string' && vendorIdValue.trim().length > 0) {
+      const vids = [vendorIdValue]
+      const [byIdRes, byUserIdRes] = await Promise.all([
+        supabase.from('user_profiles').select('id, user_id, first_name, last_name, metadata').in('id', vids as any),
+        supabase.from('user_profiles').select('id, user_id, first_name, last_name, metadata').in('user_id', vids as any)
+      ])
+      const profile = (byIdRes.data?.[0] ?? byUserIdRes.data?.[0]) as
+        | { first_name?: string | null; last_name?: string | null; metadata?: Record<string, unknown> | null }
+        | undefined
+      if (profile) {
+        const prefs = (profile.metadata as any)?.preferences ?? {}
+        const rawName = prefs?.business_name ?? prefs?.store_name ?? prefs?.company ?? null
+        const fallback = [profile.first_name, profile.last_name]
+          .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+          .join(' ')
+        vendorInfo = {
+          id: vendorIdValue,
+          name:
+            typeof rawName === 'string' && rawName.trim().length > 0
+              ? rawName.trim()
+              : (fallback || null)
+        }
+      } else {
+        vendorInfo = { id: vendorIdValue, name: null }
+      }
+    }
+
     const normalized = {
       id: delivery.id,
       orderId: delivery.order_id,
@@ -50,19 +80,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       currentLocation: delivery.current_location,
       paymentMethod: delivery.orders?.payment_method ?? 'cod',
       paymentStatus: delivery.orders?.payment_status ?? 'pending',
-            vendor: delivery.vendor_profile
-        ? (() => {
-            const prefs = (delivery.vendor_profile.metadata as any)?.preferences ?? {}
-            const name = prefs?.business_name ?? prefs?.store_name ?? prefs?.company ?? null
-            const fallback = [delivery.vendor_profile.first_name, delivery.vendor_profile.last_name]
-              .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
-              .join(' ')
-            return {
-              name: typeof name === 'string' && name.trim().length > 0 ? name.trim() : (fallback || null),
-              id: delivery.orders?.vendor_id ?? null
-            }
-          })()
-        : null,
+      vendor: vendorInfo,
       driver: delivery.driver_name
         ? {
             name: delivery.driver_name,
