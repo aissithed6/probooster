@@ -24,7 +24,7 @@ export interface SuperAdminDeliveryEvent {
   status: string | null
   description: string | null
   location: string | null
-  coordinates: { lat: number; lng: number } | null
+  coordinates: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null
   occurredAt: string | null
   data: Record<string, unknown>
 }
@@ -70,14 +70,52 @@ export interface SuperAdminDeliveryRecord {
   driver: SuperAdminDeliveryDriver | null
   trackingNumber: string | null
   progressPercent: number
-  coordinates: { lat: number; lng: number } | null
-  destinationCoordinates?: { lat: number; lng: number } | null
+  /** Coordonnées du livreur. Accepte { lat, lng } ou { latitude, longitude }. */
+  coordinates: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null
+  /** Coordonnées de la destination. Optionnel. */
+  destinationCoordinates?: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null
   shippingMethod: SuperAdminDeliveryShippingMethod | null
   carrier: SuperAdminDeliveryCarrier | null
   metadata: Record<string, unknown>
   createdAt: string
   updatedAt: string
   events: SuperAdminDeliveryEvent[]
+}
+
+/**
+ * Normalise les coordonnées brutes issues de la base vers { lat, lng }.
+ * Accepte les formats { lat, lng }, { latitude, longitude }, { coordinates: [lng, lat] } (GeoJSON)
+ * ou { location: { lat, lng } }. Retourne null si aucune coordonnée valide n'est trouvée.
+ */
+export function normalizeCoordinates(raw: unknown): { lat: number; lng: number } | null {
+  if (!raw || typeof raw !== 'object') return null
+
+  const obj = raw as Record<string, unknown>
+
+  // Format imbriqué : { coordinates: [lng, lat] } ou { location: { lat, lng } }
+  if (Array.isArray(obj.coordinates)) {
+    const [lng, lat] = obj.coordinates as unknown[]
+    if (typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng }
+    }
+  }
+  if (obj.location && typeof obj.location === 'object') {
+    const loc = obj.location as Record<string, unknown>
+    const lat = typeof loc.lat === 'number' ? loc.lat : typeof loc.latitude === 'number' ? loc.latitude : undefined
+    const lng = typeof loc.lng === 'number' ? loc.lng : typeof loc.longitude === 'number' ? loc.longitude : undefined
+    if (lat !== undefined && lng !== undefined && Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng }
+    }
+  }
+
+  // Format plat : { lat, lng } ou { latitude, longitude }
+  const lat = typeof obj.lat === 'number' ? obj.lat : typeof obj.latitude === 'number' ? obj.latitude : undefined
+  const lng = typeof obj.lng === 'number' ? obj.lng : typeof obj.longitude === 'number' ? obj.longitude : undefined
+  if (lat !== undefined && lng !== undefined && Number.isFinite(lat) && Number.isFinite(lng)) {
+    return { lat, lng }
+  }
+
+  return null
 }
 
 export interface SuperAdminDeliveryListResponse {

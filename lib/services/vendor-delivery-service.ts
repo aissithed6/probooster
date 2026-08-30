@@ -7,14 +7,25 @@ export interface VendorDeliveryDriver {
   vehiclePlate: string | null
 }
 
+/**
+ * Coordonnées du livreur. Accepte { lat, lng } ou { latitude, longitude }.
+ * La base peut renvoyer soit l'une soit l'autre de ces conventions.
+ */
 export interface VendorDeliveryCoordinates {
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
+  latitude?: number
+  longitude?: number
 }
 
+/**
+ * Coordonnées de la destination. Optionnel. Meme flexibilite que VendorDeliveryCoordinates.
+ */
 export interface VendorDeliveryDestinationCoordinates {
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
+  latitude?: number
+  longitude?: number
 }
 
 export interface VendorDeliveryEvent {

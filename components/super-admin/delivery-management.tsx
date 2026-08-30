@@ -59,6 +59,7 @@ const DeliveryChatReplacement = dynamic(
   { ssr: false }
 )
 import {
+  normalizeCoordinates,
   SuperAdminDeliveryRecord,
   SuperAdminDeliveryService,
   SuperAdminDeliveryStatus
@@ -679,16 +680,16 @@ export default function DeliveryManagement(): JSX.Element {
   const [deliveryProofs, setDeliveryProofs] = useState<Array<{ id: string; public_url: string | null; created_at: string | null }>>([])
   const [isLoadingProofs, setIsLoadingProofs] = useState(false)
 
-  const driverPoint = useMemo(() => {
-    const coords = selectedDelivery?.coordinates
-    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return null
+    const driverPoint = useMemo(() => {
+    const coords = normalizeCoordinates(selectedDelivery?.coordinates)
+    if (!coords) return null
     return { lat: coords.lat, lng: coords.lng, label: 'Livreur' }
   }, [selectedDelivery?.coordinates])
 
   const destinationPoint = useMemo(() => {
-    const dest = (selectedDelivery as any)?.destinationCoordinates
-    if (!dest || !Number.isFinite(dest.lat) || !Number.isFinite(dest.lng)) return null
-    return { lat: dest.lat, lng: dest.lng, label: 'Client' }
+    const coords = normalizeCoordinates((selectedDelivery as any)?.destinationCoordinates)
+    if (!coords) return null
+    return { lat: coords.lat, lng: coords.lng, label: 'Client' }
   }, [(selectedDelivery as any)?.destinationCoordinates])
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -4484,7 +4485,7 @@ export default function DeliveryManagement(): JSX.Element {
                               ) : null}
                               {event.coordinates ? (
                                 <span>
-                                  Lat {event.coordinates.lat.toFixed(4)} / Lng {event.coordinates.lng.toFixed(4)}
+                                  Lat {event.coordinates.lat?.toFixed(4) ?? "—"} / Lng {event.coordinates.lng?.toFixed(4) ?? "—"}
                                 </span>
                               ) : null}
                             </div>

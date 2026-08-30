@@ -44,6 +44,7 @@ import {
   ClientDeliveryPreferences,
   ClientDeliveryService
 } from "@/lib/services/client-delivery-service"
+import { normalizeCoordinates } from "@/lib/services/super-admin-delivery-service"
 
 const STATUS_META: Record<
   ClientDelivery["status"],
@@ -150,16 +151,16 @@ export function ClientDeliveryManagement(): JSX.Element {
   const [deliveryProofs, setDeliveryProofs] = useState<Array<{ id: string; public_url: string | null; created_at: string | null }>>([])
   const [isLoadingProofs, setIsLoadingProofs] = useState(false)
 
-  const driverPoint = useMemo(() => {
-    const coords = selectedDelivery?.coordinates
-    if (!coords || !Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return null
+    const driverPoint = useMemo(() => {
+    const coords = normalizeCoordinates(selectedDelivery?.coordinates)
+    if (!coords) return null
     return { lat: coords.lat, lng: coords.lng, label: 'Livreur' }
   }, [selectedDelivery?.coordinates])
 
   const destinationPoint = useMemo(() => {
-    const dest = (selectedDelivery as any)?.destinationCoordinates
-    if (!dest || !Number.isFinite(dest.lat) || !Number.isFinite(dest.lng)) return null
-    return { lat: dest.lat, lng: dest.lng, label: 'Client' }
+    const coords = normalizeCoordinates((selectedDelivery as any)?.destinationCoordinates)
+    if (!coords) return null
+    return { lat: coords.lat, lng: coords.lng, label: 'Client' }
   }, [(selectedDelivery as any)?.destinationCoordinates])
 
   const statusStats = useMemo(() => {

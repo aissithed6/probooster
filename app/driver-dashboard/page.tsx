@@ -42,6 +42,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Calendar } from '@/components/ui/calendar'
 import { supabase } from '@/lib/supabase'
 import { useDateTime } from '@/lib/hooks/use-date-time'
+import { normalizeCoordinates } from '@/lib/services/super-admin-delivery-service'
 
 const DeliveryTrackingMap = dynamic(() => import('@/components/deliveries/DeliveryTrackingMap'), { ssr: false })
 
@@ -59,8 +60,8 @@ type DriverDeliveryRecord = {
   progressPercent: number
   shippingAddress: any | null
   deliveryAddress?: string | null
-  coordinates?: { lat: number; lng: number } | null
-  destinationCoordinates?: { lat: number; lng: number } | null
+    coordinates?: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null
+  destinationCoordinates?: { lat?: number; lng?: number; latitude?: number; longitude?: number } | null
   driver: {
     userId: string | null
     name: string | null
@@ -1169,7 +1170,10 @@ export default function DriverDashboardPage(): JSX.Element {
         },
         body: JSON.stringify({
           location: selectedDelivery.currentLocation ?? null,
-          coordinates: selectedDelivery.coordinates ? { lat: selectedDelivery.coordinates.lat, lng: selectedDelivery.coordinates.lng } : null
+          coordinates: (() => {
+          const c = normalizeCoordinates(selectedDelivery.coordinates)
+          return c ? { lat: c.lat, lng: c.lng } : null
+        })()
         })
       })
 
@@ -1226,12 +1230,12 @@ export default function DriverDashboardPage(): JSX.Element {
 
   const deliveriesForChat = useMemo(() => deliveries.filter((d) => Boolean(d.orderId)), [deliveries])
 
-  const destinationPoint = useMemo(() => {
-    const dest = selectedDelivery?.destinationCoordinates
-    if (dest && Number.isFinite(dest.lat) && Number.isFinite(dest.lng)) {
-      return { lat: dest.lat, lng: dest.lng, label: 'Client' }
-    }
+    const destinationPoint = useMemo(() => {
+    // Format natif de la base de données
+    const coords = normalizeCoordinates(selectedDelivery?.destinationCoordinates)
+    if (coords) return { lat: coords.lat, lng: coords.lng, label: 'Client' }
 
+    // Fallback : adresse de livraison embarquée dans la commande
     const address = selectedDelivery?.shippingAddress
     if (!address || typeof address !== 'object') return null
     const lat = (address as any)?.lat ?? (address as any)?.latitude
@@ -1272,6 +1276,12 @@ export default function DriverDashboardPage(): JSX.Element {
       </div>
     )
   }
+
+  const driverPoint = useMemo(() => {
+    const coords = normalizeCoordinates(selectedDelivery?.coordinates)
+    if (!coords) return null
+    return { lat: coords.lat, lng: coords.lng, label: 'Livreur' }
+  }, [selectedDelivery?.coordinates])
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-[#0b0f19] dark:text-gray-100">
@@ -1392,15 +1402,7 @@ export default function DriverDashboardPage(): JSX.Element {
 
                     <div className="mt-3">
                       <DeliveryTrackingMap
-                        driverPoint={
-                          selectedDelivery.coordinates
-                            ? {
-                                lat: selectedDelivery.coordinates.lat,
-                                lng: selectedDelivery.coordinates.lng,
-                                label: 'Livreur'
-                              }
-                            : null
-                        }
+                        driverPoint={driverPoint}
                         destinationPoint={destinationPoint}
                         heightClassName="h-72"
                       />
@@ -1410,9 +1412,12 @@ export default function DriverDashboardPage(): JSX.Element {
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500 dark:text-gray-400">Coordonnées actuelles</span>
                         <span className="font-medium">
-                          {selectedDelivery.coordinates
-                            ? `${selectedDelivery.coordinates.lat.toFixed(5)}, ${selectedDelivery.coordinates.lng.toFixed(5)}`
-                            : '—'}
+                          {(() => {
+                            const coord = normalizeCoordinates(selectedDelivery.coordinates)
+                            return coord
+                              ? `${coord.lat.toFixed(5)}, ${coord.lng.toFixed(5)}`
+                              : '—'
+                          })()}
                         </span>
                       </div>
                       <div className="flex items-start justify-between gap-4">
@@ -1425,10 +1430,10 @@ export default function DriverDashboardPage(): JSX.Element {
                         <span className="text-gray-500 dark:text-gray-400">Heure (ETA)</span>
                         <span className="font-medium">{formatDate(selectedDelivery.eta)}</span>
                       </div>
-                      {buildOsmLink(selectedDelivery.coordinates) ? (
+                      {buildOsmLink(normalizeCoordinates(selectedDelivery.coordinates)) ? (
                         <a
                           className="inline-flex w-full items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10"
-                          href={buildOsmLink(selectedDelivery.coordinates) ?? '#'}
+                          href={buildOsmLink(normalizeCoordinates(selectedDelivery.coordinates)) ?? '#'}
                           target="_blank"
                           rel="noreferrer"
                         >

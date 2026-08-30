@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 import { useVendorDeliveries } from '@/lib/hooks/use-vendor-deliveries'
 import type { VendorDelivery } from '@/lib/services/vendor-delivery-service'
+import { normalizeCoordinates } from '@/lib/services/super-admin-delivery-service'
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'En attente',
@@ -87,14 +88,20 @@ function DeliveryDetailDialog({ delivery, open, onOpenChange, autoOpenChat }: De
     return null
   }
 
-  const driverPoint = delivery.coordinates && Number.isFinite(delivery.coordinates.lat) && Number.isFinite(delivery.coordinates.lng)
-    ? { lat: delivery.coordinates.lat, lng: delivery.coordinates.lng, label: 'Livreur' }
-    : null
+    const driverPoint = (() => {
+    const coords = normalizeCoordinates(delivery.coordinates)
+    return coords
+      ? { lat: coords.lat, lng: coords.lng, label: 'Livreur' }
+      : null
+  })()
 
   const destination = (delivery as any)?.destinationCoordinates
-  const destinationPoint = destination && Number.isFinite(destination.lat) && Number.isFinite(destination.lng)
-    ? { lat: destination.lat, lng: destination.lng, label: 'Client' }
-    : null
+  const destinationPoint = (() => {
+    const coords = normalizeCoordinates(destination)
+    return coords
+      ? { lat: coords.lat, lng: coords.lng, label: 'Client' }
+      : null
+  })()
 
   return (
     <>

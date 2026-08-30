@@ -43,6 +43,31 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/**
+ * URL d'embed OpenStreetMap (iframe) ne nécessitant AUCUN WebGL.
+ * Utilisé en mode de secours quand MapLibre (WebGL) est indisponible sur l'appareil,
+ * pour afficher quand même une carte avec un marqueur de destination.
+ */
+function osmFallbackEmbedUrl(
+  driver?: DeliveryTrackingPoint | null,
+  dest?: DeliveryTrackingPoint | null
+): string {
+  const pts = [driver, dest].filter(
+    (p): p is DeliveryTrackingPoint => Boolean(p && isFiniteNumber(p.lat) && isFiniteNumber(p.lng))
+  )
+  if (pts.length === 0) return ''
+  const lats = pts.map((p) => p.lat)
+  const lngs = pts.map((p) => p.lng)
+  const pad = 0.01
+  const minLat = Math.min(...lats) - pad
+  const maxLat = Math.max(...lats) + pad
+  const minLng = Math.min(...lngs) - pad
+  const maxLng = Math.max(...lngs) + pad
+  const bbox = `${minLng}%2C${minLat}%2C${maxLng}%2C${maxLat}`
+  const c = pts[0]
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${c.lat}%2C${c.lng}`
+}
+
 /** Marqueur SVG ultra-léger (pas d'assets/images externes). */
 function markerElement(variant: 'driver' | 'destination', label = ''): HTMLDivElement {
   const wrap = document.createElement('div')
@@ -323,12 +348,29 @@ export default function DeliveryTrackingMap({
           <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Chargement de la carte…</p>
         </div>
       )}
-      {hasAnyCoords && libReady && mapFailed && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/80 p-4 text-center backdrop-blur-sm dark:bg-gray-900/80">
-          <MapPin className="h-7 w-7 text-gray-400" />
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-            Affichage du suivi indisponible sur cet appareil
+      {/* Mode de secours sans WebGL : le canvas MapLibre a échoué (pas de WebGL / style).
+          On affiche une carte OpenStreetMap via iframe (fonctionne partout). */}
+      {hasAnyCoords && mapFailed && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-white/90 p-3 text-center dark:bg-gray-900/90">
+          <MapPin className="h-6 w-6 text-orange-500" />
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+            Suivi (mode simplifié)
           </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Carte de secours sans WebGL
+          </p>
+          {osmFallbackEmbedUrl(driverPoint, destinationPoint) ? (
+            <iframe
+              title="Carte de suivi"
+              loading="lazy"
+              className="mt-2 h-44 w-full rounded-lg border border-gray-200 dark:border-white/10"
+              src={osmFallbackEmbedUrl(driverPoint, destinationPoint)}
+            />
+          ) : (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Affichage du suivi indisponible sur cet appareil
+            </p>
+          )}
         </div>
       )}
     </div>

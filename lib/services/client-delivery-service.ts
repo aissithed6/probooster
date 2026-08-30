@@ -6,14 +6,25 @@ export interface ClientDeliveryDriver {
   vehiclePlate: string | null
 }
 
+/**
+ * Coordonnées du livreur. Accepte { lat, lng } ou { latitude, longitude }.
+ * La base Supabase peut renvoyer l'une ou l'autre convention.
+ */
 export interface ClientDeliveryCoordinates {
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
+  latitude?: number
+  longitude?: number
 }
 
+/**
+ * Coordonnées de la destination. Même flexibilité que ClientDeliveryCoordinates.
+ */
 export interface ClientDeliveryDestinationCoordinates {
-  lat: number
-  lng: number
+  lat?: number
+  lng?: number
+  latitude?: number
+  longitude?: number
 }
 
 export interface ClientDeliveryEvent {
