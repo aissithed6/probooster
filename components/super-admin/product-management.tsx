@@ -800,6 +800,12 @@ export default function ProductManagement({ prefetchedProducts }: ProductManagem
       options.featured = true
     }
 
+    // Filtre « stock faible » appliqué côté serveur : porte sur toutes les pages de résultats,
+    // pas seulement la page courante (le filtrage client reste en sécurité nette).
+    if (activeTab === 'low-stock') {
+      options.lowStock = true
+    }
+
     return options
   }, [activeTab, currentPage, pageSize, searchTerm, statusFilter, vendorFilter, statusTabs, vendorOptions])
 

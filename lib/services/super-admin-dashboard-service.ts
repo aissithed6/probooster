@@ -200,6 +200,7 @@ export interface SuperAdminProductListOptions {
   status?: SuperAdminProductStatus
   vendorId?: string
   featured?: boolean
+  lowStock?: boolean
   limit?: number
   offset?: number
 }

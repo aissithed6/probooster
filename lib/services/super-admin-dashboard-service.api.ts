@@ -713,6 +713,7 @@ export class SuperAdminDashboardApi {
     if (options.status) params.set('status', options.status)
     if (options.vendorId) params.set('vendorId', options.vendorId)
     if (typeof options.featured === 'boolean') params.set('featured', String(options.featured))
+    if (typeof options.lowStock === 'boolean') params.set('lowStock', String(options.lowStock))
     if (typeof options.limit === 'number') params.set('limit', String(options.limit))
     if (typeof options.offset === 'number') params.set('offset', String(options.offset))
 

@@ -3,6 +3,7 @@ type ListProductsQuery = {
   status?: string
   vendorId?: string
   featured?: string
+  lowStock?: string
   limit?: string
   offset?: string
   id?: string
@@ -117,6 +118,12 @@ export async function GET(request: NextRequest) {
 
     if (query.featured === 'true') {
       selectQuery = selectQuery.eq('is_featured', true)
+    }
+
+    // Filtre « stock faible » côté serveur : comparaison colonne à colonne (stock <= stock_alert).
+    // Les produits sans seuil d'alerte (stock_alert NULL) sont exclus, comme côté UI.
+    if (query.lowStock === 'true') {
+      selectQuery = selectQuery.or('stock.lte.stock_alert')
     }
 
     const limit = query.limit ? Number(query.limit) : 50
