@@ -1445,9 +1445,17 @@ export default function OrderManagement({ prefetchedOrders }: OrderManagementPro
 
       {/* Navigation par onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="orders">Commandes & Ventes</TabsTrigger>
           <TabsTrigger value="returns">Retours & Réclamations</TabsTrigger>
+          <TabsTrigger value="payments">
+            Demandes de paiement
+            {paymentRequests.filter(pr => pr.status === 'pending').length > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
+                {paymentRequests.filter(pr => pr.status === 'pending').length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Onglet Commandes & Ventes */}
@@ -1775,7 +1783,162 @@ export default function OrderManagement({ prefetchedOrders }: OrderManagementPro
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Onglet Demandes de paiement */}
+        <TabsContent value="payments" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Demandes de Paiement des Vendeurs</CardTitle>
+              <CardDescription>
+                Approuvez, rejetez ou supprimez les demandes de paiement soumises par les vendeurs. Les décisions sont enregistrées en base et journalisées.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {paymentRequests.filter(pr => pr.status !== 'deleted').map((request) => {
+                  const statusConfig: Record<string, { bg: string; label: string }> = {
+                    pending: { bg: 'bg-yellow-100 text-yellow-800', label: 'En attente' },
+                    approved: { bg: 'bg-green-100 text-green-800', label: 'Approuvée' },
+                    rejected: { bg: 'bg-red-100 text-red-800', label: 'Rejetée' },
+                    edited: { bg: 'bg-blue-100 text-blue-800', label: 'Modifiée' },
+                    deleted: { bg: 'bg-gray-100 text-gray-600', label: 'Supprimée' }
+                  }
+                  const cfg = statusConfig[request.status] ?? statusConfig.pending
+
+                  return (
+                    <Card key={request.id} className={`border-l-4 ${request.status === 'pending' ? 'border-l-yellow-500' : request.status === 'approved' ? 'border-l-green-500' : 'border-l-red-500'}`}>
+                      <CardContent className="p-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold">{request.vendorName}</h3>
+                              <Badge className={cfg.bg}>{cfg.label}</Badge>
+                            </div>
+                            <div className="text-sm text-gray-600 space-y-0.5">
+                              <div><strong>Montant brut :</strong> {formatPrice(request.totalAmount)}</div>
+                              <div><strong>Commission :</strong> {formatPrice(request.commissionAmount)}</div>
+                              <div><strong>Net à payer :</strong> <span className="font-semibold text-green-700">{formatPrice(request.netAmount)}</span></div>
+                              <div><strong>Mode :</strong> {request.paymentMethod || 'Non spécifié'}</div>
+                              <div><strong>Commandes :</strong> {request.orderIds.length > 0 ? request.orderIds.join(', ') : '—'}</div>
+                              <div><strong>Demandée le :</strong> {request.createdAt || '—'}</div>
+                              {request.processedAt && <div><strong>Traitée le :</strong> {request.processedAt}</div>}
+                              {request.notes && <div><strong>Notes :</strong> {request.notes}</div>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {request.status === 'pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handlePaymentRequestApproval(request.id, true)}
+                                  className="bg-green-600 hover:bg-green-700"
+                                  disabled={isActionLoading}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Approuver
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setSelectedPaymentRequest(request)
+                                    setRejectionReason('')
+                                    setIsRejectionModalOpen(true)
+                                  }}
+                                  disabled={isActionLoading}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Rejeter
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handlePaymentRequestDeletion(request.id)}
+                              className="text-red-600 border-red-200 hover:bg-red-50"
+                              disabled={isActionLoading}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Supprimer
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+                {paymentRequests.filter(pr => pr.status !== 'deleted').length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    Aucune demande de paiement
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Modal de rejet d'une demande de paiement */}
+      <Dialog open={isRejectionModalOpen} onOpenChange={setIsRejectionModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rejeter la demande de paiement</DialogTitle>
+            <DialogDescription>
+              {selectedPaymentRequest
+                ? `Demande de ${selectedPaymentRequest.vendorName} — ${formatPrice(selectedPaymentRequest.netAmount)} net à payer.`
+                : 'Demande de paiement.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejectionReason">Motif du rejet *</Label>
+              <Textarea
+                id="rejectionReason"
+                placeholder="Expliquez la raison du rejet de cette demande…"
+                value={rejectionReason}
+                onChange={(event) => setRejectionReason(event.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsRejectionModalOpen(false)
+                setSelectedPaymentRequest(null)
+                setRejectionReason('')
+              }}
+              disabled={isActionLoading}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (rejectionReason.trim().length < 3) {
+                  addNotification({
+                    type: 'warning',
+                    title: 'Motif requis',
+                    message: 'Merci de renseigner un motif de rejet (3 caractères minimum).',
+                    duration: 4000
+                  })
+                  return
+                }
+                if (selectedPaymentRequest) {
+                  void handlePaymentRequestRejection(selectedPaymentRequest.id, rejectionReason.trim())
+                  setSelectedPaymentRequest(null)
+                }
+              }}
+              disabled={isActionLoading || rejectionReason.trim().length < 3}
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              Rejeter la demande
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de visualisation de commande */}
       <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
