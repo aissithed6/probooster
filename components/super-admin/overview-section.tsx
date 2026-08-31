@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Users, ShoppingCart, DollarSign, Star, Shield, Activity, AlertTriangle, Mail, Loader2, BarChart3, RefreshCw, Info } from 'lucide-react'
@@ -35,7 +35,7 @@ const DEFAULT_STATS: SuperAdminOverviewStats = {
 }
 
 /**
- * Affiche la synthÃ¨se temps rÃ©el du super administrateur (stats, activitÃ©s, alertes, messages).
+ * Affiche la synthèse temps réel du super administrateur (stats, activités, alertes, messages).
  */
 export default function SuperAdminOverview({ stats }: OverviewProps) {
   const { user } = useAuth()
@@ -74,7 +74,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
       setInboxMessages(messageData)
     } catch (err) {
       console.error('Erreur lors du chargement de la vue d\'ensemble:', err)
-      setError('Impossible de charger la vue d\'ensemble. Veuillez rÃ©essayer plus tard.')
+      setError('Impossible de charger la vue d\'ensemble. Veuillez réessayer plus tard.')
     } finally {
       setIsLoading(false)
     }
@@ -107,7 +107,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
         setShowAlertDialog(false)
         void loadOverviewData()
       } else {
-        setError('Impossible de crÃ©er l\'alerte systÃ¨me. RÃ©essayez ultÃ©rieurement.')
+        setError('Impossible de créer l\'alerte système. Réessayez ultérieurement.')
       }
     } finally {
       setIsSubmittingAlert(false)
@@ -128,8 +128,8 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Vue d'ensemble du systÃ¨me</h2>
-          <p className="text-gray-600">Surveillez l'activitÃ© globale, les alertes et la messagerie en temps rÃ©el.</p>
+          <h2 className="text-2xl font-bold text-gray-900">Vue d'ensemble du système</h2>
+          <p className="text-gray-600">Surveillez l'activité globale, les alertes et la messagerie en temps réel.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={handleRefresh} disabled={isLoading}>
@@ -138,7 +138,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
           </Button>
           <Button onClick={() => setShowAlertDialog(true)} className="bg-[#ff6600] hover:bg-[#ff6600]/90 text-white">
             <AlertTriangle className="mr-2 h-4 w-4" />
-            CrÃ©er une alerte
+            Créer une alerte
           </Button>
         </div>
       </div>
@@ -177,7 +177,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
                 <p className="text-sm font-medium text-gray-600">Chiffre d'affaires</p>
                 <p className="text-3xl font-bold text-[#535455]">{formatAmount((resolvedStats as any).revenueNet ?? resolvedStats.totalRevenue)}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Ventes: {formatAmount((resolvedStats as any).revenueGross ?? resolvedStats.totalRevenue)} Â· Remboursements: {formatAmount((resolvedStats as any).revenueRefunds ?? 0)}
+                  Ventes: {formatAmount((resolvedStats as any).revenueGross ?? resolvedStats.totalRevenue)} · Remboursements: {formatAmount((resolvedStats as any).revenueRefunds ?? 0)}
                 </p>
               </div>
               <div className="p-3 bg-[#535455]/10 rounded-full">
@@ -212,7 +212,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
                     ? `${(resolvedStats.totalPoints / 1_000_000).toFixed(1)}M`
                     : resolvedStats.totalPoints.toLocaleString('fr-FR')}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">Programme de fidÃ©litÃ©</p>
+                <p className="text-xs text-gray-500 mt-1">Programme de fidélité</p>
               </div>
               <div className="p-3 bg-[#535455]/10 rounded-full">
                 <Star className="h-8 w-8 text-[#535455]" />
@@ -227,22 +227,22 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-[#ff6600]" />
-              ActivitÃ©s rÃ©centes
+              Activités récentes
             </CardTitle>
             <CardDescription>
-              {activitySummary.orders} commandes Â· {activitySummary.alerts} alertes Â· {activitySummary.messages} messages
+              {activitySummary.orders} commandes · {activitySummary.alerts} alertes · {activitySummary.messages} messages
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-gray-500 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Chargement des activitÃ©sâ€¦
+                Chargement des activités…
               </div>
             )}
 
             {!isLoading && activities.length === 0 && (
-              <p className="text-sm text-gray-500">Aucune activitÃ© rÃ©cente pour le moment.</p>
+              <p className="text-sm text-gray-500">Aucune activité récente pour le moment.</p>
             )}
 
             {!isLoading && activities.slice(0, 8).map((activity) => (
@@ -274,13 +274,13 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
               <Shield className="h-5 w-5" />
               Alertes actives
             </CardTitle>
-            <CardDescription>Gestion centralisÃ©e des incidents en cours</CardDescription>
+            <CardDescription>Gestion centralisée des incidents en cours</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-gray-500 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                VÃ©rification des alertesâ€¦
+                Vérification des alertes…
               </div>
             )}
 
@@ -296,7 +296,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
                 </div>
                 <p className="text-xs text-orange-700 mt-1">{alert.message}</p>
                 <div className="flex items-center justify-between mt-2 text-xs text-orange-600">
-                  <span>GravitÃ© : {alert.type}</span>
+                  <span>Gravité : {alert.type}</span>
                   <span>{new Date(alert.created_at).toLocaleString('fr-FR')}</span>
                 </div>
               </div>
@@ -304,7 +304,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
 
             <Separator />
             <p className="text-xs text-gray-500">
-              Total alertes : {alerts.length} Â· Actives : {activeAlerts.length} Â· RÃ©solues : {alerts.length - activeAlerts.length}
+              Total alertes : {alerts.length} · Actives : {activeAlerts.length} · Résolues : {alerts.length - activeAlerts.length}
             </p>
           </CardContent>
         </Card>
@@ -315,20 +315,20 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-[#535455]">
               <Mail className="h-5 w-5" />
-              Derniers messages reÃ§us
+              Derniers messages reçus
             </CardTitle>
-            <CardDescription>Messages internes rÃ©cents adressÃ©s au super administrateur</CardDescription>
+            <CardDescription>Messages internes récents adressés au super administrateur</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading && (
               <div className="flex items-center gap-2 text-gray-500 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Chargement de la messagerieâ€¦
+                Chargement de la messagerie…
               </div>
             )}
 
             {!isLoading && latestMessages.length === 0 && (
-              <p className="text-sm text-gray-500">Aucun message rÃ©cent.</p>
+              <p className="text-sm text-gray-500">Aucun message récent.</p>
             )}
 
             {!isLoading && latestMessages.map((message) => (
@@ -345,7 +345,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
                 <p className="text-sm text-gray-600 mt-2">{message.message}</p>
                 <div className="flex items-center gap-3 text-xs text-gray-400 mt-2">
                   <span>{new Date(message.timestamp).toLocaleString('fr-FR')}</span>
-                  <span>PrioritÃ© : {message.priority}</span>
+                  <span>Priorité : {message.priority}</span>
                 </div>
               </div>
             ))}
@@ -356,9 +356,9 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-[#ff6600]">
               <BarChart3 className="h-5 w-5" />
-              SynthÃ¨se
+              Synthèse
             </CardTitle>
-            <CardDescription>Vue rapide des indicateurs clÃ©s</CardDescription>
+            <CardDescription>Vue rapide des indicateurs clés</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
@@ -372,7 +372,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
             </div>
             <Separator />
             <div>
-              <p className="text-sm text-gray-600 mb-2">Alertes par gravitÃ©</p>
+              <p className="text-sm text-gray-600 mb-2">Alertes par gravité</p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2"><AlertTriangle className="h-3 w-3 text-red-600" /> Critiques</span>
@@ -390,7 +390,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
             </div>
             <Separator />
             <p className="text-xs text-gray-500">
-              {resolvedStats.unreadMessages} messages non lus Â· {resolvedStats.systemAlerts} alertes totales Â· {resolvedStats.totalProducts.toLocaleString()} produits actifs
+              {resolvedStats.unreadMessages} messages non lus · {resolvedStats.systemAlerts} alertes totales · {resolvedStats.totalProducts.toLocaleString()} produits actifs
             </p>
           </CardContent>
         </Card>
@@ -399,9 +399,9 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
       <Dialog open={showAlertDialog} onOpenChange={setShowAlertDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>CrÃ©er une alerte systÃ¨me</DialogTitle>
+            <DialogTitle>Créer une alerte système</DialogTitle>
             <DialogDescription>
-              Diffusez une alerte immÃ©diate aux Ã©quipes concernÃ©es.
+              Diffusez une alerte immédiate aux équipes concernées.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -421,7 +421,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
             <Textarea
               value={alertMessage}
               onChange={(event) => setAlertMessage(event.target.value)}
-              placeholder="DÃ©crivez l'incident ou l'information importante Ã  partager."
+              placeholder="Décrivez l'incident ou l'information importante à partager."
               className="min-h-[140px]"
             />
             <div className="flex justify-end gap-2">

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useConfirm } from '@/components/ui/confirm-dialog'
