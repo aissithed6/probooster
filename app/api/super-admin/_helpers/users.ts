@@ -1160,14 +1160,41 @@ export async function updateUserAdmin(payload: UpdateSuperAdminUserInput): Promi
 export async function deleteUserAdmin(userId: string): Promise<void> {
   const supabase = getSupabaseAdmin()
 
-  await supabase.from('user_profiles').delete().eq('user_id', userId)
-  await supabase.from('user_social_media').delete().eq('user_id', userId)
-  await supabase.from('user_roles').delete().eq('user_id', userId)
+  // Supprime les relations directes en aval avant la ligne users.
+  const cleanupTargets: Array<[string, string]> = [
+    ['user_profiles', 'user_id'],
+    ['user_social_media', 'user_id'],
+    ['user_roles', 'user_id'],
+    ['user_role_assignments', 'user_id'],
+    ['user_custom_permissions', 'user_id'],
+    ['user_features', 'user_id'],
+    ['user_security_settings', 'user_id']
+  ]
 
+  for (const [table, column] of cleanupTargets) {
+    const { error } = await supabase.from(table).delete().eq(column, userId)
+    if (error) {
+      console.warn(`deleteUserAdmin: suppression ${table} échouée (ignorée):`, error.message)
+    }
+  }
+
+  // Supprime la ligne principale users.
   const { error } = await supabase.from('users').delete().eq('id', userId)
-
   if (error) {
     throw new Error(`Suppression utilisateur échouée: ${error.message}`)
+  }
+
+  // Supprime aussi le compte d'authentification (auth.users) si possible.
+  // Le compte public users.id référençant auth.users.id, on supprime d'abord
+  // la ligne publique puis le compte Auth pour éviter une violation de FK.
+  try {
+    const { error: authError } = await supabase.auth.admin.deleteUser(userId)
+    if (authError) {
+      console.warn('deleteUserAdmin: suppression du compte Auth échouée (ignorée):', authError.message)
+    }
+  } catch (authFailure) {
+    const message = authFailure instanceof Error ? authFailure.message : String(authFailure)
+    console.warn('deleteUserAdmin: suppression du compte Auth levée une erreur (ignorée):', message)
   }
 }
 

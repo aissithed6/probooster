@@ -1268,10 +1268,28 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
       users: selectedUsers.map(u => ({ id: u.id, name: u.name, email: u.email }))
     })
 
-    // Simulation d'envoi
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    alert(`Message envoyé avec succès à ${selectedUsers.length} utilisateurs !`)
+    const response = await SuperAdminDashboardService.createBulkNotifications({
+      userIds: selectedUsers.map((u) => u.id),
+      channel: messageType === 'email' ? 'email' : messageType === 'push' ? 'push' : 'in-app',
+      title: messageSubject || 'Notification Probooster',
+      message: messageTemplate,
+      type: 'bulk_message'
+    })
+
+    if (!response) {
+      addNotification({
+        type: 'error',
+        title: 'Envoi échoué',
+        message: 'La messagerie en masse n’a pas pu être envoyée. Veuillez réessayer.'
+      })
+      return
+    }
+
+    addNotification({
+      type: 'success',
+      title: 'Message envoyé',
+      message: `${selectedUsers.length} notification(s) envoyée(s) et enregistrée(s) dans Supabase.`
+    })
     setShowMessageModal(false)
     setMessageSubject('')
     setMessageTemplate('')
@@ -1781,9 +1799,11 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     })
   }, [])
 
-  const handleDeleteUser = async (userId: string) => {
-    const confirmed = await openConfirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')
-    if (!confirmed) return
+  const handleDeleteUser = async (userId: string, skipConfirm = false): Promise<boolean> => {
+    if (!skipConfirm) {
+      const confirmed = await openConfirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')
+      if (!confirmed) return false
+    }
 
     const success = await runWithLoader(async () => {
       const response = await SuperAdminDashboardService.deleteUser(userId)
@@ -1794,7 +1814,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     })
 
     if (!success) {
-      return
+      return false
     }
 
     await refreshUsers()
@@ -1804,9 +1824,10 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
       message: 'Le compte a été supprimé avec succès.'
     })
     console.log('🗑️ Utilisateur supprimé via Supabase:', userId)
+    return true
   }
 
-  const handleStatusChange = async (userId: string, newStatus: User['status']) => {
+  const handleStatusChange = async (userId: string, newStatus: User['status']): Promise<boolean> => {
     const success = await runWithLoader(async () => {
       const response = await SuperAdminDashboardService.updateUserStatus(userId, newStatus)
       if (!response) {
@@ -1816,12 +1837,13 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     })
 
     if (!success) {
-      return
+      return false
     }
 
     setUsers(users.map(user => 
       user.id === userId ? { ...user, status: newStatus } : user
     ))
+    return true
   }
 
   /**
@@ -1895,29 +1917,60 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   // Actions en lot
   const handleBulkAction = async (action: string) => {
     const usersToProcess = filteredUsers.filter(user => selectedUsers.has(user.id))
-    
+    if (usersToProcess.length === 0) {
+      return
+    }
+
+    let allSucceeded = true
+
     switch (action) {
       case 'activate':
-        usersToProcess.forEach(user => handleStatusChange(user.id, 'active'))
-        break
       case 'deactivate':
-        usersToProcess.forEach(user => handleStatusChange(user.id, 'inactive'))
-        break
       case 'suspend':
-        usersToProcess.forEach(user => handleStatusChange(user.id, 'suspended'))
-        break
-      case 'verify':
-        usersToProcess.forEach(user => handleStatusChange(user.id, 'verified'))
-        break
-      case 'delete': {
-        const confirmed = await openConfirm(`Êtes-vous sûr de vouloir supprimer ${usersToProcess.length} utilisateur(s) ?`)
-        if (confirmed) {
-          usersToProcess.forEach(user => handleDeleteUser(user.id))
+      case 'verify': {
+        const nextStatus =
+          action === 'activate' ? 'active'
+            : action === 'deactivate' ? 'inactive'
+              : action === 'suspend' ? 'suspended'
+                : 'verified'
+
+        // Déroulement séquentiel pour respecter le garde-fou anti-reentrance
+        // de runWithLoader (actionLoading partagé).
+        for (const user of usersToProcess) {
+          const ok = await handleStatusChange(user.id, nextStatus)
+          if (!ok) allSucceeded = false
+        }
+        if (!allSucceeded) {
+          addNotification({
+            type: 'error',
+            title: 'Action partielle',
+            message: 'Certains utilisateurs n’ont pas pu être mis à jour.'
+          })
         }
         break
       }
+      case 'delete': {
+        const confirmed = await openConfirm(`Êtes-vous sûr de vouloir supprimer définitivement ${usersToProcess.length} utilisateur(s) ?`)
+        if (!confirmed) {
+          return
+        }
+        for (const user of usersToProcess) {
+          const ok = await handleDeleteUser(user.id, true)
+          if (!ok) allSucceeded = false
+        }
+        if (!allSucceeded) {
+          addNotification({
+            type: 'error',
+            title: 'Suppression partielle',
+            message: 'Certains utilisateurs n’ont pas pu être supprimés.'
+          })
+        }
+        break
+      }
+      default:
+        return
     }
-    
+
     clearSelection()
   }
 
@@ -2412,16 +2465,59 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   /**
    * Téléverse un avatar et l'enregistre dans le formulaire.
    */
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) {
       return
     }
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setUserForm((prev) => ({ ...prev, avatar: (e.target?.result as string) ?? prev.avatar }))
+
+    if (isAvatarUploading) {
+      return
     }
-    reader.readAsDataURL(file)
+
+    setIsAvatarUploading(true)
+
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+      const ownerKey = selectedUser?.id || 'nouveau'
+      const path = `avatars/${ownerKey}-${Date.now()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, {
+          upsert: true,
+          contentType: file.type || undefined
+        })
+
+      if (uploadError) {
+        console.warn('Upload avatar Supabase Storage échoué, repli Data URL:', uploadError.message)
+        // Repli: conversion en Data URL (compatible et jamais bloquant).
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setUserForm((prev) => ({ ...prev, avatar: (e.target?.result as string) ?? prev.avatar }))
+        }
+        reader.readAsDataURL(file)
+        return
+      }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+      const publicUrl = String(urlData?.publicUrl ?? '')
+      setUserForm((prev) => ({ ...prev, avatar: publicUrl || prev.avatar }))
+      addNotification({
+        type: 'success',
+        title: 'Avatar téléversé',
+        message: 'L’avatar a été envoyé dans Supabase Storage.'
+      })
+    } catch (error) {
+      console.error('Erreur lors de l’upload de l’avatar:', error)
+      addNotification({
+        type: 'error',
+        title: 'Upload avatar',
+        message: 'Impossible de téléverser l’avatar. Veuillez réessayer.'
+      })
+    } finally {
+      setIsAvatarUploading(false)
+    }
   }
 
   /**
@@ -2457,27 +2553,49 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   }
 
   /**
-   * Crée un rôle personnalisé localement (mock) en attendant la persistance backend.
+   * Crée un rôle personnalisé et le persiste dans Supabase via le backend.
    */
-  const handleCreateRole = () => {
+  const handleCreateRole = async () => {
     if (!roleForm.name.trim()) {
       return
     }
 
-    const newRole: ManagedRole = {
-      id: Date.now().toString(),
-      name: roleForm.name.trim(),
-      description: roleForm.description.trim(),
-      permissions: roleForm.permissions,
-      userCount: 0,
-      isActive: roleForm.isActive,
-      createdAt: new Date().toISOString().split('T')[0]
+    if (actionLoading) {
+      return
     }
 
-    setCustomRoles((prev) => [...prev, newRole])
+    setActionError(null)
+
+    const created = await runWithLoader(async () => {
+      const role = await SuperAdminDashboardService.createRole({
+        name: roleForm.name.trim(),
+        description: roleForm.description.trim(),
+        isActive: roleForm.isActive
+      })
+
+      if (!role) {
+        throw new Error('Création du rôle échouée')
+      }
+
+      // Persiste aussi les permissions du nouveau rôle si sélectionnées
+      if (Array.isArray(roleForm.permissions) && roleForm.permissions.length > 0) {
+        await SuperAdminDashboardService.setRolePermissions(role.id, roleForm.permissions)
+      }
+
+      return role
+    }, {
+      successTitle: 'Rôle créé',
+      successMessage: `Le rôle "${roleForm.name.trim()}" a été créé et sauvegardé dans Supabase.`
+    })
+
+    if (!created) {
+      return
+    }
+
     setRoleForm({ name: '', description: '', permissions: [], isActive: true })
     setIsRoleModalOpen(false)
-    console.log('🆕 Rôle créé (mock):', newRole)
+    await loadRoles()
+    console.log('🆕 Rôle créé via Supabase:', created)
   }
 
   /**
@@ -2495,42 +2613,81 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   }
 
   /**
-   * Applique les modifications du formulaire sur le rôle sélectionné.
+   * Applique les modifications du formulaire sur le rôle sélectionné et les persiste dans Supabase.
    */
-  const handleUpdateRole = () => {
+  const handleUpdateRole = async () => {
     if (!editingRole || !roleForm.name.trim()) {
       return
     }
 
-    setCustomRoles((prev) =>
-      prev.map((role) =>
-        role.id === editingRole.id
-          ? {
-              ...role,
-              name: roleForm.name.trim(),
-              description: roleForm.description.trim(),
-              permissions: roleForm.permissions,
-              isActive: roleForm.isActive
-            }
-          : role
-      )
-    )
+    if (actionLoading) {
+      return
+    }
 
-    console.log('✏️ Rôle mis à jour (mock):', editingRole.id)
+    setActionError(null)
+
+    const updated = await runWithLoader(async () => {
+      const result = await SuperAdminDashboardService.updateRole(editingRole.id, {
+        name: roleForm.name.trim(),
+        description: roleForm.description.trim(),
+        isActive: roleForm.isActive
+      })
+
+      if (!result) {
+        throw new Error('Mise à jour du rôle échouée')
+      }
+
+      if (Array.isArray(roleForm.permissions)) {
+        await SuperAdminDashboardService.setRolePermissions(editingRole.id, roleForm.permissions)
+      }
+
+      return result
+    }, {
+      successTitle: 'Rôle mis à jour',
+      successMessage: 'Le rôle a été mis à jour et sauvegardé dans Supabase.'
+    })
+
+    if (!updated) {
+      return
+    }
+
     setEditingRole(null)
     setRoleForm({ name: '', description: '', permissions: [], isActive: true })
     setIsRoleModalOpen(false)
+    await loadRoles()
+    console.log('✏️ Rôle mis à jour via Supabase:', editingRole.id)
   }
 
   /**
-   * Supprime le rôle donné (mock, sans backend).
+   * Supprime définitivement un rôle (et ses permissions/associations) dans Supabase.
    */
   const handleDeleteRole = async (roleId: string) => {
-    const confirmed = await openConfirm('Êtes-vous sûr de vouloir supprimer ce rôle ?')
+    const confirmed = await openConfirm('Êtes-vous sûr de vouloir supprimer ce rôle ? Cette action est définitive.')
     if (!confirmed) return
 
-    setCustomRoles((prev) => prev.filter((role) => role.id !== roleId))
-    console.log('🗑️ Rôle supprimé (mock):', roleId)
+    if (actionLoading) {
+      return
+    }
+
+    setActionError(null)
+
+    const deleted = await runWithLoader(async () => {
+      const result = await SuperAdminDashboardService.deleteRole(roleId)
+      if (!result) {
+        throw new Error('Suppression du rôle échouée')
+      }
+      return result
+    }, {
+      successTitle: 'Rôle supprimé',
+      successMessage: 'Le rôle a été supprimé et retiré de Supabase.'
+    })
+
+    if (!deleted) {
+      return
+    }
+
+    await loadRoles()
+    console.log('🗑️ Rôle supprimé via Supabase:', roleId)
   }
 
   /**

@@ -355,6 +355,25 @@ export class SuperAdminDashboardApi {
     await fetchApi<void>(`/users?${params.toString()}`, { method: 'DELETE', signal })
   }
 
+  static async createBulkNotifications(
+    payload: {
+      userIds: string[]
+      channel: 'in-app' | 'email' | 'push'
+      title: string
+      message: string
+      type?: string
+      priority?: 'low' | 'normal' | 'high' | 'urgent'
+      actionUrl?: string | null
+    },
+    signal?: AbortSignal
+  ): Promise<{ inserted: unknown[] }> {
+    return fetchApi<{ inserted: unknown[] }, typeof payload>('/notifications', {
+      method: 'POST',
+      body: payload,
+      signal
+    })
+  }
+
   static async updateUserStatus(userId: string, status: SuperAdminUserStatus, signal?: AbortSignal): Promise<void> {
     await fetchApi<void, { id: string; status: SuperAdminUserStatus }>('/users', {
       method: 'PATCH',

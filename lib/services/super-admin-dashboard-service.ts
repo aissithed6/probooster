@@ -562,6 +562,18 @@ export class SuperAdminDashboardService {
   }
 
   /**
+   * Envoie une notification en masse (in-app / email / push) à une liste d'utilisateurs.
+   */
+  static async createBulkNotifications(payload: Parameters<typeof SuperAdminDashboardApi.createBulkNotifications>[0]): Promise<{ inserted: unknown[] } | null> {
+    try {
+      return await SuperAdminDashboardApi.createBulkNotifications(payload)
+    } catch (error) {
+      console.error('❌ createBulkNotifications failed:', error)
+      return null
+    }
+  }
+
+  /**
    * Met à jour le statut d'un utilisateur.
    */
   static async updateUserStatus(userId: string, status: SuperAdminUserStatus): Promise<boolean> {
