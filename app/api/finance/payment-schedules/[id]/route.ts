@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { assertVendor } from '@/app/api/vendor/_helpers/auth'
+import { assertVendorOrSuperAdmin } from '@/app/api/vendor/_helpers/auth'
 
 type UpdatePaymentSchedulePayload = {
   dueDate?: string
@@ -36,7 +36,7 @@ function toNumber(value: unknown): number {
  */
 export async function PUT(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const vendorId = await assertVendor(request)
+    const vendorId = await assertVendorOrSuperAdmin(request)
     const supabase = getSupabaseAdmin()
 
     const params = await ctx.params

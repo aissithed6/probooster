@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { assertSuperAdmin } from '@/app/api/super-admin/_helpers/auth'
 
 // Types du contrat d'échange
 interface EmailSettingsDTO {
@@ -40,7 +41,8 @@ function normalizeSettings(payload: Partial<EmailSettingsDTO>): EmailSettingsDTO
 }
 
 // GET: Récupère la configuration unique (singleton)
-export async function GET() {
+export async function GET(req: NextRequest) {
+  await assertSuperAdmin(req)
   try {
     const supabase = getSupabaseAdmin()
     const { data, error } = await supabase
@@ -76,7 +78,8 @@ export async function GET() {
 }
 
 // POST: Crée/Met à jour la configuration unique (singleton)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  await assertSuperAdmin(request)
   try {
     const payload = (await request.json()) as Partial<EmailSettingsDTO>
     const dto = normalizeSettings(payload)

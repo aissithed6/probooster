@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { assertSuperAdmin } from '@/app/api/super-admin/_helpers/auth'
 
 /**
  * Liste des lots de paiement avec leurs demandes (sans timeline pour perf).
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  await assertSuperAdmin(req)
   try {
     const supabase = getSupabaseAdmin()
 

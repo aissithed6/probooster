@@ -39,6 +39,47 @@ export async function assertVendor(request?: NextRequest): Promise<string> {
   return userId
 }
 
+/**
+ * Autorise les vendeurs OU les super admins (endpoints financiers partagés,
+ * ex: programmations de paiement consultées par la trésorerie et les vendeurs).
+ */
+export async function assertVendorOrSuperAdmin(request?: NextRequest): Promise<string> {
+  const supabase = getSupabaseAdmin()
+  const accessToken = await extractAccessToken(request)
+
+  if (!accessToken) {
+    throw new Error('Token Supabase manquant, accès refusé.')
+  }
+
+  const { data: authData, error } = await supabase.auth.getUser(accessToken)
+
+  if (error || !authData?.user) {
+    throw new Error("Utilisateur introuvable ou token invalide.")
+  }
+
+  const userId = authData.user.id
+
+  const { data: roleRow, error: roleError } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const role = (roleRow?.role ?? '').toString().toLowerCase()
+  const appMetaRole = ((authData.user.app_metadata as Record<string, unknown> | null)?.role ?? '').toString().toLowerCase()
+  const allowed = new Set(['vendor', 'super_admin', 'superadmin', 'admin'])
+
+  if (roleError && !role) {
+    console.warn(`⚠️ Vérification du rôle échouée pour ${userId}:`, roleError)
+  }
+
+  if (!allowed.has(role) && !allowed.has(appMetaRole)) {
+    throw new Error('Accès réservé aux vendeurs et administrateurs authentifiés.')
+  }
+
+  return userId
+}
+
 async function extractAccessToken(request?: NextRequest): Promise<string | undefined> {
   const asyncHeaders = request ? request.headers : await headers()
   const bearerHeader = asyncHeaders.get('authorization') ?? undefined

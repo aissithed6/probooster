@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { assertSuperAdmin } from '@/app/api/super-admin/_helpers/auth'
 
 /**
  * Liste des demandes planifiées (scheduled) depuis la base.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  await assertSuperAdmin(req)
   try {
     const supabase = getSupabaseAdmin()
     const { data, error } = await supabase

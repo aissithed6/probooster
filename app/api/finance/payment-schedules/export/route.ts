@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { assertVendor } from '@/app/api/vendor/_helpers/auth'
+import { assertVendorOrSuperAdmin } from '@/app/api/vendor/_helpers/auth'
 
 function asCsvValue(value: unknown): string {
   const raw = value == null ? '' : String(value)
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Format non supporté (csv uniquement).' }, { status: 400 })
     }
 
-    const vendorId = await assertVendor(request)
+    const vendorId = await assertVendorOrSuperAdmin(request)
     const supabase = getSupabaseAdmin()
 
     const { data, error } = await supabase

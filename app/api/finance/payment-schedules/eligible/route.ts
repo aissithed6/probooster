@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { assertVendor } from '@/app/api/vendor/_helpers/auth'
+import { assertVendorOrSuperAdmin } from '@/app/api/vendor/_helpers/auth'
 
 type CommissionRuleRow = {
   id: string
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Paramètre mine=true requis.' }, { status: 400 })
     }
 
-    const vendorUserId = await assertVendor(request)
+    const vendorUserId = await assertVendorOrSuperAdmin(request)
     const supabase = getSupabaseAdmin()
 
     // Certains environnements stockent vendor_id sur user_profiles.id, d'autres sur users.id.

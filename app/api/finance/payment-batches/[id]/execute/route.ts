@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { assertSuperAdmin } from '@/app/api/super-admin/_helpers/auth'
 
 /**
  * Exécute un lot: passe le lot en processing puis completed, approuve les demandes du lot,
  * et enregistre des flux sortants dans la trésorerie.
  */
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  await assertSuperAdmin(req)
   const { id } = params
   const supabase = getSupabaseAdmin()
 

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { assertSuperAdmin } from '@/app/api/super-admin/_helpers/auth'
 
 /**
  * Met à jour un remboursement (status, notes, etc.)
  */
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  await assertSuperAdmin(req)
   const { id } = params
   const payload = (await req.json().catch(() => null)) as any
   if (!payload || typeof payload !== 'object') {
