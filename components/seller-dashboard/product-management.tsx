@@ -29,6 +29,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import AdvancedProductModal from '@/components/seller-dashboard/advanced-product-modal'
 import { ProductCategoryProvider } from '@/contexts/product-category-context'
+import { supabase } from '@/lib/supabase'
 import { CatalogCategoryService } from '@/lib/services/catalog-category-service'
 import type { ProductCategoryRecord } from '@/lib/types/product-category'
 import type { SharedProductInput } from '@/lib/types/shared-product'
@@ -282,26 +283,63 @@ export default function ProductManagement({ vendorId, refreshSignal, onCreatePro
     }
   }, [mapProduct, toast, vendorId])
 
-  useEffect(() => {
-    if (!vendorId) return
-    loadProducts()
-  }, [loadProducts, vendorId])
-
+  // Chargement unique : vendorId, refreshSignal et le rechargement temps réel partagent le même effet.
   useEffect(() => {
     if (!vendorId) return
     loadProducts()
   }, [loadProducts, vendorId, refreshSignal])
 
+  // Synchro temps réel (Supabase Realtime) : toute insertion/modification/suppression
+  // sur les produits du vendeur rafraîchit automatiquement la liste.
+  useEffect(() => {
+    if (!vendorId) return
+    const channel = supabase
+      .channel(`vendor-products-${vendorId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_products',
+          filter: `vendor_id=eq.${vendorId}`
+        },
+        () => {
+          loadProducts()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [loadProducts, vendorId])
+
   const handleDuplicateProduct = async (product: Product) => {
     try {
+      // Copie complète : contenu, visuels, SEO, logistique et déclinaisons.
+      // Le nom reçoit le suffixe "(Copie)" pour respecter la contrainte
+      // unique(vendor_id, name) et le SKU un suffixe "-COPY".
       const payload = {
         vendorId,
         name: `${product.name} (Copie)`,
         description: product.description ?? null,
+        shortDescription: product.shortDescription ?? null,
+        sku: product.sku ? `${product.sku}-COPY` : null,
         price: product.price,
         salePrice: product.salePrice ?? null,
-        category: product.category,
+        costPrice: product.costPrice ?? null,
+        category: product.category || null,
         stockQuantity: product.stock,
+        tags: product.tags ?? null,
+        images: product.images?.length ? product.images : product.image ? [product.image] : null,
+        seoTitle: product.seoTitle ?? null,
+        seoDescription: product.seoDescription ?? null,
+        weight: product.weight ?? null,
+        dimensions: product.dimensions ?? null,
+        shippingCost: product.shippingCost ?? null,
+        productType: product.productType,
+        variations: product.variations?.length ? product.variations : undefined,
+        status: 'draft' as const,
         metadata: { duplicatedFrom: product.id }
       }
       const created = await SellerDashboardApi.createProduct(payload as any)
@@ -311,7 +349,7 @@ export default function ProductManagement({ vendorId, refreshSignal, onCreatePro
       await loadProducts()
       toast({
         title: 'Produit dupliqué',
-        description: 'La copie est en attente de validation.'
+        description: 'La copie a été créée en brouillon. Complétez-la puis activez-la.'
       })
     } catch (err) {
       console.error('Erreur duplication produit', err)

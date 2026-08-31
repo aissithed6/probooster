@@ -42,7 +42,9 @@ BEGIN
     'point_exchange_history',
     'loyalty_reward_redemptions',
     -- Profil
-    'user_profiles'
+    'user_profiles',
+    -- Produits vendeur (gestion des produits du tableau de bord vendeur)
+    'user_products'
   ]
   LOOP
     -- Ignore les tables absentes pour ne pas faire échouer tout le script.

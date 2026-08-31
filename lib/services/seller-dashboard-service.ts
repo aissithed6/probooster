@@ -1763,24 +1763,41 @@ export class SellerDashboardService {
     try {
       const accessToken = await this.getAccessToken()
 
-      const resp = await fetch('/api/vendor/products?limit=100&offset=0', {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
-        },
-        credentials: 'include',
-        cache: 'no-store'
-      })
+      // Pagination complète : on boucle page par page (100 produits par page)
+      // jusqu'à atteindre le total renvoyé par l'API, afin de ne jamais tronquer
+      // la liste au-delà de 100 produits.
+      const PAGE_SIZE = 100
+      const items: SharedProduct[] = []
+      let offset = 0
+      let total = 0
 
-      if (!resp.ok) {
-        const body = await resp.text().catch(() => '')
-        throw new Error(`Chargement produits vendeur impossible (${resp.status}): ${body}`)
-      }
+      do {
+        const resp = await fetch(`/api/vendor/products?limit=${PAGE_SIZE}&offset=${offset}`, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {})
+          },
+          credentials: 'include',
+          cache: 'no-store'
+        })
 
-      const json = await resp.json().catch(() => ({}))
-      const rawItems = (json as any)?.data?.items
-      const items = Array.isArray(rawItems) ? rawItems : []
+        if (!resp.ok) {
+          const body = await resp.text().catch(() => '')
+          throw new Error(`Chargement produits vendeur impossible (${resp.status}): ${body}`)
+        }
+
+        const json = await resp.json().catch(() => ({}))
+        const rawItems = (json as any)?.data?.items
+        const pageItems = Array.isArray(rawItems) ? rawItems : []
+        total = Number((json as any)?.data?.count ?? 0)
+
+        items.push(...(pageItems as SharedProduct[]))
+        offset += PAGE_SIZE
+
+        // Garde-fou anti-boucle infinie si l'API ne renvoie plus de pages.
+        if (pageItems.length === 0) break
+      } while (offset < total)
 
       return items
         .map((item: any) => {

@@ -1514,7 +1514,7 @@ function AdvancedProductModal({
         setProductData(sanitizedData)
       }
 
-      const basePayload = getSharedPayload(undefined, sanitizedData)
+      const basePayload = getSharedPayload(undefined, sanitizedData) as SharedProductInput & { id?: string }
       const mergedPayload: SharedProductInput & { id?: string } = {
         ...basePayload,
         ...overrides,
@@ -1761,8 +1761,8 @@ function AdvancedProductModal({
     }
     
     try {
-      const draftPayload = getSharedPayload()
-      const draftKey = `seller-product-draft-${draftPayload.id ?? Date.now()}`
+      const draftPayload = getSharedPayload() as SharedProductInput
+      const draftKey = `seller-product-draft-${initialVendorId ?? 'unknown'}-${draftPayload.id ?? Date.now()}`
       localStorage.setItem(draftKey, JSON.stringify(draftPayload))
       setDraftData({ key: draftKey, payload: draftPayload })
       setIsDraftSaved(true)
@@ -1819,7 +1819,7 @@ function AdvancedProductModal({
       id: undefined,
       name: duplicatedProduct.name,
       sku: duplicatedProduct.sku
-    }
+    } as unknown as SharedProductInput
     setProductData(mapSharedToAdvancedData(duplicatedShared))
     addNotification('success', 'Produit dupliqué !', 'Le produit a été dupliqué avec succès. Modifiez les informations et sauvegardez.', {
       label: 'Modifier maintenant',
