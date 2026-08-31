@@ -49,7 +49,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       'shippingLat',
       'shippingLng',
       'billingAddress',
-      'deliveryDate'
+      'deliveryDate',
+      'clientValidation',
+      'clientValidationDate'
     ]
     const updates: Record<string, unknown> = {}
 

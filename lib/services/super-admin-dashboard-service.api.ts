@@ -290,6 +290,8 @@ export class SuperAdminDashboardApi {
     shippingLng?: number | null
     billingAddress?: Record<string, unknown> | null
     deliveryDate?: string | null
+    clientValidation?: boolean
+    clientValidationDate?: string | null
   }): Promise<any> {
     return fetchApi<{ data: any }>(`/orders/${orderId}`, {
       method: 'PATCH',

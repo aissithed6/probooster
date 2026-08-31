@@ -24,6 +24,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useNotifications } from '@/components/ui/modern-notification'
 import { SuperAdminOrderService } from '@/lib/services/super-admin-order-service'
+import { SuperAdminDashboardService } from '@/lib/services/super-admin-dashboard-service'
 import { isProductEligibleForFreeShippingLabel, type FreeShippingConfig } from '@/lib/utils/free-shipping-eligibility'
 import { useMoney } from '@/lib/hooks/use-money'
 import { ClientAuthService } from '@/lib/services/client-auth-service'
@@ -486,13 +487,84 @@ export default function OrderManagement({ prefetchedOrders }: OrderManagementPro
   })
 
   const [commissionType, setCommissionType] = useState<'percentage' | 'fixed' | 'hybrid'>('percentage')
-  
+
   const [paymentFrequencies, setPaymentFrequencies] = useState({
     daily: false,
     weekly: false,
     monthly: true,
     quarterly: false
   })
+
+  // ============================================================
+  // Persistance de la configuration (commissions + fréquences)
+  // via super_admin_settings (scope 'global')
+  // ============================================================
+  const ORDERS_SETTINGS_KEY = 'orders_section'
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const cfg = await SuperAdminDashboardService.getGlobalSettings()
+        if (cancelled) return
+        const section = ((cfg as Record<string, any>)?.[ORDERS_SETTINGS_KEY] ?? {}) as Record<string, any>
+
+        if (section.commissionRates) setCommissionRates((prev) => ({ ...prev, ...section.commissionRates }))
+        if (section.commissionFixed) setCommissionFixed((prev) => ({ ...prev, ...section.commissionFixed }))
+        if (section.commissionType) setCommissionType(section.commissionType)
+        if (section.paymentFrequencies) setPaymentFrequencies((prev) => ({ ...prev, ...section.paymentFrequencies }))
+      } catch {
+        // silencieux : valeurs par défaut conservées
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const persistOrdersConfig = useCallback(
+    async (next: {
+      commissionRates?: typeof commissionRates
+      commissionFixed?: typeof commissionFixed
+      commissionType?: typeof commissionType
+      paymentFrequencies?: typeof paymentFrequencies
+    }) => {
+      try {
+        const current = ((await SuperAdminDashboardService.getGlobalSettings()) as Record<string, any>) ?? {}
+        const section = { ...(current[ORDERS_SETTINGS_KEY] ?? {}) }
+
+        if (next.commissionRates) section.commissionRates = next.commissionRates
+        if (next.commissionFixed) section.commissionFixed = next.commissionFixed
+        if (next.commissionType) section.commissionType = next.commissionType
+        if (next.paymentFrequencies) section.paymentFrequencies = next.paymentFrequencies
+
+        await SuperAdminDashboardService.updateSettings('global', {
+          ...current,
+          [ORDERS_SETTINGS_KEY]: section
+        })
+      } catch (error) {
+        console.error('❌ Impossible de sauvegarder la configuration commandes', error)
+        addNotification({
+          type: 'error',
+          title: 'Sauvegarde échouée',
+          message: "La configuration n'a pas pu être enregistrée en base.",
+          duration: 5000
+        })
+      }
+    },
+    [addNotification]
+  )
+
+  // Sauvegarde automatique (debounce 800 ms) à chaque modification de configuration
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void persistOrdersConfig({ commissionRates, commissionFixed, commissionType, paymentFrequencies })
+    }, 800)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commissionRates, commissionFixed, commissionType, paymentFrequencies])
+
 
   const disputeTypes = [
     { value: 'delivery_issue', label: 'Problème de livraison' },
@@ -569,17 +641,36 @@ export default function OrderManagement({ prefetchedOrders }: OrderManagementPro
     [isOrderProductFreeShippingEligible]
   )
   
-  // Données mock pour les vendeurs (même que tableau de bord vendeur)
-  const mockSellers = [
-    { id: 1, name: "Kouassi Jean", email: "kouassi.jean@email.com", phone: "+225 07 12 34 56 78" },
-    { id: 2, name: "Traoré Fatou", email: "traore.fatou@email.com", phone: "+225 07 23 45 67 89" },
-    { id: 3, name: "Diallo Mamadou", email: "diallo.mamadou@email.com", phone: "+225 07 34 56 78 90" },
-    { id: 4, name: "Koné Aminata", email: "kone.aminata@email.com", phone: "+225 07 45 67 89 01" },
-    { id: 5, name: "Ouattara Issouf", email: "ouattara.issouf@email.com", phone: "+225 07 56 78 90 12" },
-  ]
-  
+  // Vendeurs réels chargés depuis la base (table users, rôle vendeur)
+  const [realSellers, setRealSellers] = useState<Array<{ id: string; name: string; email: string; phone: string }>>([])
+
+  useEffect(() => {
+    let cancelled = false
+    const loadSellers = async () => {
+      try {
+        const sellers = await SuperAdminDashboardService.getUsers({ role: 'seller', limit: 500 })
+        if (!cancelled) {
+          setRealSellers(
+            (Array.isArray(sellers) ? sellers : []).map((s: any) => ({
+              id: String(s.id ?? ''),
+              name: String(s.fullName ?? s.full_name ?? s.name ?? s.email ?? 'Vendeur'),
+              email: String(s.email ?? ''),
+              phone: String(s.phone ?? s.phoneNumber ?? '')
+            })).filter((s) => s.id)
+          )
+        }
+      } catch {
+        // silencieux : la recherche vendeur reste utilisable avec la liste vide
+      }
+    }
+    void loadSellers()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Vendeurs filtrés pour la recherche
-  const filteredSellers = mockSellers.filter(seller => 
+  const filteredSellers = realSellers.filter(seller =>
     seller.name.toLowerCase().includes(sellerSearchValue.toLowerCase()) ||
     seller.email.toLowerCase().includes(sellerSearchValue.toLowerCase())
   )
@@ -790,79 +881,171 @@ export default function OrderManagement({ prefetchedOrders }: OrderManagementPro
     }
   }
 
-  const handleClientValidation = (orderId: string) => {
+  const handleClientValidation = async (orderId: string) => {
+    const snapshot = orders.map((order) => ({ ...order }))
+
+    // Mise à jour optimiste
     setOrders(orders.map(order =>
-      order.id === orderId ? { 
-        ...order, 
-        clientValidation: true, 
+      order.id === orderId ? {
+        ...order,
+        clientValidation: true,
         clientValidationDate: new Date().toLocaleString(),
         updatedAt: new Date().toLocaleString()
       } : order
     ))
-    
-    addNotification({
-      type: 'success',
-      title: 'Validation Client',
-      message: 'La livraison a été validée par le client avec succès.',
-      duration: 4000
-    })
+
+    try {
+      // Persistance en base via l'API super admin
+      const updatedOrder = await SuperAdminOrderService.update(orderId, {
+        clientValidation: true,
+        clientValidationDate: new Date().toISOString()
+      })
+
+      setOrders((previous) => previous.map((entry) => (entry.id === orderId ? mapApiOrderToOrder(updatedOrder) : entry)))
+      setReturns((previous) => previous.map((entry) => (entry.id === orderId ? mapApiOrderToOrder(updatedOrder) : entry)))
+
+      addNotification({
+        type: 'success',
+        title: 'Validation Client',
+        message: 'La livraison a été validée par le client avec succès.',
+        duration: 4000
+      })
+    } catch (error) {
+      console.error('❌ Impossible de valider la livraison côté client', error)
+      setOrders(snapshot)
+      addNotification({
+        type: 'error',
+        title: 'Validation échouée',
+        message: "La validation client n'a pas pu être enregistrée. Veuillez réessayer.",
+        duration: 5000
+      })
+    }
   }
 
-  const handlePaymentRequestApproval = (requestId: string, approved: boolean) => {
-    setPaymentRequests(paymentRequests.map(request =>
-      request.id === requestId ? { 
-        ...request, 
-        status: approved ? 'approved' : 'rejected',
-        processedAt: new Date().toLocaleString()
-      } : request
-    ))
-    
-    addNotification({
-      type: approved ? 'success' : 'error',
-      title: approved ? 'Demande Approuvée' : 'Demande Rejetée',
-      message: approved ? 'La demande de paiement a été approuvée avec succès.' : 'La demande de paiement a été rejetée.',
-      duration: 5000
-    })
+  const handlePaymentRequestApproval = async (requestId: string, approved: boolean) => {
+    setIsActionLoading(true)
+    try {
+      const authHeaders = await ClientAuthService.buildAuthHeaders()
+      const resp = await fetch(`/api/finance/payment-requests/${requestId}/${approved ? 'approve' : 'reject'}`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: approved ? undefined : JSON.stringify({ reason: 'Décision manuelle du super admin' }),
+        cache: 'no-store'
+      })
+      const payload = await resp.json().catch(() => null)
+      if (!resp.ok) {
+        throw new Error(payload?.error ?? 'Échec de la décision de paiement.')
+      }
+
+      setPaymentRequests(paymentRequests.map(request =>
+        request.id === requestId ? {
+          ...request,
+          status: approved ? ('approved' as any) : ('rejected' as any),
+          processedAt: new Date().toLocaleString()
+        } : request
+      ))
+      // Resynchronisation avec la base (timeline, statuts réels)
+      void loadFinancePaymentRequests()
+
+      addNotification({
+        type: approved ? 'success' : 'error',
+        title: approved ? 'Demande Approuvée' : 'Demande Rejetée',
+        message: approved ? 'La demande de paiement a été approuvée avec succès.' : 'La demande de paiement a été rejetée.',
+        duration: 5000
+      })
+    } catch (error) {
+      console.error('❌ Impossible de traiter la demande de paiement', error)
+      addNotification({
+        type: 'error',
+        title: 'Opération échouée',
+        message: error instanceof Error ? error.message : 'La décision de paiement n’a pas pu être enregistrée.',
+        duration: 5000
+      })
+    } finally {
+      setIsActionLoading(false)
+    }
   }
 
-  const handlePaymentRequestRejection = (requestId: string, reason: string) => {
-    setPaymentRequests(paymentRequests.map(request =>
-      request.id === requestId ? { 
-        ...request, 
-        status: 'rejected',
-        rejectionReason: reason,
-        rejectionDate: new Date().toLocaleString(),
-        rejectionBy: 'Super Admin',
-        processedAt: new Date().toLocaleString()
-      } : request
-    ))
-    
-    addNotification({
-      type: 'warning',
-      title: 'Demande Rejetée',
-      message: `La demande de paiement a été rejetée. Motif: ${reason}`,
-      duration: 5000
-    })
-    
-    setIsRejectionModalOpen(false)
-    setRejectionReason('')
+  const handlePaymentRequestRejection = async (requestId: string, reason: string) => {
+    setIsActionLoading(true)
+    try {
+      const authHeaders = await ClientAuthService.buildAuthHeaders()
+      const resp = await fetch(`/api/finance/payment-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+        cache: 'no-store'
+      })
+      const payload = await resp.json().catch(() => null)
+      if (!resp.ok) {
+        throw new Error(payload?.error ?? 'Échec du rejet de la demande.')
+      }
+
+      setPaymentRequests(paymentRequests.map(request =>
+        request.id === requestId ? {
+          ...request,
+          status: 'rejected' as any,
+          processedAt: new Date().toLocaleString(),
+          notes: reason
+        } : request
+      ))
+      void loadFinancePaymentRequests()
+
+      addNotification({
+        type: 'warning',
+        title: 'Demande Rejetée',
+        message: `La demande de paiement a été rejetée. Motif: ${reason}`,
+        duration: 5000
+      })
+    } catch (error) {
+      console.error('❌ Impossible de rejeter la demande de paiement', error)
+      addNotification({
+        type: 'error',
+        title: 'Rejet échoué',
+        message: error instanceof Error ? error.message : 'Le rejet n’a pas pu être enregistré.',
+        duration: 5000
+      })
+    } finally {
+      setIsRejectionModalOpen(false)
+      setRejectionReason('')
+      setIsActionLoading(false)
+    }
   }
 
-  const handlePaymentRequestDeletion = (requestId: string) => {
-    setPaymentRequests(paymentRequests.map(request =>
-      request.id === requestId ? { 
-        ...request, 
-        status: 'deleted',
-        processedAt: new Date().toLocaleString()
-      } : request
-    ))
-    
-    addNotification({
-      type: 'info',
-      title: 'Demande Supprimée',
-      message: 'La demande de paiement a été supprimée avec succès.',
-      duration: 5000
-    })
+  const handlePaymentRequestDeletion = async (requestId: string) => {
+    setIsActionLoading(true)
+    try {
+      const authHeaders = await ClientAuthService.buildAuthHeaders()
+      const resp = await fetch(`/api/finance/payment-requests/${requestId}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+        cache: 'no-store'
+      })
+      const payload = await resp.json().catch(() => null)
+      if (!resp.ok) {
+        throw new Error(payload?.error ?? 'Échec de la suppression de la demande.')
+      }
+
+      setPaymentRequests(paymentRequests.filter(request => request.id !== requestId))
+      void loadFinancePaymentRequests()
+
+      addNotification({
+        type: 'info',
+        title: 'Demande Supprimée',
+        message: 'La demande de paiement a été supprimée avec succès.',
+        duration: 5000
+      })
+    } catch (error) {
+      console.error('❌ Impossible de supprimer la demande de paiement', error)
+      addNotification({
+        type: 'error',
+        title: 'Suppression échouée',
+        message: error instanceof Error ? error.message : 'La suppression n’a pas pu être enregistrée.',
+        duration: 5000
+      })
+    } finally {
+      setIsActionLoading(false)
+    }
   }
 
   const handlePaymentRequestEdit = (requestId: string) => {

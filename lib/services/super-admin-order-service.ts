@@ -22,6 +22,8 @@ export interface SuperAdminOrderUpdatePayload {
   shippingLng?: number | null
   billingAddress?: Record<string, unknown> | null
   deliveryDate?: string | null
+  clientValidation?: boolean
+  clientValidationDate?: string | null
 }
 
 export interface SuperAdminOrderReturnItemPayload {

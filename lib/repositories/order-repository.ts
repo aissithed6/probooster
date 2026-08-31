@@ -950,6 +950,8 @@ export class OrderRepository {
       shippingLng: number | null
       billingAddress: Json | null
       deliveryDate: string | null
+      clientValidation: boolean
+      clientValidationDate: string | null
     }> ,
     context: OrderCreateContext
   ): Promise<OrderDetails> {
@@ -997,6 +999,12 @@ export class OrderRepository {
     }
     if (updates.deliveryDate !== undefined) {
       payload.delivery_date = updates.deliveryDate
+    }
+    if (updates.clientValidation !== undefined) {
+      payload.client_validation = updates.clientValidation
+    }
+    if (updates.clientValidationDate !== undefined) {
+      payload.client_validation_date = updates.clientValidationDate
     }
 
     if (Object.keys(payload).length > 0) {
