@@ -676,6 +676,9 @@ export default function DeliveryManagement(): JSX.Element {
 
   const [selectedDelivery, setSelectedDelivery] = useState<SuperAdminDeliveryRecord | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<SuperAdminDeliveryRecord | null>(null)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isDeletingDelivery, setIsDeletingDelivery] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [deliveryProofs, setDeliveryProofs] = useState<Array<{ id: string; public_url: string | null; created_at: string | null }>>([])
   const [isLoadingProofs, setIsLoadingProofs] = useState(false)
@@ -2053,15 +2056,19 @@ export default function DeliveryManagement(): JSX.Element {
   )
 
   /**
-   * Supprime une livraison.
+   * Supprime une livraison (confirmation stylée via dialog).
    */
   const handleDeleteDelivery = useCallback(
     async (delivery: SuperAdminDeliveryRecord) => {
       try {
         if (!delivery?.id) return
-        const ok = window.confirm('Supprimer cette livraison ? Cette action est irréversible.')
-        if (!ok) return
+        if (deleteConfirmTarget?.id !== delivery.id) {
+          setDeleteConfirmTarget(delivery)
+          setIsDeleteConfirmOpen(true)
+          return
+        }
 
+        setIsDeletingDelivery(true)
         await SuperAdminDeliveryService.remove(delivery.id)
         addNotification({
           type: 'success',
@@ -2082,9 +2089,13 @@ export default function DeliveryManagement(): JSX.Element {
           title: 'Suppression échouée',
           message
         })
+      } finally {
+        setIsDeletingDelivery(false)
+        setIsDeleteConfirmOpen(false)
+        setDeleteConfirmTarget(null)
       }
     },
-    [addNotification, loadDeliveries, selectedDelivery?.id]
+    [addNotification, loadDeliveries, selectedDelivery?.id, deleteConfirmTarget?.id]
   )
 
   const handleSelectOrderChoice = useCallback(
@@ -2200,7 +2211,15 @@ export default function DeliveryManagement(): JSX.Element {
       >
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="config">Configuration des options de livraison</TabsTrigger>
-          <TabsTrigger value="free_shipping">Livraison gratuite</TabsTrigger>
+          <TabsTrigger value="free_shipping">
+                        Livraison gratuite
+                        {(() => {
+                          const count = Array.isArray(freeShippingConfig?.rules) ? freeShippingConfig.rules.filter(rule => rule?.active !== false).length : 0
+                          return count > 0 ? (
+                            <Badge variant="secondary" className="ml-2">{count}</Badge>
+                          ) : null
+                        })()}
+                      </TabsTrigger>
           <TabsTrigger value="deliveries">Gestion des livraisons</TabsTrigger>
         </TabsList>
 
@@ -4925,6 +4944,29 @@ export default function DeliveryManagement(): JSX.Element {
 
         </TabsContent>
       </Tabs>
+
+      {/* Dialog de confirmation de suppression d'une livraison */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={(open) => { if (!isDeletingDelivery) setIsDeleteConfirmOpen(open) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer cette livraison ?</DialogTitle>
+            <DialogDescription>
+              {deleteConfirmTarget
+                ? `La livraison liée à la commande #${deleteConfirmTarget.orderNumber ?? deleteConfirmTarget.orderId ?? '—'} sera définitivement supprimée. Cette action est irréversible.`
+                : 'Cette action est irréversible.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsDeleteConfirmOpen(false); setDeleteConfirmTarget(null) }} disabled={isDeletingDelivery}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={() => { if (deleteConfirmTarget) void handleDeleteDelivery(deleteConfirmTarget) }} disabled={isDeletingDelivery}>
+              {isDeletingDelivery ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
