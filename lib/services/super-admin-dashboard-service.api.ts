@@ -528,7 +528,7 @@ export class SuperAdminDashboardApi {
     return fetchApi<SuperAdminSystemAlert[]>(`/system-alerts${query}`, { method: 'GET', signal })
   }
 
-  static async createSystemAlert(payload: { title: string; message: string; priority?: SuperAdminSystemAlert['priority']; actionRequired?: boolean; targetRoles?: string[] }, signal?: AbortSignal) {
+  static async createSystemAlert(payload: { title: string; message: string; severity?: SuperAdminSystemAlert['type']; priority?: SuperAdminSystemAlert['priority']; actionRequired?: boolean; targetRoles?: string[] }, signal?: AbortSignal) {
     return fetchApi<SuperAdminSystemAlert, typeof payload>('/system-alerts', { method: 'POST', body: payload, signal })
   }
 

@@ -1007,6 +1007,37 @@ export class ClientPointsService {
         throw new Error("Le montant de l'échange doit être positif")
       }
 
+      // 1) Chemin atomique (recommandé): RPC PostgreSQL — voir migration
+      //    20260206_points_exchange_rpc.sql. Toutes les écritures (historique,
+      //    transactions, soldes, sync legacy) sont réalisées en une seule
+      //    transaction côté base, avec verrouillage du compte.
+      try {
+        const { error: rpcError } = await supabase.rpc('exchange_points_for_currency', {
+          p_user_id: userId,
+          p_from_currency: fromCurrency,
+          p_to_currency: toCurrency,
+          p_points: amount
+        })
+
+        if (!rpcError) {
+          return
+        }
+
+        const rpcMessage = String(rpcError.message ?? '')
+        const rpcMissing = /does not exist|could not find the function|PGRST202/i.test(rpcMessage)
+        if (!rpcMissing) {
+          throw new Error(rpcMessage || "Échange impossible")
+        }
+        // RPC absente sur cette base → bascule vers le chemin applicatif ci-dessous.
+      } catch (rpcFailure) {
+        const rpcMessage = rpcFailure instanceof Error ? rpcFailure.message : String(rpcFailure)
+        const rpcMissing = /does not exist|could not find the function|PGRST202/i.test(rpcMessage)
+        if (!rpcMissing) {
+          throw rpcFailure
+        }
+      }
+
+      // 2) Fallback: chemin applicatif (écritures séparées, idempotence 10 s).
       const [loyalty, settings, fee, limits, rateRow] = await Promise.all([
         this.fetchLoyaltyPointsRow(userId),
         this.getPointSettings(),

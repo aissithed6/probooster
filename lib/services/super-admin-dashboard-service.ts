@@ -992,6 +992,7 @@ export class SuperAdminDashboardService {
       await SuperAdminDashboardApi.createSystemAlert({
         title: payload.title,
         message: payload.message,
+        severity: payload.severity,
         priority: payload.priority,
         actionRequired: payload.actionRequired,
         targetRoles: payload.targetRoles

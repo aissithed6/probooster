@@ -5,6 +5,7 @@ import { Users, ShoppingCart, DollarSign, Star, Shield, Activity, AlertTriangle,
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -46,6 +47,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
   const [error, setError] = useState<string | null>(null)
   const [showAlertDialog, setShowAlertDialog] = useState(false)
   const [alertMessage, setAlertMessage] = useState('')
+  const [alertSeverity, setAlertSeverity] = useState<'critical' | 'warning' | 'info'>('warning')
   const [isSubmittingAlert, setIsSubmittingAlert] = useState(false)
 
   const resolvedStats = stats ?? DEFAULT_STATS
@@ -96,7 +98,7 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
       const success = await SuperAdminDashboardService.createSystemAlert({
         title: 'Alerte Super Admin',
         message: alertMessage,
-        severity: 'warning',
+        severity: alertSeverity,
         actionRequired: true
       })
 
@@ -403,6 +405,19 @@ export default function SuperAdminOverview({ stats }: OverviewProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-gray-700">Gravité</p>
+              <Select value={alertSeverity} onValueChange={(value) => setAlertSeverity(value as 'critical' | 'warning' | 'info')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir une gravité" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="critical">Critique</SelectItem>
+                  <SelectItem value="warning">Avertissement</SelectItem>
+                  <SelectItem value="info">Information</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Textarea
               value={alertMessage}
               onChange={(event) => setAlertMessage(event.target.value)}
