@@ -306,6 +306,7 @@ export default function MarketingPromotions() {
   const [activeTab, setActiveTab] = useState('overview')
   const [activeSubTab, setActiveSubTab] = useState('campaigns')
   const [campaigns, setCampaigns] = useState<BoostingCampaignType[]>([])
+  const [campaignActionStates, setCampaignActionState] = useState<Record<string, 'idle' | 'loading' | 'error'>>({})
   const [services, setServices] = useState<BoostingServiceType[]>([])
   const [promotions, setPromotions] = useState<PromotionType[]>([])
   const [specialPromotions, setSpecialPromotions] = useState<SpecialPromotion[]>([])
@@ -1393,41 +1394,50 @@ export default function MarketingPromotions() {
   }
 
   const handleCampaignApproval = async (campaignId: string) => {
+    const snapshot = campaigns.map((c) => ({ ...c }))
     setLoading(true)
     try {
+      setCampaignActionState(campaignId, 'loading')
       const success = await BoostingCampaignManager.approveAsSuperAdmin(campaignId, user?.id)
-      
+
       if (success) {
         addNotification({
           type: 'success',
           title: 'Campagne Approuvée',
           message: 'La campagne de boostage a été approuvée et activée'
         })
-        void loadData(false) // Recharger pour voir le changement
+        void loadData(false)
       } else {
+        setCampaigns(snapshot)
+        setCampaignActionState(campaignId, 'error')
         addNotification({
           type: 'error',
-          title: 'Erreur',
+          title: "Échec de l'approbation",
           message: "L'approbation n'a pas abouti. Veuillez réessayer."
         })
       }
     } catch (error) {
       console.error('Erreur approbation campagne:', error)
+      setCampaigns(snapshot)
+      setCampaignActionState(campaignId, 'error')
       addNotification({
         type: 'error',
-        title: 'Erreur',
-        message: 'Erreur lors de l\'approbation de la campagne'
+        title: "Échec de l'approbation",
+        message: error instanceof Error ? error.message : "Une erreur est survenue lors de l'approbation de la campagne."
       })
     } finally {
+      setCampaignActionState(campaignId, 'idle')
       setLoading(false)
     }
   }
 
   const handleCampaignRejection = async (campaignId: string, reason: string) => {
+    const snapshot = campaigns.map((c) => ({ ...c }))
     setLoading(true)
     try {
+      setCampaignActionState(campaignId, 'loading')
       const success = await BoostingCampaignManager.rejectCampaign(campaignId, reason)
-      
+
       if (success) {
         addNotification({
           type: 'success',
@@ -1435,26 +1445,38 @@ export default function MarketingPromotions() {
           message: 'La campagne a été rejetée avec succès'
         })
         void loadData(false)
+      } else {
+        setCampaigns(snapshot)
+        setCampaignActionState(campaignId, 'error')
+        addNotification({
+          type: 'error',
+          title: "Échec du rejet",
+          message: "Le rejet de la campagne n'a pas abouti. Veuillez réessayer."
+        })
       }
     } catch (error) {
       console.error('Erreur rejet campagne:', error)
+      setCampaigns(snapshot)
+      setCampaignActionState(campaignId, 'error')
       addNotification({
         type: 'error',
-        title: 'Erreur',
-        message: 'Erreur lors du rejet de la campagne'
+        title: "Échec du rejet",
+        message: error instanceof Error ? error.message : "Une erreur est survenue lors du rejet de la campagne."
       })
     } finally {
+      setCampaignActionState(campaignId, 'idle')
       setLoading(false)
     }
   }
 
   const handleCampaignStatusChange = async (campaignId: string, newStatus: 'active' | 'paused' | 'completed') => {
+    const snapshot = campaigns.map((c) => ({ ...c }))
     setLoading(true)
     try {
+      setCampaignActionState(campaignId, 'loading')
       const success = await BoostingCampaignManager.setCampaignStatus(campaignId, newStatus)
-      
+
       if (success) {
-        // Mise à jour optimiste pour refléter instantanément l'état dans l'UI.
         setCampaigns((prev) =>
           prev.map((item) =>
             item.id === campaignId
@@ -1466,7 +1488,6 @@ export default function MarketingPromotions() {
               : item
           )
         )
-
         addNotification({
           type: 'success',
           title: 'Statut Modifié',
@@ -1474,20 +1495,25 @@ export default function MarketingPromotions() {
         })
         void loadData(false)
       } else {
+        setCampaigns(snapshot)
+        setCampaignActionState(campaignId, 'error')
         addNotification({
           type: 'error',
-          title: 'Erreur',
+          title: 'Échec de la mise à jour',
           message: 'Impossible de mettre à jour le statut de la campagne.'
         })
       }
     } catch (error) {
-      console.error('Erreur changement statut:', error)
+      console.error('Erreur statut campagne:', error)
+      setCampaigns(snapshot)
+      setCampaignActionState(campaignId, 'error')
       addNotification({
         type: 'error',
-        title: 'Erreur',
-        message: 'Erreur lors du changement de statut'
+        title: 'Échec de la mise à jour',
+        message: error instanceof Error ? error.message : 'Une erreur est survenue lors de la modification du statut.'
       })
     } finally {
+      setCampaignActionState(campaignId, 'idle')
       setLoading(false)
     }
   }
