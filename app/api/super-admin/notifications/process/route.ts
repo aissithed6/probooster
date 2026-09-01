@@ -132,6 +132,16 @@ export async function POST(request: NextRequest) {
 
     const isPushEnabled = await fetchGlobalPushEnabled(supabase)
 
+    // Option retryFailed : repasse les jobs échoués en pending avant traitement
+    // (utilisé par le bouton « Réessayer » du tableau de bord).
+    const body = await request.json().catch(() => ({}))
+    if (body?.retryFailed === true) {
+      await supabase
+        .from('notification_jobs' as any)
+        .update({ status: 'pending', updated_at: new Date().toISOString() })
+        .eq('status', 'failed')
+    }
+
     // Vérifie l'existence de la table en tentant une lecture.
     const { data: pending, error } = await supabase
       .from('notification_jobs' as any)

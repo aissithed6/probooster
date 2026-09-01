@@ -1639,22 +1639,49 @@ export default function NotificationsAlerts() {
     }
   }
 
-  // Fonction pour envoyer une notification
-  const sendNotification = (notification: Notification) => {
-    addNotification({
-      type: 'info',
-      title: 'Envoi multi-canaux',
-      message: "Phase 1: l'envoi Email/Push passe par la file (notification_jobs) et l'endpoint /process." 
-    })
+  // Envoie les notifications en attente via la file technique (notification_jobs).
+  const runJobProcessor = async (retryFailed: boolean) => {
+    try {
+      const authHeaders = await getSuperAdminAuthHeaders()
+      const res = await fetch('/api/super-admin/notifications/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify(retryFailed ? { retryFailed: true } : {})
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(String(json?.error ?? 'Traitement de la file impossible'))
+      }
+
+      const processed = Number(json?.processed ?? 0)
+      const failed = Number(json?.failed ?? 0)
+      addNotification({
+        type: failed > 0 ? 'warning' : 'success',
+        title: retryFailed ? 'Nouvelle tentative lancée' : 'Envoi effectué',
+        message:
+          processed === 0 && failed === 0
+            ? 'Aucun job à traiter dans la file.'
+            : `${processed} job(s) traité(s), ${failed} échec(s).`
+      })
+      void loadNotifications()
+      void loadNotificationStats()
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: retryFailed ? 'Réessai impossible' : 'Envoi impossible',
+        message: error instanceof Error ? error.message : 'Erreur inconnue.'
+      })
+    }
   }
 
-  // Fonction pour rÃ©essayer l'envoi d'une notification
-  const retryNotification = (notification: Notification) => {
-    addNotification({
-      type: 'info',
-      title: 'File de traitement',
-      message: "Phase 1: utilisez le traitement de file (/api/super-admin/notifications/process) une fois la table crÃ©Ã©e." 
-    })
+  // Fonction pour envoyer une notification
+  const sendNotification = async (notification: Notification) => {
+    await runJobProcessor(false)
+  }
+
+  // Fonction pour réessayer l'envoi d'une notification
+  const retryNotification = async (notification: Notification) => {
+    await runJobProcessor(true)
   }
 
   // Fonction pour marquer une notification comme lue
