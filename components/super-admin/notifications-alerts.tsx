@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,7 +23,7 @@ import { useNotifications } from '@/components/ui/modern-notification'
 import { getClientAccessToken, supabase } from '@/lib/supabase'
 import { useMoney } from '@/lib/hooks/use-money'
 
-// Interfaces pour le système de notifications et alertes
+// Interfaces pour le systÃ¨me de notifications et alertes
 interface Notification {
   id: string
   type: 'order' | 'user' | 'payment' | 'alert' | 'system' | 'marketing' | 'security'
@@ -171,7 +171,7 @@ export default function NotificationsAlerts() {
   const [activeTab, setActiveTab] = useState('notifications')
 
   /**
-   * Charge la configuration Push (persistée) lorsque l'onglet Push est ouvert.
+   * Charge la configuration Push (persistÃ©e) lorsque l'onglet Push est ouvert.
    */
   useEffect(() => {
     if (activeTab !== 'push') return
@@ -179,7 +179,7 @@ export default function NotificationsAlerts() {
   }, [activeTab])
 
   /**
-   * Toggle une option Push et persiste la configuration côté Super Admin.
+   * Toggle une option Push et persiste la configuration cÃ´tÃ© Super Admin.
    */
   const togglePushConfig = async (key: keyof typeof pushConfig) => {
     const previous = pushConfig
@@ -190,7 +190,7 @@ export default function NotificationsAlerts() {
       addNotification({
         type: 'success',
         title: 'Configuration Push',
-        message: 'Configuration sauvegardée.'
+        message: 'Configuration sauvegardÃ©e.'
       })
     } catch {
       setPushConfig(previous)
@@ -229,7 +229,7 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Chargement configuration push échoué'))
+        throw new Error(String(json?.error ?? 'Chargement configuration push Ã©chouÃ©'))
       }
 
       const items = Array.isArray(json?.data) ? json.data : []
@@ -262,7 +262,7 @@ export default function NotificationsAlerts() {
     })
     const getJson = await getRes.json().catch(() => null)
     if (!getRes.ok) {
-      throw new Error(String(getJson?.error ?? 'Chargement réglages échoué'))
+      throw new Error(String(getJson?.error ?? 'Chargement rÃ©glages Ã©chouÃ©'))
     }
 
     const items = Array.isArray(getJson?.data) ? getJson.data : []
@@ -285,7 +285,7 @@ export default function NotificationsAlerts() {
     })
     const putJson = await putRes.json().catch(() => null)
     if (!putRes.ok) {
-      throw new Error(String(putJson?.error ?? 'Sauvegarde configuration push échouée'))
+      throw new Error(String(putJson?.error ?? 'Sauvegarde configuration push Ã©chouÃ©e'))
     }
   }
 
@@ -326,9 +326,8 @@ export default function NotificationsAlerts() {
     isActive: true
   })
   
-  // États pour la gestion des notifications
+  // Ã‰tats pour la gestion des notifications
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [alerts, setAlerts] = useState<Alert[]>([])
   const [stats, setStats] = useState<NotificationStats>({
     totalSent: 0,
     totalDelivered: 0,
@@ -381,7 +380,7 @@ export default function NotificationsAlerts() {
     actionUrl: ''
   })
 
-  // États pour les filtres et recherche
+  // Ã‰tats pour les filtres et recherche
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
@@ -389,9 +388,8 @@ export default function NotificationsAlerts() {
   const [channelFilter, setChannelFilter] = useState<string>('all')
   const [dateFilter, setDateFilter] = useState<string>('all')
 
-  // États pour les modals
+  // Ã‰tats pour les modals
   const [showNotificationModal, setShowNotificationModal] = useState(false)
-  const [showAlertModal, setShowAlertModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showCreateNotificationModal, setShowCreateNotificationModal] = useState(false)
   const [showGlobalConfigModal, setShowGlobalConfigModal] = useState(false)
@@ -399,7 +397,6 @@ export default function NotificationsAlerts() {
   const [showEditEmailMarketingModal, setShowEditEmailMarketingModal] = useState(false)
   const [showActionConfigModal, setShowActionConfigModal] = useState(false)
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null)
-  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null)
   const [selectedEmail, setSelectedEmail] = useState<any>(null)
   const [selectedEmailMarketing, setSelectedEmailMarketing] = useState<any>(null)
   const [selectedAction, setSelectedAction] = useState<AlertAction | null>(null)
@@ -445,15 +442,14 @@ export default function NotificationsAlerts() {
   })
   const [isLoadingGlobalChannelsEnabled, setIsLoadingGlobalChannelsEnabled] = useState(false)
 
-  // États pour la pagination
+  // Ã‰tats pour la pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [notificationsPerPage] = useState(10)
 
-  // Chargement des données au montage
+  // Chargement des donnÃ©es au montage
   useEffect(() => {
     void loadNotifications()
     void loadNotificationStats()
-    setAlerts([])
   }, [])
 
   useEffect(() => {
@@ -488,7 +484,7 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Chargement configuration globale échoué'))
+        throw new Error(String(json?.error ?? 'Chargement configuration globale Ã©chouÃ©'))
       }
 
       const items = Array.isArray(json?.data) ? json.data : []
@@ -538,7 +534,7 @@ export default function NotificationsAlerts() {
       })
       const getJson = await getRes.json().catch(() => null)
       if (!getRes.ok) {
-        throw new Error(String(getJson?.error ?? 'Chargement réglages échoué'))
+        throw new Error(String(getJson?.error ?? 'Chargement rÃ©glages Ã©chouÃ©'))
       }
 
       const items = Array.isArray(getJson?.data) ? getJson.data : []
@@ -565,13 +561,13 @@ export default function NotificationsAlerts() {
       })
       const putJson = await putRes.json().catch(() => null)
       if (!putRes.ok) {
-        throw new Error(String(putJson?.error ?? 'Sauvegarde échouée'))
+        throw new Error(String(putJson?.error ?? 'Sauvegarde Ã©chouÃ©e'))
       }
 
       addNotification({
         type: 'success',
-        title: 'Configuration sauvegardée',
-        message: 'La configuration globale a été sauvegardée avec succès'
+        title: 'Configuration sauvegardÃ©e',
+        message: 'La configuration globale a Ã©tÃ© sauvegardÃ©e avec succÃ¨s'
       })
       setShowGlobalConfigModal(false)
       void loadGlobalNotificationsConfig()
@@ -606,7 +602,7 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Chargement réglages échoué'))
+        throw new Error(String(json?.error ?? 'Chargement rÃ©glages Ã©chouÃ©'))
       }
 
       const items = Array.isArray(json?.data) ? json.data : []
@@ -646,7 +642,7 @@ export default function NotificationsAlerts() {
   }, [showCreateNotificationModal, globalChannelsEnabled, createNotificationForm.channel])
 
   /**
-   * Ouvre un template email (édition si existant, création sinon) depuis le modal global.
+   * Ouvre un template email (Ã©dition si existant, crÃ©ation sinon) depuis le modal global.
    */
   const openGlobalEmailTemplate = (tpl: { key: string; name: string; category: EmailTemplate['category'] }) => {
     const existing = emailTemplates.find((t) => String(t?.key ?? '') === tpl.key) ?? null
@@ -708,7 +704,7 @@ export default function NotificationsAlerts() {
   }
 
   /**
-   * Ouvre le modal de création d'un template email.
+   * Ouvre le modal de crÃ©ation d'un template email.
    */
   const openCreateEmailTemplate = () => {
     setEditingEmailTemplate(null)
@@ -725,7 +721,7 @@ export default function NotificationsAlerts() {
   }
 
   /**
-   * Ouvre le modal d'édition d'un template email.
+   * Ouvre le modal d'Ã©dition d'un template email.
    */
   const openEditEmailTemplate = (tpl: EmailTemplate) => {
     setEditingEmailTemplate(tpl)
@@ -742,7 +738,7 @@ export default function NotificationsAlerts() {
   }
 
   /**
-   * Crée ou met à jour un template email.
+   * CrÃ©e ou met Ã  jour un template email.
    */
   const saveEmailTemplate = async () => {
     try {
@@ -774,8 +770,8 @@ export default function NotificationsAlerts() {
 
       addNotification({
         type: 'success',
-        title: 'Template sauvegardé',
-        message: 'Le template email a été sauvegardé.'
+        title: 'Template sauvegardÃ©',
+        message: 'Le template email a Ã©tÃ© sauvegardÃ©.'
       })
       setShowEmailTemplateModal(false)
       setEditingEmailTemplate(null)
@@ -808,8 +804,8 @@ export default function NotificationsAlerts() {
 
       addNotification({
         type: 'success',
-        title: 'Template supprimé',
-        message: 'Le template email a été supprimé.'
+        title: 'Template supprimÃ©',
+        message: 'Le template email a Ã©tÃ© supprimÃ©.'
       })
       void loadEmailTemplates()
     } catch (error) {
@@ -840,7 +836,7 @@ export default function NotificationsAlerts() {
         const lower = raw.toLowerCase()
         if (lower.includes('schema cache') || lower.includes('notification_jobs')) {
           throw new Error(
-            "La table 'notification_jobs' est introuvable (schema cache). Vérifie que tu as bien exécuté le SQL de création dans le bon projet Supabase, attends 30-60s, puis clique sur Actualiser."
+            "La table 'notification_jobs' est introuvable (schema cache). VÃ©rifie que tu as bien exÃ©cutÃ© le SQL de crÃ©ation dans le bon projet Supabase, attends 30-60s, puis clique sur Actualiser."
           )
         }
         throw new Error(raw)
@@ -850,7 +846,7 @@ export default function NotificationsAlerts() {
       setNotificationJobs(items as NotificationJobItem[])
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erreur inconnue.'
-      // Message explicite déjà remonté via toast.
+      // Message explicite dÃ©jÃ  remontÃ© via toast.
       setNotificationJobs([])
       addNotification({
         type: 'error',
@@ -880,8 +876,8 @@ export default function NotificationsAlerts() {
 
       addNotification({
         type: 'success',
-        title: 'Job relancé',
-        message: 'Le job a été remis en attente (pending).'
+        title: 'Job relancÃ©',
+        message: 'Le job a Ã©tÃ© remis en attente (pending).'
       })
       void loadNotificationJobs()
     } catch (error) {
@@ -918,7 +914,7 @@ export default function NotificationsAlerts() {
   }
 
   /**
-   * Déclenche le traitement côté serveur (SMTP/OneSignal) des jobs pending.
+   * DÃ©clenche le traitement cÃ´tÃ© serveur (SMTP/OneSignal) des jobs pending.
    */
   const processNotificationQueue = async () => {
     try {
@@ -937,8 +933,8 @@ export default function NotificationsAlerts() {
 
       addNotification({
         type: 'success',
-        title: 'Traitement lancé',
-        message: `Jobs traités: ${String(json?.processed ?? 0)} | envoyés: ${String(json?.sent ?? 0)} | échecs: ${String(json?.failed ?? 0)}`
+        title: 'Traitement lancÃ©',
+        message: `Jobs traitÃ©s: ${String(json?.processed ?? 0)} | envoyÃ©s: ${String(json?.sent ?? 0)} | Ã©checs: ${String(json?.failed ?? 0)}`
       })
       void loadNotificationJobs()
     } catch (error) {
@@ -977,7 +973,7 @@ export default function NotificationsAlerts() {
 
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Erreur lors du chargement des alertes système'))
+        throw new Error(String(json?.error ?? 'Erreur lors du chargement des alertes systÃ¨me'))
       }
 
       const rows = Array.isArray(json?.data) ? json.data : []
@@ -1005,7 +1001,7 @@ export default function NotificationsAlerts() {
 
       setSystemAlerts(mapped)
     } catch (error) {
-      console.error('Erreur chargement alertes système:', error)
+      console.error('Erreur chargement alertes systÃ¨me:', error)
       setSystemAlerts([])
       addNotification({
         type: 'error',
@@ -1027,7 +1023,7 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Résolution impossible'))
+        throw new Error(String(json?.error ?? 'RÃ©solution impossible'))
       }
       setSystemAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, status: 'resolved' } : a)))
     } catch (error) {
@@ -1053,8 +1049,8 @@ export default function NotificationsAlerts() {
       }
       addNotification({
         type: 'success',
-        title: 'Alerte escaladée',
-        message: "L'alerte a été escaladée." 
+        title: 'Alerte escaladÃ©e',
+        message: "L'alerte a Ã©tÃ© escaladÃ©e." 
       })
       void loadSystemAlerts()
     } catch (error) {
@@ -1157,7 +1153,7 @@ export default function NotificationsAlerts() {
             recipient: String(userName ?? userEmail ?? userId ?? ''),
             recipientType: mapUserRoleToRecipientType(row?.userRole ?? row?.user_role),
             channel: 'in-app',
-            category: String(row?.type ?? 'Système'),
+            category: String(row?.type ?? 'SystÃ¨me'),
             tags: [],
             metadata: {
               actionUrl: row?.actionUrl ?? row?.action_url ?? null,
@@ -1261,7 +1257,7 @@ export default function NotificationsAlerts() {
       )
       setSiteEventsCount(count)
     } catch (error) {
-      console.error('Erreur chargement événements:', error)
+      console.error('Erreur chargement Ã©vÃ©nements:', error)
       setSiteEvents([])
       setSiteEventsCount(0)
     } finally {
@@ -1332,8 +1328,8 @@ export default function NotificationsAlerts() {
 
       addNotification({
         type: 'success',
-        title: editingSiteEvent ? 'Événement mis à jour' : 'Événement créé',
-        message: "L'événement a été sauvegardé." 
+        title: editingSiteEvent ? 'Ã‰vÃ©nement mis Ã  jour' : 'Ã‰vÃ©nement crÃ©Ã©',
+        message: "L'Ã©vÃ©nement a Ã©tÃ© sauvegardÃ©." 
       })
       setShowSiteEventModal(false)
       void loadSiteEvents(siteEventsPage, siteEventsQuery)
@@ -1357,13 +1353,13 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Suppression échouée'))
+        throw new Error(String(json?.error ?? 'Suppression Ã©chouÃ©e'))
       }
 
       addNotification({
         type: 'success',
-        title: 'Événement supprimé',
-        message: "L'événement a été supprimé." 
+        title: 'Ã‰vÃ©nement supprimÃ©',
+        message: "L'Ã©vÃ©nement a Ã©tÃ© supprimÃ©." 
       })
       void loadSiteEvents(siteEventsPage, siteEventsQuery)
     } catch (error) {
@@ -1396,7 +1392,7 @@ export default function NotificationsAlerts() {
       const json = await res.json().catch(() => null)
 
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Accès refusé ou erreur serveur (alertes clients).'))
+        throw new Error(String(json?.error ?? 'AccÃ¨s refusÃ© ou erreur serveur (alertes clients).'))
       }
 
       const items = Array.isArray(json?.data?.items) ? json.data.items : []
@@ -1458,14 +1454,14 @@ export default function NotificationsAlerts() {
 
       addNotification({
         type: 'success',
-        title: 'Export prêt',
-        message: 'Le fichier CSV a été téléchargé.'
+        title: 'Export prÃªt',
+        message: 'Le fichier CSV a Ã©tÃ© tÃ©lÃ©chargÃ©.'
       })
     } catch (error) {
       addNotification({
         type: 'error',
         title: 'Export impossible',
-        message: error instanceof Error ? error.message : 'Impossible de générer le CSV pour le moment.'
+        message: error instanceof Error ? error.message : 'Impossible de gÃ©nÃ©rer le CSV pour le moment.'
       })
     }
   }
@@ -1507,7 +1503,7 @@ export default function NotificationsAlerts() {
     const priorityConfig = {
       low: { color: 'bg-gray-100 text-gray-800 border-gray-200', text: 'Faible' },
       medium: { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', text: 'Moyenne' },
-      high: { color: 'bg-orange-100 text-orange-800 border-orange-200', text: 'Élevée' },
+      high: { color: 'bg-orange-100 text-orange-800 border-orange-200', text: 'Ã‰levÃ©e' },
       critical: { color: 'bg-red-100 text-red-800 border-red-200', text: 'Critique' }
     }
     
@@ -1537,15 +1533,15 @@ export default function NotificationsAlerts() {
     }
     return <Badge variant={variants[status] || 'outline'} className={colors[status]}>
       {status === 'pending' ? 'En attente' : 
-       status === 'sent' ? 'Envoyée' : 
-       status === 'delivered' ? 'Livrée' : 
-       status === 'read' ? 'Lue' : 'Échouée'}
+       status === 'sent' ? 'EnvoyÃ©e' : 
+       status === 'delivered' ? 'LivrÃ©e' : 
+       status === 'read' ? 'Lue' : 'Ã‰chouÃ©e'}
     </Badge>
   }
 
   // Fonction pour exporter les notifications
   const exportNotifications = () => {
-    const csvHeaders = ['Type', 'Titre', 'Message', 'Priorité', 'Statut', 'Date', 'Destinataire', 'Canal', 'Catégorie']
+    const csvHeaders = ['Type', 'Titre', 'Message', 'PrioritÃ©', 'Statut', 'Date', 'Destinataire', 'Canal', 'CatÃ©gorie']
     const csvRows = filteredNotifications.map(notification => [
       notification.type,
       notification.title,
@@ -1573,8 +1569,8 @@ export default function NotificationsAlerts() {
     
     addNotification({
       type: 'success',
-      title: 'Export réussi',
-      message: `${filteredNotifications.length} notifications exportées en CSV`
+      title: 'Export rÃ©ussi',
+      message: `${filteredNotifications.length} notifications exportÃ©es en CSV`
     })
   }
 
@@ -1585,7 +1581,7 @@ export default function NotificationsAlerts() {
       addNotification({
         type: 'error',
         title: 'Duplication impossible',
-        message: 'Aucune notification à dupliquer.'
+        message: 'Aucune notification Ã  dupliquer.'
       })
       return
     }
@@ -1622,14 +1618,14 @@ export default function NotificationsAlerts() {
             ? rawError
             : rawError
               ? JSON.stringify(rawError)
-              : 'Duplication échouée'
+              : 'Duplication Ã©chouÃ©e'
         throw new Error(message)
       }
 
       addNotification({
         type: 'success',
-        title: 'Notification dupliquée',
-        message: 'La notification a été dupliquée en base.'
+        title: 'Notification dupliquÃ©e',
+        message: 'La notification a Ã©tÃ© dupliquÃ©e en base.'
       })
       void loadNotifications()
       void loadNotificationStats()
@@ -1652,12 +1648,12 @@ export default function NotificationsAlerts() {
     })
   }
 
-  // Fonction pour réessayer l'envoi d'une notification
+  // Fonction pour rÃ©essayer l'envoi d'une notification
   const retryNotification = (notification: Notification) => {
     addNotification({
       type: 'info',
       title: 'File de traitement',
-      message: "Phase 1: utilisez le traitement de file (/api/super-admin/notifications/process) une fois la table créée." 
+      message: "Phase 1: utilisez le traitement de file (/api/super-admin/notifications/process) une fois la table crÃ©Ã©e." 
     })
   }
 
@@ -1672,7 +1668,7 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Mise à jour impossible'))
+        throw new Error(String(json?.error ?? 'Mise Ã  jour impossible'))
       }
 
       setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, status: 'read', readAt: new Date().toISOString() } : n)))
@@ -1698,7 +1694,7 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Suppression échouée'))
+        throw new Error(String(json?.error ?? 'Suppression Ã©chouÃ©e'))
       }
 
       setNotifications((prev) => prev.filter((n) => n.id !== notification.id))
@@ -1712,211 +1708,7 @@ export default function NotificationsAlerts() {
     }
   }
 
-  // Fonction pour exporter les alertes
-  const exportAlerts = () => {
-    const csvHeaders = ['Titre', 'Description', 'Type', 'Catégorie', 'Statut', 'Fréquence', 'Déclenchements', 'Destinataires']
-    const csvRows = alerts.map(alert => [
-      alert.title,
-      alert.description,
-      alert.type,
-      alert.category,
-      alert.active ? 'Active' : 'Inactive',
-      alert.schedule.frequency,
-      alert.triggerCount,
-      alert.recipients.length
-    ])
-    
-    const csvContent = [csvHeaders, ...csvRows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n')
-    
-    const bom = '\uFEFF'
-    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `alertes-${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-    
-    addNotification({
-      type: 'success',
-      title: 'Export réussi',
-      message: `${alerts.length} alertes exportées en CSV`
-    })
-  }
-
-  // Fonction pour activer/désactiver une alerte
-  const toggleAlertStatus = (alert: Alert) => {
-    setAlerts(prev => prev.map(a => 
-      a.id === alert.id 
-        ? { ...a, active: !a.active }
-        : a
-    ))
-    
-    addNotification({
-      type: 'success',
-      title: `Alerte ${!alert.active ? 'activée' : 'désactivée'}`,
-      message: `L'alerte "${alert.title}" a été ${!alert.active ? 'activée' : 'désactivée'}`
-    })
-  }
-
-  // Fonction pour configurer une action d'alerte
-  const configureAlertAction = (action: AlertAction) => {
-    setSelectedAction(action)
-    setShowActionConfigModal(true)
-  }
-
-  // Fonction pour ajouter une action d'alerte
-  const addAlertAction = () => {
-    if (selectedAlert) {
-      const newAction: AlertAction = {
-        id: `action_${Date.now()}`,
-        type: 'notification',
-        config: {},
-        enabled: true
-      }
-      
-      setAlerts(prev => prev.map(a => 
-        a.id === selectedAlert.id 
-          ? { ...a, actions: [...a.actions, newAction] }
-          : a
-      ))
-      
-      addNotification({
-        type: 'success',
-        title: 'Action ajoutée',
-        message: 'Une nouvelle action a été ajoutée à l\'alerte'
-      })
-    }
-  }
-
-  // Fonction pour ajouter une condition d'alerte
-  const addAlertCondition = () => {
-    if (selectedAlert) {
-      const newCondition: AlertCondition = {
-        id: `condition_${Date.now()}`,
-        field: 'stock',
-        operator: 'less_than',
-        value: 10
-      }
-      
-      setAlerts(prev => prev.map(a => 
-        a.id === selectedAlert.id 
-          ? { ...a, conditions: [...a.conditions, newCondition] }
-          : a
-      ))
-      
-      // Mettre à jour le selectedAlert aussi
-      setSelectedAlert(prev => prev ? {
-        ...prev,
-        conditions: [...prev.conditions, newCondition]
-      } : null)
-      
-      addNotification({
-        type: 'success',
-        title: 'Condition ajoutée',
-        message: 'Une nouvelle condition a été ajoutée à l\'alerte'
-      })
-    }
-  }
-
-  // Fonction pour supprimer une condition d'alerte
-  const removeAlertCondition = (conditionId: string) => {
-    if (selectedAlert) {
-      setAlerts(prev => prev.map(a => 
-        a.id === selectedAlert.id 
-          ? { ...a, conditions: a.conditions.filter(c => c.id !== conditionId) }
-          : a
-      ))
-      
-      addNotification({
-        type: 'success',
-        title: 'Condition supprimée',
-        message: 'La condition a été supprimée de l\'alerte'
-      })
-    }
-  }
-
-  // Fonction pour sauvegarder une alerte
-  const saveAlert = () => {
-    if (selectedAlert) {
-      setAlerts(prev => prev.map(a => 
-        a.id === selectedAlert.id 
-          ? { ...selectedAlert, updatedAt: new Date().toISOString() }
-          : a
-      ))
-      
-      addNotification({
-        type: 'success',
-        title: 'Alerte sauvegardée',
-        message: 'L\'alerte a été sauvegardée avec succès'
-      })
-      
-      setShowAlertModal(false)
-    } else {
-      // Créer une nouvelle alerte
-      const newAlert: Alert = {
-        id: `alert_${Date.now()}`,
-        title: 'Nouvelle Alerte',
-        description: 'Description de la nouvelle alerte',
-        type: 'info',
-        category: 'system',
-        active: true,
-        conditions: [],
-        actions: [],
-        schedule: {
-          enabled: true,
-          timezone: 'Europe/Paris',
-          quietHours: { enabled: false, start: '22:00', end: '08:00' },
-          frequency: 'immediate'
-        },
-        recipients: [],
-        triggerCount: 0
-      }
-      
-      setAlerts(prev => [newAlert, ...prev])
-      
-      addNotification({
-        type: 'success',
-        title: 'Alerte créée',
-        message: 'La nouvelle alerte a été créée avec succès'
-      })
-      
-      setShowAlertModal(false)
-    }
-  }
-
-  // Fonction pour supprimer une alerte
-  const deleteAlert = (alert: Alert) => {
-    setAlerts(prev => prev.filter(a => a.id !== alert.id))
-    
-    addNotification({
-      type: 'success',
-      title: 'Alerte supprimée',
-      message: 'L\'alerte a été supprimée avec succès'
-    })
-  }
-
-  // Fonction pour tester une alerte
-  const testAlert = (alert: Alert) => {
-    addNotification({
-      type: 'info',
-      title: 'Test d\'alerte',
-      message: `Test de l'alerte "${alert.title}" en cours...`
-    })
-    
-    // Simuler le test
-    setTimeout(() => {
-      addNotification({
-        type: 'success',
-        title: 'Test réussi',
-        message: `L'alerte "${alert.title}" fonctionne correctement`
-      })
-    }, 2000)
-  }
-
-  // Fonction pour créer/mettre à jour une notification
+  // Fonction pour crÃ©er/mettre Ã  jour une notification
   const createNotification = async () => {
     if (isCreatingNotification) return
 
@@ -1932,7 +1724,7 @@ export default function NotificationsAlerts() {
     if (!title || !message) {
       addNotification({
         type: 'error',
-        title: 'Création impossible',
+        title: 'CrÃ©ation impossible',
         message: 'Titre et message sont requis.'
       })
       return
@@ -1941,7 +1733,7 @@ export default function NotificationsAlerts() {
     if (createNotificationForm.channel !== 'in-app' && recipients.length === 0) {
       addNotification({
         type: 'error',
-        title: 'Création impossible',
+        title: 'CrÃ©ation impossible',
         message: 'Ajoute au moins un destinataire email pour Email/Push.'
       })
       return
@@ -1958,7 +1750,7 @@ export default function NotificationsAlerts() {
       }
 
       /**
-       * Crée une ligne "optimistic" pour affichage immédiat côté super-admin.
+       * CrÃ©e une ligne "optimistic" pour affichage immÃ©diat cÃ´tÃ© super-admin.
        */
       const buildOptimisticNotification = (options: {
         title: string
@@ -1984,7 +1776,7 @@ export default function NotificationsAlerts() {
           recipient,
           recipientType: 'user',
           channel: 'in-app',
-          category: String(options.type || 'Système'),
+          category: String(options.type || 'SystÃ¨me'),
           tags: [],
           metadata: {
             actionUrl: actionUrlRaw || null,
@@ -2060,27 +1852,27 @@ export default function NotificationsAlerts() {
             ? rawError
             : rawError
               ? JSON.stringify(rawError)
-              : 'Création échouée'
+              : 'CrÃ©ation Ã©chouÃ©e'
         throw new Error(message)
       }
 
       if (isEditing) {
         addNotification({
           type: 'success',
-          title: 'Notification mise à jour',
-          message: 'La notification a été mise à jour en base.'
+          title: 'Notification mise Ã  jour',
+          message: 'La notification a Ã©tÃ© mise Ã  jour en base.'
         })
       } else {
         const channelMsg =
           createNotificationForm.channel === 'in-app'
-            ? 'Notification créée (in-app).'
-            : `Notification créée (in-app) + job ajouté à la Queue pour l'envoi ${
+            ? 'Notification crÃ©Ã©e (in-app).'
+            : `Notification crÃ©Ã©e (in-app) + job ajoutÃ© Ã  la Queue pour l'envoi ${
                 createNotificationForm.channel === 'push' ? 'Push' : 'Email'
               }.`
 
         addNotification({
           type: 'success',
-          title: 'Notification créée',
+          title: 'Notification crÃ©Ã©e',
           message: channelMsg
         })
       }
@@ -2091,7 +1883,7 @@ export default function NotificationsAlerts() {
       setNotifications((prev) => prev.filter((n) => !String(n.id || '').startsWith('optimistic_')))
       addNotification({
         type: 'error',
-        title: 'Création impossible',
+        title: 'CrÃ©ation impossible',
         message: error instanceof Error ? error.message : 'Erreur inconnue.'
       })
     } finally {
@@ -2110,8 +1902,8 @@ export default function NotificationsAlerts() {
       
       addNotification({
         type: 'success',
-        title: 'Notification sauvegardée',
-        message: 'La notification a été sauvegardée avec succès'
+        title: 'Notification sauvegardÃ©e',
+        message: 'La notification a Ã©tÃ© sauvegardÃ©e avec succÃ¨s'
       })
       
       setShowCreateModal(false)
@@ -2120,7 +1912,7 @@ export default function NotificationsAlerts() {
 
   const deleteNotificationDb = async (notification: Notification) => {
     const ok = window.confirm(
-      'Confirmer la suppression ? Cette action supprime définitivement la notification de la base de données.'
+      'Confirmer la suppression ? Cette action supprime dÃ©finitivement la notification de la base de donnÃ©es.'
     )
     if (!ok) return
 
@@ -2132,13 +1924,13 @@ export default function NotificationsAlerts() {
       })
       const json = await res.json().catch(() => null)
       if (!res.ok) {
-        throw new Error(String(json?.error ?? 'Suppression échouée'))
+        throw new Error(String(json?.error ?? 'Suppression Ã©chouÃ©e'))
       }
 
       addNotification({
         type: 'success',
-        title: 'Notification supprimée',
-        message: 'La notification a été supprimée définitivement.'
+        title: 'Notification supprimÃ©e',
+        message: 'La notification a Ã©tÃ© supprimÃ©e dÃ©finitivement.'
       })
       void loadNotifications()
       void loadNotificationStats()
@@ -2201,7 +1993,7 @@ export default function NotificationsAlerts() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Notifications & Alertes</h2>
             <p className="text-gray-600 mt-2">
-              Gestion intelligente des notifications et système d'alertes personnalisables
+              Gestion intelligente des notifications et systÃ¨me d'alertes personnalisables
             </p>
           </div>
           <Button 
@@ -2214,7 +2006,7 @@ export default function NotificationsAlerts() {
         </div>
       </div>
 
-      {/* Statistiques principales améliorées */}
+      {/* Statistiques principales amÃ©liorÃ©es */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
           <CardContent className="p-4">
@@ -2225,7 +2017,7 @@ export default function NotificationsAlerts() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-purple-700">{stats.totalSent.toLocaleString()}</p>
-                  <p className="text-sm text-purple-600">Notifications envoyées</p>
+                  <p className="text-sm text-purple-600">Notifications envoyÃ©es</p>
                 </div>
               </div>
               <div className="text-right">
@@ -2285,7 +2077,7 @@ export default function NotificationsAlerts() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-blue-700">{stats.totalDelivered.toLocaleString()}</p>
-                  <p className="text-sm text-blue-600">Livrées avec succès</p>
+                  <p className="text-sm text-blue-600">LivrÃ©es avec succÃ¨s</p>
                 </div>
               </div>
               <div className="text-right">
@@ -2297,12 +2089,12 @@ export default function NotificationsAlerts() {
         </Card>
       </div>
 
-      {/* Filtres avancés */}
+      {/* Filtres avancÃ©s */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filtres Avancés
+            Filtres AvancÃ©s
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -2330,24 +2122,24 @@ export default function NotificationsAlerts() {
                   <SelectItem value="user">Utilisateurs</SelectItem>
                   <SelectItem value="payment">Paiements</SelectItem>
                   <SelectItem value="alert">Alertes</SelectItem>
-                  <SelectItem value="system">Système</SelectItem>
+                  <SelectItem value="system">SystÃ¨me</SelectItem>
                   <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="security">Sécurité</SelectItem>
+                  <SelectItem value="security">SÃ©curitÃ©</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="priority">Priorité</Label>
+              <Label htmlFor="priority">PrioritÃ©</Label>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Toutes priorités" />
+                  <SelectValue placeholder="Toutes prioritÃ©s" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Toutes priorités</SelectItem>
+                  <SelectItem value="all">Toutes prioritÃ©s</SelectItem>
                   <SelectItem value="low">Faible</SelectItem>
                   <SelectItem value="medium">Moyenne</SelectItem>
-                  <SelectItem value="high">Élevée</SelectItem>
+                  <SelectItem value="high">Ã‰levÃ©e</SelectItem>
                   <SelectItem value="critical">Critique</SelectItem>
                 </SelectContent>
               </Select>
@@ -2362,10 +2154,10 @@ export default function NotificationsAlerts() {
                 <SelectContent>
                   <SelectItem value="all">Tous statuts</SelectItem>
                   <SelectItem value="pending">En attente</SelectItem>
-                  <SelectItem value="sent">Envoyée</SelectItem>
-                  <SelectItem value="delivered">Livrée</SelectItem>
+                  <SelectItem value="sent">EnvoyÃ©e</SelectItem>
+                  <SelectItem value="delivered">LivrÃ©e</SelectItem>
                   <SelectItem value="read">Lue</SelectItem>
-                  <SelectItem value="failed">Échouée</SelectItem>
+                  <SelectItem value="failed">Ã‰chouÃ©e</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2387,13 +2179,13 @@ export default function NotificationsAlerts() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Période</Label>
+              <Label htmlFor="date">PÃ©riode</Label>
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Toutes périodes" />
+                  <SelectValue placeholder="Toutes pÃ©riodes" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Toutes périodes</SelectItem>
+                  <SelectItem value="all">Toutes pÃ©riodes</SelectItem>
                   <SelectItem value="today">Aujourd'hui</SelectItem>
                   <SelectItem value="week">Cette semaine</SelectItem>
                   <SelectItem value="month">Ce mois</SelectItem>
@@ -2410,7 +2202,7 @@ export default function NotificationsAlerts() {
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="alertes">Alertes</TabsTrigger>
           <TabsTrigger value="alertes-clients">Alertes des clients</TabsTrigger>
-          <TabsTrigger value="evenements">Événements</TabsTrigger>
+          <TabsTrigger value="evenements">Ã‰vÃ©nements</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="push">Notifications Push</TabsTrigger>
           <TabsTrigger value="email">Emails</TabsTrigger>
@@ -2421,9 +2213,9 @@ export default function NotificationsAlerts() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Notifications Système</CardTitle>
+                  <CardTitle>Notifications SystÃ¨me</CardTitle>
                   <CardDescription>
-                    Gestion des notifications automatiques et manuelles ({filteredNotifications.length} résultats)
+                    Gestion des notifications automatiques et manuelles ({filteredNotifications.length} rÃ©sultats)
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2486,7 +2278,7 @@ export default function NotificationsAlerts() {
 
                             <p className="text-gray-700 mb-3 leading-relaxed">{notification.message}</p>
 
-                            {/* Tags et métadonnées */}
+                            {/* Tags et mÃ©tadonnÃ©es */}
                             <div className="flex items-center gap-2 mb-3">
                               {notification.tags.map((tag, index) => (
                                 <Badge key={index} variant="secondary" className="text-xs">
@@ -2495,10 +2287,10 @@ export default function NotificationsAlerts() {
                               ))}
                             </div>
 
-                            {/* Métadonnées si disponibles */}
+                            {/* MÃ©tadonnÃ©es si disponibles */}
                             {notification.metadata && Object.keys(notification.metadata).length > 0 && (
                               <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                                <h5 className="font-medium text-sm mb-2">Détails techniques:</h5>
+                                <h5 className="font-medium text-sm mb-2">DÃ©tails techniques:</h5>
                                 <div className="grid grid-cols-2 gap-2 text-xs">
                                   {Object.entries(notification.metadata)
                                     .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '')
@@ -2577,7 +2369,7 @@ export default function NotificationsAlerts() {
                           {notification.status === 'failed' && (
                             <Button size="sm" variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => retryNotification(notification)}>
                               <Zap className="h-4 w-4 mr-1" />
-                              Réessayer
+                              RÃ©essayer
                             </Button>
                           )}
                         </div>
@@ -2590,7 +2382,7 @@ export default function NotificationsAlerts() {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div className="text-sm text-gray-600">
-                      Affichage de {((currentPage - 1) * notificationsPerPage) + 1} à {Math.min(currentPage * notificationsPerPage, filteredNotifications.length)} sur {filteredNotifications.length} notifications
+                      Affichage de {((currentPage - 1) * notificationsPerPage) + 1} Ã  {Math.min(currentPage * notificationsPerPage, filteredNotifications.length)} sur {filteredNotifications.length} notifications
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -2599,7 +2391,7 @@ export default function NotificationsAlerts() {
                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                         disabled={currentPage === 1}
                       >
-                        Précédent
+                        PrÃ©cÃ©dent
                       </Button>
                       <span className="text-sm text-gray-600">
                         Page {currentPage} sur {totalPages}
@@ -2619,8 +2411,8 @@ export default function NotificationsAlerts() {
                 {currentNotifications.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <Bell className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p>Aucune notification trouvée</p>
-                    <p className="text-sm">Ajustez vos filtres ou créez une nouvelle notification</p>
+                    <p>Aucune notification trouvÃ©e</p>
+                    <p className="text-sm">Ajustez vos filtres ou crÃ©ez une nouvelle notification</p>
                   </div>
                 )}
               </div>
@@ -2635,10 +2427,10 @@ export default function NotificationsAlerts() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-[#ff6600]" />
-                    Événements
+                    Ã‰vÃ©nements
                   </CardTitle>
                   <CardDescription>
-                    Crée et gère les événements qui s'affichent dans le modal "Voir le calendrier".
+                    CrÃ©e et gÃ¨re les Ã©vÃ©nements qui s'affichent dans le modal "Voir le calendrier".
                   </CardDescription>
                 </div>
 
@@ -2651,7 +2443,7 @@ export default function NotificationsAlerts() {
                         setSiteEventsQuery(e.target.value)
                         setSiteEventsPage(1)
                       }}
-                      placeholder="Rechercher un événement"
+                      placeholder="Rechercher un Ã©vÃ©nement"
                       className="pl-9 w-[280px]"
                     />
                   </div>
@@ -2668,7 +2460,7 @@ export default function NotificationsAlerts() {
                     className="bg-[#ff6600] hover:bg-orange-600 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Nouvel événement
+                    Nouvel Ã©vÃ©nement
                   </Button>
                 </div>
               </div>
@@ -2677,7 +2469,7 @@ export default function NotificationsAlerts() {
             <CardContent>
               <div className="rounded-xl border border-gray-200 overflow-hidden">
                 <div className="grid grid-cols-12 bg-gradient-to-r from-orange-50 to-purple-50 px-4 py-3 text-xs font-semibold text-gray-700">
-                  <div className="col-span-4">Événement</div>
+                  <div className="col-span-4">Ã‰vÃ©nement</div>
                   <div className="col-span-3">Date</div>
                   <div className="col-span-2">Statut</div>
                   <div className="col-span-2">Actif</div>
@@ -2687,24 +2479,24 @@ export default function NotificationsAlerts() {
                 {isLoadingSiteEvents ? (
                   <div className="p-6 text-sm text-gray-600">Chargement...</div>
                 ) : siteEvents.length === 0 ? (
-                  <div className="p-6 text-sm text-gray-600">Aucun événement trouvé.</div>
+                  <div className="p-6 text-sm text-gray-600">Aucun Ã©vÃ©nement trouvÃ©.</div>
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {siteEvents.map((ev) => (
                       <div key={ev.id} className="grid grid-cols-12 px-4 py-3 text-sm items-center hover:bg-gray-50">
                         <div className="col-span-4">
                           <div className="font-medium text-gray-900 flex items-center gap-2">
-                            <span>{ev.categoryIcon || '📅'}</span>
+                            <span>{ev.categoryIcon || 'ðŸ“…'}</span>
                             <span className="truncate">{ev.title}</span>
                           </div>
                           <div className="text-xs text-gray-500 truncate">{ev.categoryLabel || ev.categoryKey}</div>
                         </div>
                         <div className="col-span-3 text-gray-700">
-                          {ev.date ? new Date(ev.date).toLocaleDateString('fr-FR') : '—'} {ev.time ? `• ${ev.time}` : ''}
+                          {ev.date ? new Date(ev.date).toLocaleDateString('fr-FR') : 'â€”'} {ev.time ? `â€¢ ${ev.time}` : ''}
                         </div>
                         <div className="col-span-2">
                           <Badge className={ev.status === 'upcoming' ? 'bg-[#ff6600] text-white' : 'bg-blue-500 text-white'}>
-                            {ev.status === 'upcoming' ? 'Bientôt' : ev.status === 'announced' ? 'Annoncé' : ev.status}
+                            {ev.status === 'upcoming' ? 'BientÃ´t' : ev.status === 'announced' ? 'AnnoncÃ©' : ev.status}
                           </Badge>
                         </div>
                         <div className="col-span-2">
@@ -2743,7 +2535,7 @@ export default function NotificationsAlerts() {
                     }}
                     disabled={siteEventsPage <= 1 || isLoadingSiteEvents}
                   >
-                    Précédent
+                    PrÃ©cÃ©dent
                   </Button>
                   <Badge variant="outline">Page {siteEventsPage}</Badge>
                   <Button
@@ -2768,7 +2560,7 @@ export default function NotificationsAlerts() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-[#ff6600]" />
-                  {editingSiteEvent ? 'Modifier un événement' : 'Créer un événement'}
+                  {editingSiteEvent ? 'Modifier un Ã©vÃ©nement' : 'CrÃ©er un Ã©vÃ©nement'}
                 </DialogTitle>
               </DialogHeader>
 
@@ -2793,28 +2585,28 @@ export default function NotificationsAlerts() {
                         <SelectValue placeholder="Statut" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="upcoming">Bientôt</SelectItem>
-                        <SelectItem value="announced">Annoncé</SelectItem>
-                        <SelectItem value="completed">Terminé</SelectItem>
-                        <SelectItem value="cancelled">Annulé</SelectItem>
+                        <SelectItem value="upcoming">BientÃ´t</SelectItem>
+                        <SelectItem value="announced">AnnoncÃ©</SelectItem>
+                        <SelectItem value="completed">TerminÃ©</SelectItem>
+                        <SelectItem value="cancelled">AnnulÃ©</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Clé catégorie</Label>
+                    <Label>ClÃ© catÃ©gorie</Label>
                     <Input value={siteEventForm.categoryKey} onChange={(e) => setSiteEventForm((p) => ({ ...p, categoryKey: e.target.value }))} placeholder="tech" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Nom catégorie (optionnel)</Label>
+                    <Label>Nom catÃ©gorie (optionnel)</Label>
                     <Input value={siteEventForm.categoryLabel} onChange={(e) => setSiteEventForm((p) => ({ ...p, categoryLabel: e.target.value }))} placeholder="Technologie" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Icône (emoji)</Label>
-                    <Input value={siteEventForm.categoryIcon} onChange={(e) => setSiteEventForm((p) => ({ ...p, categoryIcon: e.target.value }))} placeholder="💻" />
+                    <Label>IcÃ´ne (emoji)</Label>
+                    <Input value={siteEventForm.categoryIcon} onChange={(e) => setSiteEventForm((p) => ({ ...p, categoryIcon: e.target.value }))} placeholder="ðŸ’»" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Réduction / mention</Label>
-                    <Input value={siteEventForm.discount} onChange={(e) => setSiteEventForm((p) => ({ ...p, discount: e.target.value }))} placeholder="Jusqu'à -70%" />
+                    <Label>RÃ©duction / mention</Label>
+                    <Input value={siteEventForm.discount} onChange={(e) => setSiteEventForm((p) => ({ ...p, discount: e.target.value }))} placeholder="Jusqu'Ã  -70%" />
                   </div>
                 </div>
 
@@ -2852,7 +2644,7 @@ export default function NotificationsAlerts() {
                     Alertes des clients
                   </CardTitle>
                   <CardDescription>
-                    Inscriptions provenant du modal “Recevoir les alertes” (WhatsApp / Email / SMS / Push)
+                    Inscriptions provenant du modal â€œRecevoir les alertesâ€ (WhatsApp / Email / SMS / Push)
                   </CardDescription>
                 </div>
 
@@ -2865,7 +2657,7 @@ export default function NotificationsAlerts() {
                         setClientAlertsQuery(e.target.value)
                         setClientAlertsPage(1)
                       }}
-                      placeholder="Rechercher par téléphone ou email"
+                      placeholder="Rechercher par tÃ©lÃ©phone ou email"
                       className="pl-9 w-[280px]"
                     />
                   </div>
@@ -2891,7 +2683,7 @@ export default function NotificationsAlerts() {
             <CardContent>
               <div className="rounded-xl border border-gray-200 overflow-hidden">
                 <div className="grid grid-cols-12 bg-gradient-to-r from-orange-50 to-purple-50 px-4 py-3 text-xs font-semibold text-gray-700">
-                  <div className="col-span-3">Téléphone</div>
+                  <div className="col-span-3">TÃ©lÃ©phone</div>
                   <div className="col-span-3">Email</div>
                   <div className="col-span-3">Canaux</div>
                   <div className="col-span-2">Statut</div>
@@ -2901,7 +2693,7 @@ export default function NotificationsAlerts() {
                 {isLoadingClientAlerts ? (
                   <div className="p-6 text-sm text-gray-600">Chargement...</div>
                 ) : clientAlerts.length === 0 ? (
-                  <div className="p-6 text-sm text-gray-600">Aucune inscription trouvée.</div>
+                  <div className="p-6 text-sm text-gray-600">Aucune inscription trouvÃ©e.</div>
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {clientAlerts.map((row) => {
@@ -2916,7 +2708,7 @@ export default function NotificationsAlerts() {
                       return (
                         <div key={row.id} className="grid grid-cols-12 px-4 py-3 text-sm items-center hover:bg-gray-50">
                           <div className="col-span-3 font-medium text-gray-900">{row.phone}</div>
-                          <div className="col-span-3 text-gray-700 truncate">{row.email ?? '—'}</div>
+                          <div className="col-span-3 text-gray-700 truncate">{row.email ?? 'â€”'}</div>
                           <div className="col-span-3">
                             <div className="flex flex-wrap gap-2">
                               {channels.length === 0 ? (
@@ -2938,7 +2730,7 @@ export default function NotificationsAlerts() {
                             )}
                           </div>
                           <div className="col-span-1 text-right text-xs text-gray-500">
-                            {row.createdAt ? new Date(row.createdAt).toLocaleDateString('fr-FR') : '—'}
+                            {row.createdAt ? new Date(row.createdAt).toLocaleDateString('fr-FR') : 'â€”'}
                           </div>
                         </div>
                       )
@@ -2962,7 +2754,7 @@ export default function NotificationsAlerts() {
                     }}
                     disabled={clientAlertsPage <= 1 || isLoadingClientAlerts}
                   >
-                    Précédent
+                    PrÃ©cÃ©dent
                   </Button>
                   <Badge variant="outline">Page {clientAlertsPage}</Badge>
                   <Button
@@ -2988,9 +2780,9 @@ export default function NotificationsAlerts() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Système d'Alertes</CardTitle>
+                  <CardTitle>SystÃ¨me d'Alertes</CardTitle>
                   <CardDescription>
-                    Supervision des alertes système réelles ({systemAlerts.length} alertes)
+                    Supervision des alertes systÃ¨me rÃ©elles ({systemAlerts.length} alertes)
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -3023,7 +2815,7 @@ export default function NotificationsAlerts() {
                               {alert.type === 'critical' ? 'Critique' : alert.type === 'warning' ? 'Avertissement' : 'Info'}
                             </Badge>
                             <Badge variant={alert.status === 'active' ? 'default' : 'outline'}>
-                              {alert.status === 'active' ? 'Active' : alert.status === 'resolved' ? 'Résolue' : 'Ignorée'}
+                              {alert.status === 'active' ? 'Active' : alert.status === 'resolved' ? 'RÃ©solue' : 'IgnorÃ©e'}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
                               {alert.priority}
@@ -3033,7 +2825,7 @@ export default function NotificationsAlerts() {
                           <p className="text-gray-700 mb-2">{alert.message}</p>
 
                           <div className="text-xs text-gray-500">
-                            Créée: {alert.created_at ? new Date(alert.created_at).toLocaleString('fr-FR') : '—'}
+                            CrÃ©Ã©e: {alert.created_at ? new Date(alert.created_at).toLocaleString('fr-FR') : 'â€”'}
                           </div>
                         </div>
 
@@ -3046,7 +2838,7 @@ export default function NotificationsAlerts() {
                               onClick={() => void resolveSystemAlert(alert.id)}
                             >
                               <CheckCircle className="h-4 w-4 mr-1" />
-                              Résoudre
+                              RÃ©soudre
                             </Button>
                           )}
                           <Button
@@ -3075,8 +2867,8 @@ export default function NotificationsAlerts() {
                 {!isLoadingSystemAlerts && systemAlerts.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p>Aucune alerte système</p>
-                    <p className="text-sm">Les alertes apparaîtront ici dès qu'elles existent en base.</p>
+                    <p>Aucune alerte systÃ¨me</p>
+                    <p className="text-sm">Les alertes apparaÃ®tront ici dÃ¨s qu'elles existent en base.</p>
                   </div>
                 )}
               </div>
@@ -3142,7 +2934,7 @@ export default function NotificationsAlerts() {
                           </div>
 
                           <div className="text-xs text-gray-500 mb-2">
-                            Créé: {job.created_at ? new Date(job.created_at).toLocaleString('fr-FR') : '—'}
+                            CrÃ©Ã©: {job.created_at ? new Date(job.created_at).toLocaleString('fr-FR') : 'â€”'}
                           </div>
 
                           {job.last_error && (
@@ -3179,7 +2971,7 @@ export default function NotificationsAlerts() {
                   <div className="text-center py-8 text-gray-500">
                     <Clock className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                     <p>Aucun job dans la file</p>
-                    <p className="text-sm">Crée une notification Email/Push pour générer un job pending.</p>
+                    <p className="text-sm">CrÃ©e une notification Email/Push pour gÃ©nÃ©rer un job pending.</p>
                   </div>
                 )}
               </div>
@@ -3286,13 +3078,13 @@ export default function NotificationsAlerts() {
                       onValueChange={(v) => setEmailTemplatesCategory(v as any)}
                     >
                       <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Catégorie" />
+                        <SelectValue placeholder="CatÃ©gorie" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Toutes</SelectItem>
                         <SelectItem value="transactional">Transactionnel</SelectItem>
                         <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="system">Système</SelectItem>
+                        <SelectItem value="system">SystÃ¨me</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -3321,7 +3113,7 @@ export default function NotificationsAlerts() {
                   <div className="grid grid-cols-12 bg-gradient-to-r from-orange-50 to-purple-50 px-4 py-3 text-xs font-semibold text-gray-700">
                     <div className="col-span-3">Key</div>
                     <div className="col-span-3">Nom</div>
-                    <div className="col-span-2">Catégorie</div>
+                    <div className="col-span-2">CatÃ©gorie</div>
                     <div className="col-span-3">Sujet</div>
                     <div className="col-span-1 text-right">Actions</div>
                   </div>
@@ -3329,7 +3121,7 @@ export default function NotificationsAlerts() {
                   {isLoadingEmailTemplates ? (
                     <div className="p-6 text-sm text-gray-600">Chargement...</div>
                   ) : emailTemplates.length === 0 ? (
-                    <div className="p-6 text-sm text-gray-600">Aucun template trouvé.</div>
+                    <div className="p-6 text-sm text-gray-600">Aucun template trouvÃ©.</div>
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {emailTemplates.map((tpl) => (
@@ -3375,16 +3167,16 @@ export default function NotificationsAlerts() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
-              Détails de la Notification
+              DÃ©tails de la Notification
             </DialogTitle>
           </DialogHeader>
           
           {selectedNotification && (
             <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-              {/* Informations générales */}
+              {/* Informations gÃ©nÃ©rales */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Informations Générales</CardTitle>
+                  <CardTitle className="text-lg">Informations GÃ©nÃ©rales</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3407,7 +3199,7 @@ export default function NotificationsAlerts() {
                     
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Date de création:</span>
+                        <span className="text-gray-600">Date de crÃ©ation:</span>
                         <span className="font-medium">{formatDate(selectedNotification.date)}</span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -3415,7 +3207,7 @@ export default function NotificationsAlerts() {
                         <Badge variant="outline">{selectedNotification.channel}</Badge>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Catégorie:</span>
+                        <span className="text-gray-600">CatÃ©gorie:</span>
                         <span className="font-medium">{selectedNotification.category}</span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -3441,16 +3233,16 @@ export default function NotificationsAlerts() {
                 </CardContent>
               </Card>
 
-              {/* Tags et métadonnées */}
+              {/* Tags et mÃ©tadonnÃ©es */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Métadonnées</CardTitle>
+                  <CardTitle className="text-lg">MÃ©tadonnÃ©es</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {/* Tags */}
                     <div>
-                      <h5 className="font-medium mb-2">Tags associés:</h5>
+                      <h5 className="font-medium mb-2">Tags associÃ©s:</h5>
                       <div className="flex flex-wrap gap-2">
                         {selectedNotification.tags.map((tag, index) => (
                           <Badge key={index} variant="secondary" className="text-sm">
@@ -3460,10 +3252,10 @@ export default function NotificationsAlerts() {
                       </div>
                     </div>
 
-                    {/* Métadonnées techniques */}
+                    {/* MÃ©tadonnÃ©es techniques */}
                     {selectedNotification.metadata && Object.keys(selectedNotification.metadata).length > 0 && (
                       <div>
-                        <h5 className="font-medium mb-2">Détails techniques:</h5>
+                        <h5 className="font-medium mb-2">DÃ©tails techniques:</h5>
                         <div className="bg-gray-50 p-4 rounded-lg">
                           <div className="grid grid-cols-2 gap-4">
                             {Object.entries(selectedNotification.metadata).map(([key, value]) => (
@@ -3480,12 +3272,12 @@ export default function NotificationsAlerts() {
                     {/* Informations de livraison */}
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                       <div className="text-center">
-                        <div className="text-sm text-gray-600">Envoyée le</div>
+                        <div className="text-sm text-gray-600">EnvoyÃ©e le</div>
                         <div className="font-medium">{formatDate(selectedNotification.date)}</div>
                       </div>
                       {selectedNotification.deliveredAt && (
                         <div className="text-center">
-                          <div className="text-sm text-gray-600">Livrée le</div>
+                          <div className="text-sm text-gray-600">LivrÃ©e le</div>
                           <div className="font-medium">{formatDate(selectedNotification.deliveredAt)}</div>
                         </div>
                       )}
@@ -3504,271 +3296,8 @@ export default function NotificationsAlerts() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de création/modification d'alerte */}
-      <Dialog open={showAlertModal} onOpenChange={setShowAlertModal}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              {selectedAlert ? 'Modifier l\'Alerte' : 'Nouvelle Alerte'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Informations de base */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Informations de Base</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Titre de l'alerte</Label>
-                    <Input
-                      id="title"
-                      placeholder="Ex: Stock critique"
-                      defaultValue={selectedAlert?.title}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Catégorie</Label>
-                    <Select defaultValue={selectedAlert?.category || 'stock'}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner une catégorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="stock">Stock</SelectItem>
-                        <SelectItem value="payment">Paiement</SelectItem>
-                        <SelectItem value="security">Sécurité</SelectItem>
-                        <SelectItem value="performance">Performance</SelectItem>
-                        <SelectItem value="user">Utilisateur</SelectItem>
-                        <SelectItem value="system">Système</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Type d'alerte</Label>
-                    <Select defaultValue={selectedAlert?.type || 'warning'}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="info">Information</SelectItem>
-                        <SelectItem value="warning">Avertissement</SelectItem>
-                        <SelectItem value="critical">Critique</SelectItem>
-                        <SelectItem value="success">Succès</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="active">Statut</Label>
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Switch id="active" defaultChecked={selectedAlert?.active} />
-                      <Label htmlFor="active">Alerte active</Label>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2 mt-4">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Décrivez le but de cette alerte..."
-                    rows={3}
-                    defaultValue={selectedAlert?.description}
-                  />
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Conditions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Conditions de Déclenchement</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Conditions configurées</span>
-                    <Button size="sm" variant="outline" onClick={addAlertCondition}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Ajouter une condition
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {selectedAlert?.conditions.map((condition, index) => (
-                      <div key={condition.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
-                        <Select defaultValue={condition.field}>
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="stock">Stock</SelectItem>
-                            <SelectItem value="price">Prix</SelectItem>
-                            <SelectItem value="sales">Ventes</SelectItem>
-                            <SelectItem value="rating">Note</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        
-                        <Select defaultValue={condition.operator}>
-                          <SelectTrigger className="w-24">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="equals">=</SelectItem>
-                            <SelectItem value="greater_than">&gt;</SelectItem>
-                            <SelectItem value="less_than">&lt;</SelectItem>
-                            <SelectItem value="contains">contient</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        
-                        <Input
-                          placeholder="Valeur"
-                          className="w-24"
-                          defaultValue={String(condition.value)}
-                        />
-                        
-                        <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => removeAlertCondition(condition.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )) || (
-                      <div className="text-center py-4 text-gray-500">
-                        <p>Aucune condition configurée</p>
-                        <p className="text-sm">Ajoutez au moins une condition pour déclencher l'alerte</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Actions Automatiques</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Actions configurées</span>
-                    <Button size="sm" variant="outline" onClick={addAlertAction}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Ajouter une action
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {selectedAlert?.actions.map((action) => (
-                      <div key={action.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <Select defaultValue={action.type}>
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="notification">Notification</SelectItem>
-                              <SelectItem value="email">Email</SelectItem>
-                              <SelectItem value="sms">SMS</SelectItem>
-                              <SelectItem value="webhook">Webhook</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          
-                          <Switch checked={action.enabled} />
-                          
-                          <span className="text-sm text-gray-600">Activée</span>
-                        </div>
-                        
-                        <Button size="sm" variant="outline" onClick={() => configureAlertAction(action)}>
-                          <Settings className="h-4 w-4 mr-1" />
-                          Configurer
-                        </Button>
-                      </div>
-                    )) || (
-                      <div className="text-center py-4 text-gray-500">
-                        <p>Aucune action configurée</p>
-                        <p className="text-sm">Ajoutez au moins une action à exécuter</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Planification */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Planification</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="frequency">Fréquence</Label>
-                    <Select defaultValue={selectedAlert?.schedule.frequency || 'immediate'}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="immediate">Immédiat</SelectItem>
-                        <SelectItem value="hourly">Horaire</SelectItem>
-                        <SelectItem value="daily">Quotidien</SelectItem>
-                        <SelectItem value="weekly">Hebdomadaire</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="maxPerDay">Maximum par jour</Label>
-                    <Input
-                      id="maxPerDay"
-                      type="number"
-                      placeholder="10"
-                      defaultValue={selectedAlert?.schedule.maxPerDay || 10}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="timezone">Fuseau horaire</Label>
-                    <Select defaultValue={selectedAlert?.schedule.timezone || 'Europe/Paris'}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Europe/Paris">Europe/Paris</SelectItem>
-                        <SelectItem value="UTC">UTC</SelectItem>
-                        <SelectItem value="America/New_York">America/New_York</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Switch id="quietHours" defaultChecked={selectedAlert?.schedule.quietHours.enabled} />
-                      <Label htmlFor="quietHours">Heures silencieuses</Label>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setShowAlertModal(false)}>
-              Annuler
-            </Button>
-            <Button className="bg-orange-600 hover:bg-orange-700" onClick={saveAlert}>
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              {selectedAlert ? 'Modifier l\'Alerte' : 'Créer l\'Alerte'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal d'édition des emails transactionnels */}
+      {/* Modal d'Ã©dition des emails transactionnels */}
       <Dialog open={showEditEmailModal} onOpenChange={setShowEditEmailModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
           <DialogHeader className="flex-shrink-0">
@@ -3819,7 +3348,7 @@ export default function NotificationsAlerts() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="emailPriority">Priorité</Label>
+                      <Label htmlFor="emailPriority">PrioritÃ©</Label>
                       <Select defaultValue="normal">
                         <SelectTrigger>
                           <SelectValue />
@@ -3827,7 +3356,7 @@ export default function NotificationsAlerts() {
                         <SelectContent>
                           <SelectItem value="low">Faible</SelectItem>
                           <SelectItem value="normal">Normale</SelectItem>
-                          <SelectItem value="high">Élevée</SelectItem>
+                          <SelectItem value="high">Ã‰levÃ©e</SelectItem>
                           <SelectItem value="urgent">Urgente</SelectItem>
                         </SelectContent>
                       </Select>
@@ -3835,7 +3364,7 @@ export default function NotificationsAlerts() {
                   </div>
                   
                   <div className="space-y-2 mt-4">
-                    <Label htmlFor="emailSubject">Sujet par défaut</Label>
+                    <Label htmlFor="emailSubject">Sujet par dÃ©faut</Label>
                     <Input
                       id="emailSubject"
                       placeholder="Sujet de l'email"
@@ -3844,7 +3373,7 @@ export default function NotificationsAlerts() {
                   </div>
                   
                   <div className="space-y-2 mt-4">
-                    <Label htmlFor="emailContent">Contenu par défaut</Label>
+                    <Label htmlFor="emailContent">Contenu par dÃ©faut</Label>
                     <Textarea
                       id="emailContent"
                       placeholder="Contenu de l'email..."
@@ -3855,15 +3384,15 @@ export default function NotificationsAlerts() {
                 </CardContent>
               </Card>
 
-              {/* Paramètres d'envoi */}
+              {/* ParamÃ¨tres d'envoi */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Paramètres d'Envoi</CardTitle>
+                  <CardTitle className="text-lg">ParamÃ¨tres d'Envoi</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="emailDelay">Délai d'envoi (minutes)</Label>
+                      <Label htmlFor="emailDelay">DÃ©lai d'envoi (minutes)</Label>
                       <Input
                         id="emailDelay"
                         type="number"
@@ -3913,8 +3442,8 @@ export default function NotificationsAlerts() {
               onClick={() => {
                 addNotification({
                   type: 'success',
-                  title: 'Email modifié',
-                  message: `L'email ${selectedEmail?.title} a été modifié avec succès`
+                  title: 'Email modifiÃ©',
+                  message: `L'email ${selectedEmail?.title} a Ã©tÃ© modifiÃ© avec succÃ¨s`
                 })
                 setShowEditEmailModal(false)
               }}
@@ -3926,7 +3455,7 @@ export default function NotificationsAlerts() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal d'édition des emails marketing */}
+      {/* Modal d'Ã©dition des emails marketing */}
       <Dialog open={showEditEmailMarketingModal} onOpenChange={setShowEditEmailMarketingModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
           <DialogHeader className="flex-shrink-0">
@@ -3955,7 +3484,7 @@ export default function NotificationsAlerts() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="marketingFrequency">Fréquence</Label>
+                      <Label htmlFor="marketingFrequency">FrÃ©quence</Label>
                       <Select defaultValue={selectedEmailMarketing.frequency.toLowerCase()}>
                         <SelectTrigger>
                           <SelectValue />
@@ -3991,15 +3520,15 @@ export default function NotificationsAlerts() {
                         <SelectContent>
                           <SelectItem value="newsletter">Newsletter</SelectItem>
                           <SelectItem value="promotion">Promotion</SelectItem>
-                          <SelectItem value="nouveaute">Nouveauté</SelectItem>
-                          <SelectItem value="evenement">Événement</SelectItem>
+                          <SelectItem value="nouveaute">NouveautÃ©</SelectItem>
+                          <SelectItem value="evenement">Ã‰vÃ©nement</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   
                   <div className="space-y-2 mt-4">
-                    <Label htmlFor="marketingSubject">Sujet par défaut</Label>
+                    <Label htmlFor="marketingSubject">Sujet par dÃ©faut</Label>
                     <Input
                       id="marketingSubject"
                       placeholder="Sujet de l'email"
@@ -4008,7 +3537,7 @@ export default function NotificationsAlerts() {
                   </div>
                   
                   <div className="space-y-2 mt-4">
-                    <Label htmlFor="marketingContent">Contenu par défaut</Label>
+                    <Label htmlFor="marketingContent">Contenu par dÃ©faut</Label>
                     <Textarea
                       id="marketingContent"
                       placeholder="Contenu de l'email..."
@@ -4100,7 +3629,7 @@ export default function NotificationsAlerts() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="marketingSegments">Segments spécifiques</Label>
+                      <Label htmlFor="marketingSegments">Segments spÃ©cifiques</Label>
                       <Input
                         id="marketingSegments"
                         placeholder="Ex: nouveaux_inscrits, clients_actifs"
@@ -4129,8 +3658,8 @@ export default function NotificationsAlerts() {
               onClick={() => {
                 addNotification({
                   type: 'success',
-                  title: 'Email configuré',
-                  message: `L'email ${selectedEmailMarketing?.title} a été configuré avec succès`
+                  title: 'Email configurÃ©',
+                  message: `L'email ${selectedEmailMarketing?.title} a Ã©tÃ© configurÃ© avec succÃ¨s`
                 })
                 setShowEditEmailMarketingModal(false)
               }}
@@ -4142,318 +3671,6 @@ export default function NotificationsAlerts() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de configuration des actions d'alerte */}
-      <Dialog open={showActionConfigModal} onOpenChange={setShowActionConfigModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Configuration de l'Action d'Alerte
-            </DialogTitle>
-          </DialogHeader>
-          
-          {selectedAction && (
-            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-              {/* Informations de base */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Informations de Base</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="actionType">Type d'action</Label>
-                      <Select defaultValue={selectedAction.type}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="notification">Notification</SelectItem>
-                          <SelectItem value="email">Email</SelectItem>
-                          <SelectItem value="sms">SMS</SelectItem>
-                          <SelectItem value="webhook">Webhook</SelectItem>
-                          <SelectItem value="system_action">Action Système</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="actionStatus">Statut</Label>
-                      <div className="flex items-center space-x-2 pt-2">
-                        <Switch 
-                          id="actionStatus" 
-                          defaultChecked={selectedAction.enabled}
-                        />
-                        <Label htmlFor="actionStatus">Action activée</Label>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Configuration spécifique selon le type */}
-              {selectedAction.type === 'notification' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Configuration Notification</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="notifChannel">Canal</Label>
-                          <Select defaultValue="push">
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="push">Push</SelectItem>
-                              <SelectItem value="in-app">In-App</SelectItem>
-                              <SelectItem value="email">Email</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="notifPriority">Priorité</Label>
-                          <Select defaultValue="high">
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="low">Faible</SelectItem>
-                              <SelectItem value="medium">Moyenne</SelectItem>
-                              <SelectItem value="high">Élevée</SelectItem>
-                              <SelectItem value="critical">Critique</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="notifMessage">Message par défaut</Label>
-                        <Textarea
-                          id="notifMessage"
-                          placeholder="Message de notification..."
-                          rows={3}
-                          defaultValue="Alerte déclenchée - Action requise"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {selectedAction.type === 'email' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Configuration Email</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="emailTemplate">Template</Label>
-                          <Select defaultValue="alert_template">
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="alert_template">Template d'alerte</SelectItem>
-                              <SelectItem value="custom_template">Template personnalisé</SelectItem>
-                              <SelectItem value="system_template">Template système</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="emailSubject">Sujet</Label>
-                          <Input
-                            id="emailSubject"
-                            placeholder="Sujet de l'email"
-                            defaultValue="Alerte - Action requise"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="emailRecipients">Destinataires</Label>
-                        <Input
-                          id="emailRecipients"
-                          placeholder="admin@probooster.com, support@probooster.com"
-                          defaultValue="admin@probooster.com"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {selectedAction.type === 'webhook' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Configuration Webhook</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="webhookUrl">URL du webhook</Label>
-                        <Input
-                          id="webhookUrl"
-                          placeholder="https://api.exemple.com/webhook"
-                          defaultValue="https://api.probooster.com/webhook"
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="webhookMethod">Méthode HTTP</Label>
-                          <Select defaultValue="POST">
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="POST">POST</SelectItem>
-                              <SelectItem value="PUT">PUT</SelectItem>
-                              <SelectItem value="PATCH">PATCH</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="webhookTimeout">Timeout (secondes)</Label>
-                          <Input
-                            id="webhookTimeout"
-                            type="number"
-                            placeholder="30"
-                            defaultValue="30"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="webhookHeaders">En-têtes personnalisés</Label>
-                        <Textarea
-                          id="webhookHeaders"
-                          placeholder="Content-Type: application/json&#10;Authorization: Bearer token"
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {selectedAction.type === 'system_action' && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Configuration Action Système</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="systemAction">Action à exécuter</Label>
-                        <Select defaultValue="suspend_user">
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="suspend_user">Suspendre l'utilisateur</SelectItem>
-                            <SelectItem value="restart_service">Redémarrer le service</SelectItem>
-                            <SelectItem value="backup_database">Sauvegarder la base</SelectItem>
-                            <SelectItem value="clear_cache">Vider le cache</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="actionDelay">Délai d'exécution (secondes)</Label>
-                        <Input
-                          id="actionDelay"
-                          type="number"
-                          placeholder="0"
-                          defaultValue="0"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="actionRetry">Tentatives en cas d'échec</Label>
-                        <Input
-                          id="actionRetry"
-                          type="number"
-                          placeholder="3"
-                          defaultValue="3"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Paramètres avancés */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Paramètres Avancés</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="actionDelay">Délai d'exécution</Label>
-                        <Input
-                          id="actionDelay"
-                          type="number"
-                          placeholder="0"
-                          defaultValue="0"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="actionRetry">Tentatives</Label>
-                        <Input
-                          id="actionRetry"
-                          type="number"
-                          placeholder="3"
-                          defaultValue="3"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="actionCondition">Condition d'exécution</Label>
-                      <Textarea
-                        id="actionCondition"
-                        placeholder="Condition personnalisée (optionnel)"
-                        rows={2}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setShowActionConfigModal(false)}>
-              Annuler
-            </Button>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700" 
-              onClick={() => {
-                addNotification({
-                  type: 'success',
-                  title: 'Action configurée',
-                  message: `L'action ${selectedAction?.type} a été configurée avec succès`
-                })
-                setShowActionConfigModal(false)
-              }}
-            >
-              <Settings className="h-4 w-4 mr-1" />
-              Sauvegarder
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={showEmailTemplateModal}
@@ -4506,7 +3723,7 @@ export default function NotificationsAlerts() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="tplCategory">Catégorie</Label>
+                    <Label htmlFor="tplCategory">CatÃ©gorie</Label>
                     <Select
                       value={emailTemplateForm.category}
                       onValueChange={(value) =>
@@ -4522,7 +3739,7 @@ export default function NotificationsAlerts() {
                       <SelectContent>
                         <SelectItem value="transactional">Transactionnel</SelectItem>
                         <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="system">Système</SelectItem>
+                        <SelectItem value="system">SystÃ¨me</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -4629,18 +3846,18 @@ export default function NotificationsAlerts() {
           </DialogHeader>
           
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Paramètres généraux */}
+            {/* ParamÃ¨tres gÃ©nÃ©raux */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Paramètres Généraux</CardTitle>
+                <CardTitle className="text-lg">ParamÃ¨tres GÃ©nÃ©raux</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <Label className="text-sm font-medium">Notifications en temps réel</Label>
-                        <p className="text-xs text-gray-600">Activer les notifications instantanées</p>
+                        <Label className="text-sm font-medium">Notifications en temps rÃ©el</Label>
+                        <p className="text-xs text-gray-600">Activer les notifications instantanÃ©es</p>
                       </div>
                       <Switch
                         checked={globalNotificationsConfig.realtimeEnabled}
@@ -4653,7 +3870,7 @@ export default function NotificationsAlerts() {
                     <div className="flex items-center justify-between">
                       <div>
                         <Label className="text-sm font-medium">Mode silencieux</Label>
-                        <p className="text-xs text-gray-600">Désactiver entre 22h et 8h</p>
+                        <p className="text-xs text-gray-600">DÃ©sactiver entre 22h et 8h</p>
                       </div>
                       <Switch
                         checked={globalNotificationsConfig.quietHoursEnabled}
@@ -4719,10 +3936,10 @@ export default function NotificationsAlerts() {
               </CardContent>
             </Card>
 
-            {/* Intégrations */}
+            {/* IntÃ©grations */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Intégrations</CardTitle>
+                <CardTitle className="text-lg">IntÃ©grations</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -4850,13 +4067,13 @@ export default function NotificationsAlerts() {
                   </div>
                   <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                     <div>
-                      <p className="font-medium">Template de sécurité</p>
-                      <p className="text-sm text-gray-600">Alertes de sécurité</p>
+                      <p className="font-medium">Template de sÃ©curitÃ©</p>
+                      <p className="text-sm text-gray-600">Alertes de sÃ©curitÃ©</p>
                     </div>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => openGlobalEmailTemplate({ key: 'security_template', name: 'Template de sécurité', category: 'system' })}
+                      onClick={() => openGlobalEmailTemplate({ key: 'security_template', name: 'Template de sÃ©curitÃ©', category: 'system' })}
                     >
                       Modifier
                     </Button>
@@ -4882,7 +4099,7 @@ export default function NotificationsAlerts() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de création de notification */}
+      {/* Modal de crÃ©ation de notification */}
       <Dialog
         open={showCreateNotificationModal}
         onOpenChange={(open) => {
@@ -4959,7 +4176,7 @@ export default function NotificationsAlerts() {
                   }
                   disabled={Boolean(editNotificationId)}
                 />
-                <div className="text-xs text-gray-500">Sépare plusieurs emails par virgule ou point-virgule.</div>
+                <div className="text-xs text-gray-500">SÃ©pare plusieurs emails par virgule ou point-virgule.</div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4978,12 +4195,12 @@ export default function NotificationsAlerts() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="system">Système</SelectItem>
+                      <SelectItem value="system">SystÃ¨me</SelectItem>
                       <SelectItem value="order">Commande</SelectItem>
                       <SelectItem value="payment">Paiement</SelectItem>
                       <SelectItem value="alert">Alerte</SelectItem>
                       <SelectItem value="marketing">Marketing</SelectItem>
-                      <SelectItem value="security">Sécurité</SelectItem>
+                      <SelectItem value="security">SÃ©curitÃ©</SelectItem>
                       {createNotificationForm.type &&
                         ![
                           'system',
@@ -5000,7 +4217,7 @@ export default function NotificationsAlerts() {
                 </div>
 
               <div className="space-y-2">
-                <Label htmlFor="newPriority">Priorité</Label>
+                <Label htmlFor="newPriority">PrioritÃ©</Label>
                 <Select
                   value={createNotificationForm.priority}
                   onValueChange={(value) =>
@@ -5016,7 +4233,7 @@ export default function NotificationsAlerts() {
                   <SelectContent>
                     <SelectItem value="low">Faible</SelectItem>
                     <SelectItem value="medium">Moyenne</SelectItem>
-                    <SelectItem value="high">Élevée</SelectItem>
+                    <SelectItem value="high">Ã‰levÃ©e</SelectItem>
                     <SelectItem value="critical">Critique</SelectItem>
                   </SelectContent>
                 </Select>
@@ -5071,7 +4288,7 @@ export default function NotificationsAlerts() {
               disabled={isCreatingNotification}
             >
               <Bell className="h-4 w-4 mr-2" />
-              {editNotificationId ? 'Sauvegarder' : 'Créer'}
+              {editNotificationId ? 'Sauvegarder' : 'CrÃ©er'}
             </Button>
           </div>
         </DialogContent>
