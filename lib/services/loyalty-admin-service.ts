@@ -3,6 +3,7 @@
  */
 
 import { supabase, getSupabaseAdmin } from '@/lib/supabase'
+import { ClientAuthService } from '@/lib/services/client-auth-service'
 
 export type LoyaltyRuleType = 'purchase' | 'bonus' | 'referral' | 'social' | 'custom'
 export type LoyaltyRewardType = 'discount' | 'free_shipping' | 'free_product' | 'cashback' | 'voucher'
@@ -153,218 +154,123 @@ function mapRewardPayload(reward: Partial<LoyaltyReward>) {
 }
 
 export class LoyaltyAdminService {
+  /**
+   * fetch authentifié (JWT Bearer + cookies) vers les routes super admin.
+   */
+  private static async authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    const authHeaders = await ClientAuthService.buildAuthHeaders()
+    return fetch(url, {
+      ...init,
+      headers: { ...(init.headers ?? {}), ...authHeaders },
+      cache: 'no-store'
+    })
+  }
   // RÈGLES -------------------------------------------------------------
-  /**
-   * Retourne toutes les règles de fidélité triées par date de création décroissante.
-   */
   static async listRules(): Promise<LoyaltyRule[]> {
-    const { data, error } = await supabase
-      .from('loyalty_rules')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw error
-    }
-
-    return data ?? []
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rules', { method: 'GET' })
+    if (!res.ok) throw new Error('Erreur lecture des règles.')
+    const json = await res.json()
+    return json?.data ?? []
   }
 
-  /**
-   * Récupère une règle précise via son identifiant.
-   */
   static async getRule(ruleId: string): Promise<LoyaltyRule | null> {
-    const { data, error } = await supabase
-      .from('loyalty_rules')
-      .select('*')
-      .eq('id', ruleId)
-      .maybeSingle()
-
-    if (error) {
-      throw error
-    }
-
-    return data ?? null
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rules', { method: 'GET' })
+    if (!res.ok) throw new Error('Erreur lecture des règles.')
+    const json = await res.json()
+    return (json?.data ?? []).find((r: LoyaltyRule) => r.id === ruleId) ?? null
   }
 
-  /**
-   * Crée une nouvelle règle de fidélité et renvoie l'entité persistée.
-   */
   static async createRule(rule: Partial<LoyaltyRule>, userId: string): Promise<LoyaltyRule> {
-    const payload = {
-      ...mapRulePayload(rule),
-      created_by: userId
-    }
-
-    const { data, error } = await supabase
-      .from('loyalty_rules')
-      .insert(payload)
-      .select('*')
-      .single()
-
-    if (error) {
-      throw error
-    }
-
-    return data
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rule, userId })
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur création règle.')
+    return json?.data
   }
 
-  /**
-   * Met à jour une règle de fidélité existante et retourne la version à jour.
-   */
   static async updateRule(ruleId: string, updates: Partial<LoyaltyRule>): Promise<LoyaltyRule> {
-    const payload = mapRulePayload(updates)
-
-    const { data, error } = await supabase
-      .from('loyalty_rules')
-      .update(payload)
-      .eq('id', ruleId)
-      .select('*')
-      .single()
-
-    if (error) {
-      throw error
-    }
-
-    return data
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rules', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: ruleId, updates })
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur mise à jour règle.')
+    return json?.data
   }
 
-  /**
-   * Désactive ou supprime définitivement une règle de fidélité.
-   */
   static async deleteRule(ruleId: string): Promise<void> {
-    const { error } = await supabase
-      .from('loyalty_rules')
-      .delete()
-      .eq('id', ruleId)
-
-    if (error) {
-      throw error
-    }
+    const params = new URLSearchParams({ id: ruleId })
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rules?' + params.toString(), { method: 'DELETE' })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur suppression règle.')
   }
-  /**
-   * Met à jour uniquement le statut actif d'une règle sans toucher aux autres champs.
-   */
-  static async setRuleStatus(ruleId: string, isActive: boolean, userId?: string): Promise<void> {
-    const { error } = await supabase
-      .from('loyalty_rules')
-      .update({
-        is_active: isActive,
-        updated_by: userId ?? null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', ruleId)
 
-    if (error) {
-      throw error
-    }
+  static async setRuleStatus(ruleId: string, isActive: boolean, userId?: string): Promise<void> {
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rules', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: ruleId, isActive, userId })
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur bascule statut règle.')
   }
 
   // RÉCOMPENSES -------------------------------------------------------
-  /**
-   * Retourne toutes les récompenses disponibles avec les plus récentes en premier.
-   */
   static async listRewards(): Promise<LoyaltyReward[]> {
-    const { data, error } = await supabase
-      .from('loyalty_rewards')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      throw error
-    }
-
-    return data ?? []
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rewards', { method: 'GET' })
+    if (!res.ok) throw new Error('Erreur lecture des récompenses.')
+    const json = await res.json()
+    return json?.data ?? []
   }
 
-  /**
-   * Récupère une récompense spécifique via son identifiant.
-   */
   static async getReward(rewardId: string): Promise<LoyaltyReward | null> {
-    const { data, error } = await supabase
-      .from('loyalty_rewards')
-      .select('*')
-      .eq('id', rewardId)
-      .maybeSingle()
-
-    if (error) {
-      throw error
-    }
-
-    return data ?? null
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rewards', { method: 'GET' })
+    if (!res.ok) throw new Error('Erreur lecture des récompenses.')
+    const json = await res.json()
+    return (json?.data ?? []).find((r: LoyaltyReward) => r.id === rewardId) ?? null
   }
 
-  /**
-   * Crée une nouvelle récompense et renvoie l'enregistrement créé.
-   */
   static async createReward(reward: Partial<LoyaltyReward>, userId: string): Promise<LoyaltyReward> {
-    const payload = {
-      ...mapRewardPayload(reward),
-      created_by: userId
-    }
-
-    const { data, error } = await supabase
-      .from('loyalty_rewards')
-      .insert(payload)
-      .select('*')
-      .single()
-
-    if (error) {
-      throw error
-    }
-
-    return data
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rewards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reward, userId })
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur création récompense.')
+    return json?.data
   }
 
-  /**
-   * Met à jour une récompense existante et retourne la version persistée.
-   */
   static async updateReward(rewardId: string, updates: Partial<LoyaltyReward>): Promise<LoyaltyReward> {
-    const payload = mapRewardPayload(updates)
-
-    const { data, error } = await supabase
-      .from('loyalty_rewards')
-      .update(payload)
-      .eq('id', rewardId)
-      .select('*')
-      .single()
-
-    if (error) {
-      throw error
-    }
-
-    return data
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rewards', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: rewardId, updates })
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur mise à jour récompense.')
+    return json?.data
   }
 
-  /**
-   * Supprime définitivement une récompense définie par son identifiant.
-   */
   static async deleteReward(rewardId: string): Promise<void> {
-    const { error } = await supabase
-      .from('loyalty_rewards')
-      .delete()
-      .eq('id', rewardId)
-
-    if (error) {
-      throw error
-    }
+    const params = new URLSearchParams({ id: rewardId })
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rewards?' + params.toString(), { method: 'DELETE' })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur suppression récompense.')
   }
-  /**
-   * Met à jour uniquement l'état actif d'une récompense dans Supabase.
-   */
-  static async setRewardStatus(rewardId: string, isActive: boolean, userId?: string): Promise<void> {
-    const { error } = await supabase
-      .from('loyalty_rewards')
-      .update({
-        is_active: isActive,
-        updated_by: userId ?? null,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', rewardId)
 
-    if (error) {
-      throw error
-    }
+  static async setRewardStatus(rewardId: string, isActive: boolean, userId?: string): Promise<void> {
+    const res = await LoyaltyAdminService.authFetch('/api/super-admin/loyalty/rewards', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: rewardId, isActive, userId })
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json?.error ?? 'Erreur bascule statut récompense.')
   }
 
   // MEMBRES -----------------------------------------------------------
