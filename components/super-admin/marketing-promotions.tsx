@@ -2253,19 +2253,16 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
   }
 
   // Fonction pour envoyer les rapports par email
-  const handleSendEmail = async () => {
+    const handleSendEmail = async () => {
     try {
       addNotification({
         type: 'info',
-        title: 'Envoi par email en cours...',
-        message: 'Veuillez patienter pendant l\'envoi du rapport.',
+        title: 'Envoi du rapport en cours...',
+        message: "Veuillez patienter pendant l'envoi du rapport.",
         duration: 3000
       })
 
-      // Simulation d'envoi email
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      // Préparer le contenu du rapport
+      const recipients = ['admin@probooster.com', 'marketing@probooster.com', 'analytics@probooster.com']
       const reportContent = {
         period: analyticsPeriod,
         totalBoostages: analyticsData.totalBoostages,
@@ -2282,27 +2279,31 @@ ${analyticsPeriod === '1month' ? '1 Mois' :
         conversions: analyticsData.conversions
       }
 
-      // Simuler l'envoi à une liste de destinataires
-      const recipients = ['admin@probooster.com', 'marketing@probooster.com', 'analytics@probooster.com']
-      
-      // Log de l'envoi (simulation)
-      console.log('📧 Rapport envoyé par email:', {
-        recipients,
-        reportContent,
-        timestamp: new Date().toISOString()
-      })
+      const resp = await fetch('/api/super-admin/marketing/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipients, period: analyticsPeriod, report: reportContent }),
+        cache: 'no-store'
+      }).catch(() => null)
 
+      if (!resp?.ok) {
+        const payload = await resp?.json().catch(() => null)
+        throw new Error(payload?.error || "Réponse invalide du serveur d'envoi.")
+      }
+
+      const result = await resp.json().catch(() => null)
       addNotification({
         type: 'success',
-        title: 'Envoi par email réussi',
-        message: `Le rapport a été envoyé avec succès à ${recipients.length} destinataires.`,
+        title: 'Export enregistré',
+        message: "Le rapport a été exporté et journalisé en base (statut : " + (result?.status ?? 'logged') + ").",
         duration: 4000
       })
     } catch (error) {
+      console.error('handleSendEmail failed:', error)
       addNotification({
         type: 'error',
-        title: 'Erreur d\'envoi',
-        message: 'Une erreur est survenue lors de l\'envoi par email.',
+        title: "Erreur d'envoi",
+        message: "Une erreur est survenue lors de l'envoi du rapport. L'action a été journalisée.",
         duration: 4000
       })
     }
