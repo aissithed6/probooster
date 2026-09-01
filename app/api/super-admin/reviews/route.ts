@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     const { data: reviewRows, error: reviewErr, count } = await supabase
       .from('product_reviews')
-      .select('id, product_id, user_id, rating, title, comment, is_verified_purchase, helpful_votes, created_at, updated_at, status, status_reason, moderated_at, moderated_by', {
+            .select('id, product_id, user_id, rating, title, comment, is_verified_purchase, helpful_votes, created_at, updated_at, status, status_reason, moderated_at, moderated_by, is_video', {
         count: 'exact'
       })
       .order('created_at', { ascending: false })
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
         helpful: Number(row.helpful_votes ?? 0),
         unhelpful: 0,
         status,
-        isVideo: false,
+                isVideo: Boolean(row?.is_video ?? false),
         tags: [],
         category: String(product?.category ?? ''),
         sentiment: deriveReviewSentiment(rating),
