@@ -284,14 +284,6 @@ export default function AutomationTriggers() {
     }
   }
 
-  const relaunchExecution = (executionId: string) => {
-    addNotification({
-      type: 'warning',
-      title: 'Relance',
-      message: 'Non disponible : nécessite un endpoint backend pour relancer une exécution.'
-    })
-  }
-
   /**
    * Charge les paramètres persistés (scope global) et extrait `settings.automation`.
    */
@@ -836,62 +828,28 @@ export default function AutomationTriggers() {
     
     switch (action) {
       case 'configurer':
-        switch (type) {
-          case 'timeouts':
-            message = 'Action non disponible : nécessite un backend pour appliquer des changements de configuration.'
-            notificationType = 'warning'
-            break
-          case 'retry':
-            message = 'Action non disponible : nécessite un backend pour appliquer des changements de configuration.'
-            notificationType = 'warning'
-            break
-          default:
-            message = `Configuration de ${type} en cours...`
-        }
+        message = `La configuration de ${type} doit être gérée côté backend (non disponible).`
+        notificationType = 'warning'
         break
         
       case 'optimiser':
-        switch (type) {
-          case 'mémoire':
-            message = 'Action non disponible : nécessite un backend de maintenance.'
-            notificationType = 'warning'
-            break
-          case 'performance':
-            message = 'Action non disponible : nécessite un backend de maintenance.'
-            notificationType = 'warning'
-            break
-          default:
-            message = `Optimisation de ${type} en cours...`
-        }
+        message = `L'optimisation de ${type} nécessite un backend de maintenance (non disponible).`
+        notificationType = 'warning'
         break
         
       case 'sécuriser':
-        switch (type) {
-          case 'validation':
-            message = 'Action non disponible : nécessite un backend de sécurité.'
-            notificationType = 'warning'
-            break
-          case 'authentification':
-            message = 'Action non disponible : nécessite un backend de sécurité.'
-            notificationType = 'warning'
-            break
-          default:
-            message = `Sécurisation de ${type} en cours...`
-        }
+        message = `La sécurisation de ${type} nécessite un backend de sécurité (non disponible).`
+        notificationType = 'warning'
         break
         
       case 'voir':
-        // Ouvrir les détails d'optimisation
-        message = `Affichage des détails d'optimisation pour ${type}`
-        break
-        
-      case 'analyser':
-        message = 'Action non disponible : nécessite un backend d\'analyse.'
+        message = `Les détails d'optimisation pour ${type} nécessitent un backend d'analyse (non disponible).`
         notificationType = 'warning'
         break
         
       default:
-        message = `Action "${action}" sur "${type}" en cours...`
+        message = `Action "${action}" non disponible (backend requis).`
+        notificationType = 'warning'
     }
     
     addNotification({
@@ -1984,10 +1942,6 @@ export default function AutomationTriggers() {
                           <Eye className="h-4 w-4 mr-2" />
                           Voir détails
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => relaunchExecution(execution.id)}>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Relancer
-                        </Button>
                       </div>
                     </div>
                   ))}
@@ -2214,7 +2168,7 @@ export default function AutomationTriggers() {
                           { priority: 'Moyenne', color: 'bg-yellow-500', min: 3 },
                           { priority: 'Faible', color: 'bg-green-500', min: 1 }
                         ]
-                        const bucketCounts = buckets.map((b) => ({ ...b, count: counts.filter((c) => c >= b.min).length }))
+                        const bucketCounts = buckets.map((b) => ({ ...b, count: counts.filter((c: number) => c >= b.min).length }))
                         return bucketCounts.map((item) => {
                           const percentage = total ? Math.round((item.count / Math.max(1, bucketCounts.reduce((acc, x) => acc + x.count, 0))) * 100) : 0
                           return { priority: item.priority, count: item.count, color: item.color, percentage }
