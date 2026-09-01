@@ -10,6 +10,8 @@ export type ConfirmOptions = {
   confirmText?: string
   cancelText?: string
   tone?: 'default' | 'destructive'
+  /** Alias accepté de `tone` (compatibilité avec les appels existants). */
+  variant?: 'default' | 'destructive'
 }
 
 type ConfirmContextValue = {

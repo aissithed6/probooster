@@ -251,6 +251,14 @@ export default function MessagingChatSynced() {
   const handleModerateHardDeleteMessage = async (chatId: string, messageId: string) => {
     if (!chatId || !messageId) return
 
+    const accepted = await confirmDialog({
+      title: 'Supprimer définitivement le message',
+      message: 'Le message sera définitivement supprimé de la base. Cette action est irréversible. Continuer ?',
+      confirmText: 'Supprimer définitivement',
+      cancelText: 'Annuler',
+      variant: 'destructive'
+    })
+
     if (!accepted) return
 
     try {
@@ -267,8 +275,19 @@ export default function MessagingChatSynced() {
       }
 
       await loadChatMessages(chatId)
+
+      toast({
+        title: 'Message supprimé',
+        description: 'Le message a été définitivement supprimé de la conversation.',
+        variant: 'default'
+      })
     } catch (error) {
       console.error('Erreur modération hard delete:', error)
+      toast({
+        title: 'Suppression impossible',
+        description: error instanceof Error ? error.message : 'Erreur lors de la suppression définitive.',
+        variant: 'destructive'
+      })
     }
   }
 
@@ -402,8 +421,19 @@ export default function MessagingChatSynced() {
       if (moderationTargetUserId) {
         await loadModerationHistory(moderationTargetUserId)
       }
+
+      toast({
+        title: 'Sanction révoquée',
+        description: 'La sanction a été levée (unmute/unban).',
+        variant: 'default'
+      })
     } catch (error) {
       console.error('Erreur lors de la révocation:', error)
+      toast({
+        title: 'Révocation impossible',
+        description: error instanceof Error ? error.message : 'Erreur lors de la révocation de la sanction.',
+        variant: 'destructive'
+      })
     }
   }
 
@@ -480,8 +510,24 @@ export default function MessagingChatSynced() {
       if (moderationTargetUserId) {
         await loadModerationHistory(moderationTargetUserId)
       }
+
+      toast({
+        title: 'Modération appliquée',
+        description:
+          moderationAction === 'warn'
+            ? 'Avertissement enregistré.'
+            : moderationAction === 'mute'
+            ? 'Utilisateur muté.'
+            : 'Ban du chat appliqué.',
+        variant: 'default'
+      })
     } catch (error) {
       console.error('Erreur lors de la modération:', error)
+      toast({
+        title: 'Modération impossible',
+        description: error instanceof Error ? error.message : 'Erreur lors de la modération.',
+        variant: 'destructive'
+      })
     } finally {
       setIsModerationSubmitting(false)
     }
@@ -1215,8 +1261,19 @@ export default function MessagingChatSynced() {
       }
 
       await loadChatMessages(chatId)
+
+      toast({
+        title: 'Message supprimé',
+        description: 'Le contenu a été remplacé par un message de modération.',
+        variant: 'default'
+      })
     } catch (error) {
       console.error('Erreur modération soft delete:', error)
+      toast({
+        title: 'Suppression impossible',
+        description: error instanceof Error ? error.message : 'Erreur lors de la suppression du message.',
+        variant: 'destructive'
+      })
     }
   }
 
