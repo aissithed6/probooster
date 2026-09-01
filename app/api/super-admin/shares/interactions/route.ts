@@ -35,25 +35,59 @@ export async function GET(request: NextRequest) {
     const start = String(url.searchParams.get('start') ?? '').trim()
     const end = String(url.searchParams.get('end') ?? '').trim()
     const type = String(url.searchParams.get('type') ?? '').trim().toLowerCase()
+    const platform = String(url.searchParams.get('platform') ?? '').trim().toLowerCase()
     const shareId = String(url.searchParams.get('shareId') ?? '').trim()
 
     const supabase = getSupabaseAdmin()
 
-    let query = supabase
-      .from('share_interactions')
-      .select('id, share_id, interaction_type, created_at, ip_address, user_agent, referrer')
-      .order('created_at', { ascending: false })
-      .range((page - 1) * pageSize, (page - 1) * pageSize + pageSize - 1)
+    const baseSelect = 'id, share_id, interaction_type, created_at, ip_address, user_agent, referrer'
+    const applyCommonFilters = (query: any) => {
+      let q = query
+      if (start) q = q.gte('created_at', start)
+      if (end) q = q.lte('created_at', end)
+      if (type) q = q.eq('interaction_type', type)
+      if (UUID_REGEX.test(shareId)) q = q.eq('share_id', shareId)
+      return q
+    }
 
-    if (start) query = query.gte('created_at', start)
-    if (end) query = query.lte('created_at', end)
-    if (type) query = query.eq('interaction_type', type)
-    if (UUID_REGEX.test(shareId)) query = query.eq('share_id', shareId)
+    let interactions: any[] | null = null
+    let warning: string | null = null
 
-    const { data: interactions, error } = await query
+    if (platform) {
+      // Filtre plateforme appliqué côté SQL via la relation share_interactions -> product_shares (!inner).
+      let embeddedQuery = applyCommonFilters(
+        supabase
+          .from('share_interactions')
+          .select(`${baseSelect}, product_shares!inner(user_id, product_id, platform)`)
+          .order('created_at', { ascending: false })
+          .range((page - 1) * pageSize, (page - 1) * pageSize + pageSize - 1)
+      ).eq('product_shares.platform', platform)
 
-    if (error) {
-      return NextResponse.json({ data: { rows: [], page, pageSize }, error: error.message }, { status: 200 })
+      const { data, error } = await embeddedQuery
+      if (!error) {
+        interactions = data ?? []
+      } else {
+        // Relation non exposée sur cette base -> fallback sans filtre plateforme (le reste fonctionne).
+        warning = `Filtre plateforme non appliqué (${error.message})`
+      }
+    }
+
+    if (interactions === null) {
+      let query = applyCommonFilters(
+        supabase
+          .from('share_interactions')
+          .select(baseSelect)
+          .order('created_at', { ascending: false })
+          .range((page - 1) * pageSize, (page - 1) * pageSize + pageSize - 1)
+      )
+
+      const { data: rows, error } = await query
+
+      if (error) {
+        return NextResponse.json({ data: { rows: [], page, pageSize }, error: error.message }, { status: 200 })
+      }
+
+      interactions = rows ?? []
     }
 
     const shareIds = Array.from(
@@ -91,7 +125,7 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(
-      { data: { rows, page, pageSize } },
+      { data: { rows, page, pageSize }, ...(warning ? { warning } : {}) },
       {
         status: 200,
         headers: {

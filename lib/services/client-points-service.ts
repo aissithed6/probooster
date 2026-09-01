@@ -711,6 +711,23 @@ export class ClientPointsService {
   }
 
   /**
+   * Taux de conversion points ➝ FCFA utilisé pour la colonne fcfa_value de loyalty_points.
+   * Utilise en priorité la "Valeur de retrait" configurée par le Super Admin
+   * (metadata.conversion.withdrawalValue) et retombe sur settings.conversion_rate.
+   * Harmonisé entre tous les chemins (RPC + fallbacks) pour éviter toute dérive du solde FCFA.
+   */
+  private static resolvePointsToFcfaRate(settings: { conversion_rate?: number; metadata?: Record<string, unknown> } | null | undefined): number {
+    const metadata = (settings as any)?.metadata ?? {}
+    const conversion = ((metadata as any)?.conversion ?? {}) as Record<string, unknown>
+    const withdrawalValue = Number((conversion as any)?.withdrawalValue)
+    if (Number.isFinite(withdrawalValue) && withdrawalValue > 0) {
+      return withdrawalValue
+    }
+    const conversionRate = Number(settings?.conversion_rate)
+    return Number.isFinite(conversionRate) && conversionRate > 0 ? conversionRate : 1
+  }
+
+  /**
    * Transfère des points à un autre utilisateur (client ou vendeur).
    */
   static async transferPoints(userId: string, recipientId: string, amount: number): Promise<void> {
@@ -777,7 +794,7 @@ export class ClientPointsService {
         throw new Error('Solde insuffisant pour effectuer le transfert')
       }
 
-      const conversionRate = settings?.conversion_rate || 1
+      const conversionRate = this.resolvePointsToFcfaRate(settings)
       const currency = settings?.default_currency || 'XOF'
 
       const nowIso = new Date().toISOString()
@@ -1073,7 +1090,7 @@ export class ClientPointsService {
         throw new Error('Solde insuffisant pour effectuer l\'échange')
       }
 
-      const conversionRate = settings?.conversion_rate || 1
+      const conversionRate = this.resolvePointsToFcfaRate(settings)
       const convertedAmount = Number((amount * rateRow.rate).toFixed(2))
 
       const { data: exchangeRow, error: exchangeErr } = await supabase

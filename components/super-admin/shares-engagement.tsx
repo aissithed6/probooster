@@ -111,6 +111,21 @@ function safeToIso(value: string): string {
   return d.toISOString()
 }
 
+/**
+ * Convertit une date de fin de filtre en borne haute inclusive.
+ * Un <input type="date"> renvoie "yyyy-mm-dd" (minuit) : on l'étend à la fin de la journée
+ * (23:59:59.999) pour ne pas exclure toutes les données de ce jour.
+ */
+function safeToEndOfDayIso(value: string): string {
+  if (!value) return ''
+  const raw = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const d = new Date(`${raw}T23:59:59.999Z`)
+    if (!Number.isNaN(d.getTime())) return d.toISOString()
+  }
+  return safeToIso(raw)
+}
+
 function formatDateTimeFr(iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
@@ -242,7 +257,7 @@ export default function SharesEngagementSuperAdmin() {
       const params = new URLSearchParams()
 
       const start = safeToIso(startDate)
-      const end = safeToIso(endDate)
+      const end = safeToEndOfDayIso(endDate)
 
       if (start) params.set('start', start)
       if (end) params.set('end', end)
@@ -297,6 +312,14 @@ export default function SharesEngagementSuperAdmin() {
       const interactionsJson = await interactionsRes.json().catch(() => null)
 
       if (fetchId !== lastFetchId.current) return
+
+      // Remonte l'erreur métier des routes (401/500) au lieu d'afficher des cartes à 0 silencieusement.
+      const firstRouteError =
+        (!summaryRes.ok && typeof summaryJson?.error === 'string' && summaryJson.error) ||
+        (!sharesRes.ok && typeof sharesJson?.error === 'string' && sharesJson.error) ||
+        (!interactionsRes.ok && typeof interactionsJson?.error === 'string' && interactionsJson.error) ||
+        null
+      setError(firstRouteError ? `Erreur serveur : ${String(firstRouteError)}` : null)
 
       if (!summaryRes.ok) {
         setSummary(null)
@@ -419,43 +442,92 @@ export default function SharesEngagementSuperAdmin() {
     void refreshAll()
   }, [refreshAll, pageShares, pageInteractions, filtersKey])
 
-  /** Export CSV des partages enrichis (nom user / produit / vendeur / points / interactions). */
-  const exportSharesCsv = useCallback(() => {
-    const header = ['Date', 'Plateforme', 'Utilisateur', 'Rôle', 'Produit', 'Vendeur', 'Points partage', 'Interactions', 'Points interactions', 'URL']
-    const rows = shares.rows.map((s) => [
-      formatDateTimeFr(s.createdAt),
-      s.platform,
-      s.shareUserName,
-      s.shareUserRole,
-      s.productName,
-      s.productVendorName,
-      s.pointsEarned,
-      s.interactionsCount,
-      s.pointsFromInteractions,
-      s.shareUrl
-    ])
+  /**
+   * Récupère TOUTES les pages d'un endpoint paginé (plafond de sécurité à 5000 lignes)
+   * afin d'exporter le jeu complet filtré et non la seule page affichée.
+   */
+  const fetchAllPagedRows = useCallback(
+    async (kind: 'shares' | 'interactions', maxRows = 5000): Promise<Array<Record<string, any>>> => {
+      const pageSize = 100
+      const all: Array<Record<string, any>> = []
+      const headers = await ClientAuthService.buildAuthHeaders()
 
-    const csv = buildCsv([header, ...rows])
-    downloadCsv(`super-admin-partages-${new Date().toISOString().slice(0, 10)}.csv`, csv)
-  }, [shares.rows])
+      for (let page = 1; all.length < maxRows; page += 1) {
+        const params = buildParams({ kind, page, pageSize })
+        const endpoint = kind === 'shares' ? '/api/super-admin/shares/list' : '/api/super-admin/shares/interactions'
+        const res = await fetch(`${endpoint}?${params.toString()}`, { headers, cache: 'no-store' })
+        const json = await res.json().catch(() => null)
+        if (!res.ok) {
+          const message = (typeof json?.error === 'string' && json.error) || 'Erreur lors de la récupération des données.'
+          throw new Error(String(message))
+        }
+        const rows = (json?.data?.rows ?? []) as Array<Record<string, any>>
+        all.push(...rows)
+        if (rows.length < pageSize) break
+      }
 
-  /** Export CSV des interactions. */
-  const exportInteractionsCsv = useCallback(() => {
-    const header = ['Date', 'Type', 'Plateforme', 'ShareId', 'UserId partage', 'ProductId', 'IP', 'Referrer']
-    const rows = interactions.rows.map((r) => [
-      formatDateTimeFr(r.createdAt),
-      r.type,
-      r.platform,
-      r.shareId,
-      r.shareUserId,
-      r.productId,
-      r.ip,
-      r.referrer
-    ])
+      return all.slice(0, maxRows)
+    },
+    [buildParams]
+  )
 
-    const csv = buildCsv([header, ...rows])
-    downloadCsv(`super-admin-interactions-${new Date().toISOString().slice(0, 10)}.csv`, csv)
-  }, [interactions.rows])
+  /** Export CSV des partages enrichis (nom user / produit / vendeur / points / interactions) — jeu complet filtré. */
+  const exportSharesCsv = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const allRows = await fetchAllPagedRows('shares')
+
+      const header = ['Date', 'Plateforme', 'Utilisateur', 'Rôle', 'Produit', 'Vendeur', 'Points partage', 'Interactions', 'Points interactions', 'URL']
+      const rows = allRows.map((s: any) => [
+        formatDateTimeFr(String(s?.createdAt ?? '')),
+        String(s?.platform ?? ''),
+        String(s?.shareUserName ?? ''),
+        String(s?.shareUserRole ?? ''),
+        String(s?.productName ?? ''),
+        String(s?.productVendorName ?? ''),
+        Number(s?.pointsEarned ?? 0),
+        Number(s?.interactionsCount ?? 0),
+        Number(s?.pointsFromInteractions ?? 0),
+        String(s?.shareUrl ?? '')
+      ])
+
+      const csv = buildCsv([header, ...rows])
+      downloadCsv(`super-admin-partages-${new Date().toISOString().slice(0, 10)}.csv`, csv)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de l'export CSV des partages.")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [fetchAllPagedRows])
+
+  /** Export CSV des interactions — jeu complet filtré. */
+  const exportInteractionsCsv = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      const allRows = await fetchAllPagedRows('interactions')
+
+      const header = ['Date', 'Type', 'Plateforme', 'ShareId', 'UserId partage', 'ProductId', 'IP', 'Referrer']
+      const rows = allRows.map((r: any) => [
+        formatDateTimeFr(String(r?.createdAt ?? '')),
+        String(r?.type ?? ''),
+        String(r?.platform ?? ''),
+        String(r?.shareId ?? ''),
+        String(r?.shareUserId ?? ''),
+        String(r?.productId ?? ''),
+        String(r?.ip ?? ''),
+        String(r?.referrer ?? '')
+      ])
+
+      const csv = buildCsv([header, ...rows])
+      downloadCsv(`super-admin-interactions-${new Date().toISOString().slice(0, 10)}.csv`, csv)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur lors de l'export CSV des interactions.")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [fetchAllPagedRows])
 
   const totals = summary?.totals ?? {
     shares: 0,
@@ -684,7 +756,8 @@ export default function SharesEngagementSuperAdmin() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={exportSharesCsv}
+                onClick={() => void exportSharesCsv()}
+                disabled={isLoading}
                 className="border-slate-300 text-slate-700 hover:bg-slate-50"
               >
                 <Download className="h-4 w-4 mr-2" />
@@ -848,7 +921,8 @@ export default function SharesEngagementSuperAdmin() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={exportInteractionsCsv}
+                    onClick={() => void exportInteractionsCsv()}
+                    disabled={isLoading}
                     className="border-slate-300 text-slate-700 hover:bg-slate-50"
                   >
                     <Download className="h-4 w-4 mr-2" />

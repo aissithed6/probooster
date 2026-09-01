@@ -42,23 +42,32 @@ export async function GET(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    let sharesQuery = supabase
-      .from('product_shares')
-      .select('id, platform, points_earned, created_at')
-      .order('created_at', { ascending: false })
-      .limit(5000)
+    // Pagination complète (plafond de sécurité 50 000) au lieu d'un unique limit(5000)
+    // pour que les totaux ne soient pas sous-estimés sur les grosses volumétries.
+    const shares: any[] = []
+    const sharesPageSize = 1000
+    for (let from = 0; from < 50000; from += sharesPageSize) {
+      let pageQuery = supabase
+        .from('product_shares')
+        .select('id, platform, points_earned, created_at')
+        .order('created_at', { ascending: false })
+        .range(from, from + sharesPageSize - 1)
 
-    if (start) sharesQuery = sharesQuery.gte('created_at', start)
-    if (end) sharesQuery = sharesQuery.lte('created_at', end)
-    if (platform) sharesQuery = sharesQuery.eq('platform', platform)
+      if (start) pageQuery = pageQuery.gte('created_at', start)
+      if (end) pageQuery = pageQuery.lte('created_at', end)
+      if (platform) pageQuery = pageQuery.eq('platform', platform)
 
-    const { data: shareRows, error: shareErr } = await sharesQuery
-    if (shareErr) {
-      return NextResponse.json({ data: null, error: shareErr.message }, { status: 500 })
+      const { data, error: pageErr } = await pageQuery
+      if (pageErr) {
+        return NextResponse.json({ data: null, error: pageErr.message }, { status: 500 })
+      }
+
+      const pageRows = data ?? []
+      shares.push(...pageRows)
+      if (pageRows.length < sharesPageSize) break
     }
 
-    const shares = shareRows ?? []
-    const shareIds = shares.map((s: any) => String(s?.id ?? '').trim()).filter((id) => UUID_REGEX.test(id)).slice(0, 5000)
+    const shareIds = shares.map((s: any) => String(s?.id ?? '').trim()).filter((id) => UUID_REGEX.test(id))
 
     const pointsFromShares = shares.reduce((acc, s: any) => acc + safeNumber(s?.points_earned), 0)
 
@@ -71,49 +80,54 @@ export async function GET(request: NextRequest) {
       byPlatformMap.set(p, entry)
     }
 
-    let interactions: any[] = []
-    if (shareIds.length > 0) {
-      const { data } = await supabase
-        .from('share_interactions')
-        .select('interaction_type, created_at, share_id')
-        .in('share_id', shareIds)
-        .limit(20000)
-      interactions = data ?? []
+    // Chunking des IDs (PostgREST limite la taille d'une clause IN).
+    const shareIdChunks: string[][] = []
+    for (let i = 0; i < shareIds.length; i += 500) {
+      shareIdChunks.push(shareIds.slice(i, i + 500))
     }
 
     const byTypeMap = new Map<string, number>()
-    for (const i of interactions) {
-      const t = String((i as any)?.interaction_type ?? '').trim().toLowerCase() || 'unknown'
-      byTypeMap.set(t, (byTypeMap.get(t) ?? 0) + 1)
-    }
+    let interactionsCount = 0
+    for (const chunk of shareIdChunks) {
+      const { data } = await supabase
+        .from('share_interactions')
+        .select('interaction_type')
+        .in('share_id', chunk)
+        .limit(10000)
 
+      for (const i of data ?? []) {
+        const t = String((i as any)?.interaction_type ?? '').trim().toLowerCase() || 'unknown'
+        byTypeMap.set(t, (byTypeMap.get(t) ?? 0) + 1)
+        interactionsCount += 1
+      }
+    }
     let pointsFromInteractions = 0
-    if (shareIds.length > 0) {
+    for (const chunk of shareIdChunks) {
       const { data: txRows } = await supabase
         .from('point_transactions')
         .select('points, type, reference_id')
-        .in('reference_id', shareIds)
+        .in('reference_id', chunk)
         .neq('type', 'share')
-        .limit(20000)
+        .limit(10000)
 
       if (Array.isArray(txRows)) {
-        pointsFromInteractions = txRows.reduce((acc, row: any) => acc + safeNumber(row?.points), 0)
+        pointsFromInteractions += txRows.reduce((acc: number, row: any) => acc + safeNumber(row?.points), 0)
       } else {
         // Fallback schéma historique.
         const { data: legacyRows } = await supabase
           .from('user_points_transactions')
           .select('points, type, reference_id')
-          .in('reference_id', shareIds)
+          .in('reference_id', chunk)
           .neq('type', 'share')
-          .limit(20000)
-        pointsFromInteractions = (legacyRows ?? []).reduce((acc: number, row: any) => acc + safeNumber(row?.points), 0)
+          .limit(10000)
+        pointsFromInteractions += (legacyRows ?? []).reduce((acc: number, row: any) => acc + safeNumber(row?.points), 0)
       }
     }
 
     const response: SharesSummaryResponse = {
       totals: {
         shares: shares.length,
-        interactions: interactions.length,
+        interactions: interactionsCount,
         pointsFromShares,
         pointsFromInteractions,
         pointsTotal: pointsFromShares + pointsFromInteractions
