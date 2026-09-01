@@ -1988,9 +1988,9 @@ export default function NotificationsAlerts() {
           tags: [],
           metadata: {
             actionUrl: actionUrlRaw || null,
-            userId: null
+            userId: undefined
           },
-          readAt: null,
+          readAt: undefined,
           deliveredAt: now
         }
       }
@@ -2088,7 +2088,7 @@ export default function NotificationsAlerts() {
       void loadNotificationStats()
     } catch (error) {
       console.error('createNotification failed:', error)
-      setNotifications((prev) => prev.filter((n) => n.id !== optimisticId))
+      setNotifications((prev) => prev.filter((n) => !String(n.id || '').startsWith('optimistic_')))
       addNotification({
         type: 'error',
         title: 'Création impossible',
@@ -2153,6 +2153,25 @@ export default function NotificationsAlerts() {
 
   // Filtrage des notifications
   const filteredNotifications = useMemo(() => {
+    const now = new Date()
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const startOfWeek = new Date(startOfDay.getTime() - ((startOfDay.getDay() + 6) % 7) * 24 * 60 * 60 * 1000)
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+
+    const matchesDate = (dateIso: string): boolean => {
+      if (dateFilter === 'all' || !dateIso) return true
+      const d = new Date(dateIso)
+      if (Number.isNaN(d.getTime())) return true
+      switch (dateFilter) {
+        case 'today': return d >= startOfDay
+        case 'week': return d >= startOfWeek
+        case 'month': return d >= startOfMonth
+        case 'quarter': return d >= startOfQuarter
+        default: return true
+      }
+    }
+
     return notifications.filter((notification) => {
       const matchesSearch =
         notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -2162,10 +2181,11 @@ export default function NotificationsAlerts() {
       const matchesPriority = priorityFilter === 'all' || notification.priority === priorityFilter
       const matchesStatus = statusFilter === 'all' || notification.status === statusFilter
       const matchesChannel = channelFilter === 'all' || notification.channel === channelFilter
+      const matchesDateValue = matchesDate(notification.date)
 
-      return matchesSearch && matchesType && matchesPriority && matchesStatus && matchesChannel
+      return matchesSearch && matchesType && matchesPriority && matchesStatus && matchesChannel && matchesDateValue
     })
-  }, [notifications, searchTerm, typeFilter, priorityFilter, statusFilter, channelFilter])
+  }, [notifications, searchTerm, typeFilter, priorityFilter, statusFilter, channelFilter, dateFilter])
 
   // Pagination
   const totalPages = Math.ceil(filteredNotifications.length / notificationsPerPage)
@@ -2386,7 +2406,7 @@ export default function NotificationsAlerts() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="alertes">Alertes</TabsTrigger>
           <TabsTrigger value="alertes-clients">Alertes des clients</TabsTrigger>
@@ -2394,7 +2414,6 @@ export default function NotificationsAlerts() {
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="push">Notifications Push</TabsTrigger>
           <TabsTrigger value="email">Emails</TabsTrigger>
-          <TabsTrigger value="configuration">Configuration</TabsTrigger>
         </TabsList>
 
         <TabsContent value="notifications" className="space-y-4">
@@ -2530,7 +2549,8 @@ export default function NotificationsAlerts() {
                                 priority: notification.priority,
                                 channel: notification.channel,
                                 message: notification.message,
-                                recipientEmail: notification.recipient
+                                recipientEmail: notification.recipient,
+                actionUrl: notification.metadata?.actionUrl ?? ''
                               })
                               setShowCreateNotificationModal(true)
                             }}
@@ -3346,72 +3366,7 @@ export default function NotificationsAlerts() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="configuration" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuration Globale</CardTitle>
-              <CardDescription>
-                Paramètres généraux du système de notifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="font-medium">Paramètres Généraux</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium">Notifications en temps réel</label>
-                        <p className="text-xs text-gray-600">Activer les notifications instantanées</p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium">Mode silencieux</label>
-                        <p className="text-xs text-gray-600">Désactiver entre 22h et 8h</p>
-                      </div>
-                      <input type="checkbox" className="w-4 h-4" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-sm font-medium">Limite quotidienne</label>
-                        <p className="text-xs text-gray-600">Max 50 notifications par jour</p>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="font-medium">Intégrations</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <Globe className="h-5 w-5 text-blue-600" />
-                        <span>Web Push</span>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
-                    </div>
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <Smartphone className="h-5 w-5 text-green-600" />
-                        <span>Mobile Push</span>
-                      </div>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
-                    </div>
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <MessageCircle className="h-5 w-5 text-purple-600" />
-                        <span>SMS</span>
-                      </div>
-                      <input type="checkbox" className="w-4 h-4" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        
       </Tabs>
 
       {/* Modal de visualisation de notification */}
