@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Loader2, RefreshCw, Save, ShieldCheck, Wand2 } from 'lucide-react'
 import type { AdminPointSettings, SocialNetworkKey } from '@/lib/services/point-settings-service'
 import type { ProductCategoryRecord } from '@/lib/types/product-category'
@@ -632,14 +631,14 @@ function ValueCard({ label, helper, badge, tone = 'blue', children }: ValueCardP
 
   return (
     <div className={`p-4 border rounded-lg ${toneClass}`}>
-      <Label className="text-sm font-medium text-inherit">{label}</Label>
-      <div className="mt-2 flex items-center gap-2">
-        {children}
-        <Badge variant="secondary" className="text-xs font-medium">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <Label className="text-sm font-medium text-inherit whitespace-nowrap truncate">{label}</Label>
+        <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase whitespace-nowrap text-inherit">
           {badge}
-        </Badge>
+        </span>
       </div>
-      <p className="text-xs mt-1 text-inherit/80">{helper}</p>
+      <div className="mt-2">{children}</div>
+      <p className="text-xs mt-1.5 opacity-80 leading-snug">{helper}</p>
     </div>
   )
 }
@@ -668,9 +667,9 @@ function ThresholdCard({ label, helper, suffix, tone, children }: ThresholdCardP
       <Label className="text-sm font-medium text-inherit">{label}</Label>
       <div className="mt-2 flex items-center gap-2">
         {children}
-        <span className="text-sm font-medium text-inherit/80">{suffix}</span>
+        <span className="text-sm font-medium opacity-80">{suffix}</span>
       </div>
-      <p className="text-xs mt-1 text-inherit/80">{helper}</p>
+      <p className="text-xs mt-1 opacity-80">{helper}</p>
     </div>
   )
 }
@@ -702,9 +701,9 @@ function BonusCard({ label, helper, suffix, tone, children }: BonusCardProps) {
       <Label className="text-sm font-medium text-inherit">{label}</Label>
       <div className="mt-2 flex items-center gap-2">
         {children}
-        <span className="text-sm font-medium text-inherit/80">{suffix}</span>
+        <span className="text-sm font-medium opacity-80">{suffix}</span>
       </div>
-      <p className="text-xs mt-1 text-inherit/80">{helper}</p>
+      <p className="text-xs mt-1 opacity-80">{helper}</p>
     </div>
   )
 }
