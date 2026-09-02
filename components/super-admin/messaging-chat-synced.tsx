@@ -1003,6 +1003,27 @@ export default function MessagingChatSynced() {
             return
           }
 
+          // Jouer un son de notification pour les nouveaux messages (pas pour les messages de l'admin lui-même)
+          if (senderId !== user?.id && messageId) {
+            try {
+              const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+              const oscillator = audioContext.createOscillator()
+              const gainNode = audioContext.createGain()
+
+              oscillator.connect(gainNode)
+              gainNode.connect(audioContext.destination)
+
+              oscillator.frequency.value = 800
+              oscillator.type = 'sine'
+              gainNode.gain.value = 0.3
+
+              oscillator.start()
+              oscillator.stop(audioContext.currentTime + 0.3)
+            } catch (e) {
+              // Ignorer les erreurs audio
+            }
+          }
+
           // Mise à jour immédiate de la liste des conversations (preview + tri)
           setChatSessions((prev) => {
             const existing = prev.find((s) => s.id === chatId)

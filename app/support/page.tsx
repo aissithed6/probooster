@@ -49,17 +49,90 @@ import { useChatContext } from "@/lib/chat-context-supabase"
 import { ChatService } from "@/lib/services/chat-service"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "react-hot-toast"
-import { useState } from "react"
+import { useState, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+
+/**
+ * Joue un son de notification pour alerter d'un nouveau message
+ */
+const playNotificationSound = () => {
+  try {
+    // Créer un son de notification simple (bip)
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+
+    oscillator.frequency.value = 800 // Fréquence du bip
+    oscillator.type = 'sine'
+    gainNode.gain.value = 0.3 // Volume
+
+    oscillator.start()
+    oscillator.stop(audioContext.currentTime + 0.2) // Durée du bip
+  } catch (error) {
+    console.error('Erreur lors de la lecture du son:', error)
+  }
+}
+
+/**
+ * Envoie une notification à tous les administrateurs
+ */
+const notifyAdmins = async (senderName: string, message: string) => {
+  try {
+    // Récupérer tous les admins
+    const { data: admins } = await supabase
+      .from('users')
+      .select('id')
+      .in('role', ['super_admin', 'admin'])
+
+    if (!admins || admins.length === 0) return
+
+    // Créer une notification pour chaque admin
+    const notifications = admins.map(admin => ({
+      user_id: admin.id,
+      type: 'support_chat',
+      title: 'Nouveau message de support',
+      message: `${senderName}: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`,
+      is_read: false,
+      priority: 'high' as const,
+      action_url: '/super-admin-dashboard?tab=chat',
+      created_at: new Date().toISOString()
+    }))
+
+    await supabase.from('user_notifications').insert(notifications)
+  } catch (error) {
+    console.error('Erreur lors de l\'envoi des notifications:', error)
+  }
+}
 
 export default function SupportPage() {
   const { currencyCode } = useMoney()
   const { user } = useAuth()
-  const { createChatSession, openChatSession, chatSessions, setIsAnyChatOpen } = useChatContext()
+  const { createChatSession, openChatSession, chatSessions, setIsAnyChatOpen, sendMessage, activeChatSession } = useChatContext()
   const [isLoadingChat, setIsLoadingChat] = useState(false)
+
+  /**
+   * Envoie un message de support et notifie les admins
+   */
+  const handleSendSupportMessage = useCallback(async (message: string) => {
+    if (!user || !message.trim()) return
+
+    // Envoyer le message
+    await sendMessage(message.trim())
+
+    // Notifier les admins (notification in-app + son)
+    await notifyAdmins(user.email || 'Utilisateur', message.trim())
+
+    // Jouer un son pour confirmer l'envoi
+    playNotificationSound()
+  }, [user, sendMessage])
 
   /**
    * Ouvre le chat de support avec l'administrateur système.
    * Crée une nouvelle session si nécessaire, sinon réouvre la session existante.
+   * Même si l'admin est hors ligne, l'utilisateur peut laisser un message.
    */
   const handleOpenChat = async () => {
     if (!user) {
@@ -70,38 +143,48 @@ export default function SupportPage() {
     setIsLoadingChat(true)
     const loadingToast = toast.loading("Ouverture du chat de support...")
     try {
-      // Ouvrir d'abord l'UI du chat pour afficher le modal
-      setIsAnyChatOpen(true)
-      
+      // 1. Récupérer l'admin (peut être null si hors ligne)
       const admin = await ChatService.getSystemAdmin(user.id)
-      if (!admin) {
-        toast.error("Le système de chat est en cours de maintenance. Veuillez nous contacter par email.")
-        return
-      }
 
-      // Vérifier si une session existe déjà avec cet admin
-      const existingSession = chatSessions.find(s => 
-        (s.sellerId === admin.id) || 
-        (s.sellerName === admin.name)
+      // 2. Vérifier si une session de support existe déjà
+      const existingSession = chatSessions.find(s =>
+        (admin && (s.sellerId === admin.id || s.sellerName === admin.name)) ||
+        (s.sellerName?.toLowerCase().includes('support'))
       )
 
+      let sessionId: string
       if (existingSession) {
-        openChatSession(existingSession.id)
+        sessionId = existingSession.id
       } else {
-        const sessionId = await createChatSession(admin.id, admin.name, admin.avatar_url)
-        if (sessionId) {
-          openChatSession(sessionId)
-          
-          // Petit délai pour laisser le temps à la session de s'ouvrir
-          setTimeout(() => {
-            toast.info("Un conseiller vous répondra dès que possible.", { duration: 5000 })
-          }, 1000)
+        // 3. Créer une nouvelle session (même si admin est null, on crée avec un ID support)
+        const adminId = admin?.id || `support-${user.id}`
+        const adminName = admin?.name || 'Support Probooster'
+        const adminAvatar = admin?.avatar_url || undefined
+
+        const newSessionId = await createChatSession(adminId, adminName, adminAvatar)
+        if (!newSessionId) {
+          toast.error("Impossible de créer la conversation. Veuillez réessayer ou nous contacter par email.")
+          return
         }
+        sessionId = newSessionId
       }
+
+      // 4. Ouvrir la session dans le chat
+      openChatSession(sessionId)
+
+      // 5. Ouvrir l'UI du chat
+      setIsAnyChatOpen(true)
+
+      // 6. Message de succès
       toast.success("Chat de support ouvert !")
+      if (!admin) {
+        toast.info("Un conseiller vous répondra dès que possible. Vous pouvez laisser un message.", { duration: 5000 })
+      } else {
+        toast.info("Un conseiller vous répondra dès que possible.", { duration: 5000 })
+      }
     } catch (error) {
       console.error("Erreur ouverture chat support:", error)
-      toast.error("Erreur lors de l'ouverture du chat.")
+      toast.error("Erreur lors de l'ouverture du chat. Veuillez réessayer.")
     } finally {
       toast.dismiss(loadingToast)
       setIsLoadingChat(false)

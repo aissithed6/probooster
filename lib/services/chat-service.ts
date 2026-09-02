@@ -540,10 +540,8 @@ export class ChatService {
         return await this.buildParticipantFromUser(anyOtherUser.id, 'admin')
       }
 
-      // 4. Fallback ultime: Utiliser le currentUserId s'il est fourni (auto-chat)
-      if (currentUserId) {
-        return await this.buildParticipantFromUser(currentUserId, 'admin')
-      }
+      // 4. Fallback ultime: Pas de currentUserId comme admin (evite l'auto-chat)
+      // Retourner null pour indiquer qu'aucun admin n'est disponible
 
       // 5. Hardcoded fallback ID (Si vraiment tout échoue)
       // On utilise un ID de super admin probable ou système
