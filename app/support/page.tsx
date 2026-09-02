@@ -690,7 +690,7 @@ export default function SupportPage() {
                 icon: Download,
                 color: "from-red-500 to-pink-600",
                 action: "Telecharger",
-                href: "/applications"
+                href: "https://probooster.up.railway.app/mobile-app"
               }
             ].map((resource, index) => (
               <Card 
