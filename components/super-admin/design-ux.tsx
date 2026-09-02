@@ -103,12 +103,28 @@ export default function DesignUX() {
     touchGestures: true
   })
   const [accessibilityFeatures, setAccessibilityFeatures] = useState<AccessibilityFeature[]>([])
-  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([])
-  const [activeTab, setActiveTab] = useState('themes')
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([] as PerformanceMetric[])
+  const [performanceOptimizations, setPerformanceOptimizations] = useState({
+    lazyLoading: true,
+    codeSplitting: true,
+    imageOptimization: true,
+    minification: true
+  })
+  const [personalizationSettings, setPersonalizationSettings] = useState({
+    darkModeAuto: true,
+    customAnimations: true,
+    customIcons: false,
+    customizableLayout: true,
+    defaultLanguage: 'fr',
+    dateFormat: 'dd/mm/yyyy',
+    currency: 'XOF'
+  })
+    const [activeTab, setActiveTab] = useState('themes')
   const [showThemeModal, setShowThemeModal] = useState(false)
   const [showAnimationModal, setShowAnimationModal] = useState(false)
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
   const [selectedAnimation, setSelectedAnimation] = useState<Animation | null>(null)
+  const [animationDraft, setAnimationDraft] = useState<Animation | null>(null)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -402,8 +418,30 @@ export default function DesignUX() {
             impact: incoming?.impact === 'high' || incoming?.impact === 'medium' || incoming?.impact === 'low' ? incoming.impact : f.impact,
             category: incoming?.category === 'vision' || incoming?.category === 'mobility' || incoming?.category === 'cognitive' || incoming?.category === 'hearing' ? incoming.category : f.category
           } satisfies AccessibilityFeature
-        })
+                })
       })
+
+      // Chargement des paramètres de performance
+      const performanceRaw = (designUx as any)?.performance && typeof (designUx as any).performance === 'object' ? (designUx as any).performance : {}
+      const performanceOptimizationsRaw = performanceRaw?.optimizations && typeof performanceRaw.optimizations === 'object' ? performanceRaw.optimizations : {}
+      setPerformanceOptimizations(prev => ({
+        lazyLoading: typeof performanceOptimizationsRaw?.lazyLoading === 'boolean' ? performanceOptimizationsRaw.lazyLoading : prev.lazyLoading,
+        codeSplitting: typeof performanceOptimizationsRaw?.codeSplitting === 'boolean' ? performanceOptimizationsRaw.codeSplitting : prev.codeSplitting,
+        imageOptimization: typeof performanceOptimizationsRaw?.imageOptimization === 'boolean' ? performanceOptimizationsRaw.imageOptimization : prev.imageOptimization,
+        minification: typeof performanceOptimizationsRaw?.minification === 'boolean' ? performanceOptimizationsRaw.minification : prev.minification
+      }))
+
+      // Chargement des paramètres de personnalisation
+      const personalizationRaw = (designUx as any)?.personalization && typeof (designUx as any).personalization === 'object' ? (designUx as any).personalization : {}
+      setPersonalizationSettings(prev => ({
+        darkModeAuto: typeof personalizationRaw?.darkModeAuto === 'boolean' ? personalizationRaw.darkModeAuto : prev.darkModeAuto,
+        customAnimations: typeof personalizationRaw?.customAnimations === 'boolean' ? personalizationRaw.customAnimations : prev.customAnimations,
+        customIcons: typeof personalizationRaw?.customIcons === 'boolean' ? personalizationRaw.customIcons : prev.customIcons,
+        customizableLayout: typeof personalizationRaw?.customizableLayout === 'boolean' ? personalizationRaw.customizableLayout : prev.customizableLayout,
+        defaultLanguage: typeof personalizationRaw?.defaultLanguage === 'string' ? personalizationRaw.defaultLanguage : prev.defaultLanguage,
+        dateFormat: typeof personalizationRaw?.dateFormat === 'string' ? personalizationRaw.dateFormat : prev.dateFormat,
+        currency: typeof personalizationRaw?.currency === 'string' ? personalizationRaw.currency : prev.currency
+      }))
     } catch (error) {
       addNotification({
         type: 'error',
@@ -418,7 +456,17 @@ export default function DesignUX() {
   /**
    * Sauvegarde le thème actif + les couleurs globales dans super_admin_settings (scope=global).
    */
-  const saveDesignUxSettings = useCallback(async () => {
+  const saveDesignUxSettings = useCallback(async (
+    overrides: {
+      themes?: Theme[]
+      breakpoints?: ResponsiveBreakpoint[]
+      responsiveFeatures?: ResponsiveFeatures
+      animations?: Animation[]
+      accessibilityFeatures?: AccessibilityFeature[]
+      performanceOptimizations?: { lazyLoading: boolean; codeSplitting: boolean; imageOptimization: boolean; minification: boolean }
+      personalizationSettings?: { darkModeAuto: boolean; customAnimations: boolean; customIcons: boolean; customizableLayout: boolean; defaultLanguage: string; dateFormat: string; currency: string }
+    } = {}
+  ) => {
     if (!hasLoadedSettingsRef.current) {
       addNotification({
         type: 'warning',
@@ -428,9 +476,17 @@ export default function DesignUX() {
       return
     }
 
+    const themesToSave = overrides.themes ?? themes
+    const breakpointsToSave = overrides.breakpoints ?? breakpoints
+    const responsiveFeaturesToSave = overrides.responsiveFeatures ?? responsiveFeatures
+    const animationsToSave = overrides.animations ?? animations
+    const accessibilityFeaturesToSave = overrides.accessibilityFeatures ?? accessibilityFeatures
+    const performanceOptimizationsToSave = overrides.performanceOptimizations ?? performanceOptimizations
+    const personalizationSettingsToSave = overrides.personalizationSettings ?? personalizationSettings
+
     setIsSavingSettings(true)
     try {
-      const activeTheme = themes.find((t) => t.isActive) ?? null
+      const activeTheme = themesToSave.find((t) => t.isActive) ?? null
       if (!activeTheme) {
         throw new Error('Aucun thème actif à sauvegarder.')
       }
@@ -449,10 +505,10 @@ export default function DesignUX() {
           secondaryColor: activeTheme.colors.secondary,
           accentColor: activeTheme.colors.accent
         },
-        designUx: {
+                designUx: {
           ...(((globalSettingsBase as any)?.designUx && typeof (globalSettingsBase as any).designUx === 'object') ? (globalSettingsBase as any).designUx : {}),
           activeThemeId: normalizedActiveThemeId,
-          themes: themes.map((t) => ({
+          themes: themesToSave.map((t) => ({
             id: migrateThemeId(t.id) ?? t.id,
             name: t.name,
             description: t.description,
@@ -463,15 +519,15 @@ export default function DesignUX() {
             shadows: t.shadows
           })),
           responsive: {
-            breakpoints: breakpoints.map((bp) => ({
+            breakpoints: breakpointsToSave.map((bp) => ({
               name: bp.name,
               width: bp.width,
               isEnabled: bp.isEnabled,
               customizations: bp.customizations ?? {}
             })),
-            features: { ...responsiveFeatures }
+            features: { ...responsiveFeaturesToSave }
           },
-          animations: animations.map((a) => ({
+          animations: animationsToSave.map((a) => ({
             id: a.id,
             name: a.name,
             type: a.type,
@@ -480,14 +536,26 @@ export default function DesignUX() {
             isEnabled: a.isEnabled,
             description: a.description
           })),
-          accessibilityFeatures: accessibilityFeatures.map((f) => ({
+          accessibilityFeatures: accessibilityFeaturesToSave.map((f) => ({
             id: f.id,
             name: f.name,
             description: f.description,
             isEnabled: f.isEnabled,
             impact: f.impact,
             category: f.category
-          }))
+          })),
+          performance: {
+            optimizations: { ...performanceOptimizationsToSave }
+          },
+          personalization: {
+            darkModeAuto: personalizationSettingsToSave.darkModeAuto,
+            customAnimations: personalizationSettingsToSave.customAnimations,
+            customIcons: personalizationSettingsToSave.customIcons,
+            customizableLayout: personalizationSettingsToSave.customizableLayout,
+            defaultLanguage: personalizationSettingsToSave.defaultLanguage,
+            dateFormat: personalizationSettingsToSave.dateFormat,
+            currency: personalizationSettingsToSave.currency
+          }
         }
       }
 
@@ -808,27 +876,72 @@ export default function DesignUX() {
     return <Badge variant={variants[impact] || 'outline'}>{impact}</Badge>
   }
 
-  const toggleTheme = (themeId: string) => {
+  const toggleTheme = useCallback(async (themeId: string) => {
     const resolvedId = migrateThemeId(themeId) ?? themeId
-    setThemes(prev => prev.map(theme => ({
+    const nextThemes = themes.map(theme => ({
       ...theme,
       isActive: (migrateThemeId(theme.id) ?? theme.id) === resolvedId
-    })))
-  }
+    }))
+    setThemes(nextThemes)
+    try {
+      await saveDesignUxSettings({ themes: nextThemes })
+      addNotification({
+        type: 'success',
+        title: 'Thèmes',
+        message: 'Thème activé et sauvegardé.'
+      })
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Thèmes',
+        message: 'Erreur lors de la sauvegarde du thème.'
+      })
+    }
+  }, [migrateThemeId, saveDesignUxSettings, addNotification, themes])
 
-  const toggleAnimation = (animationId: string) => {
-    setAnimations(prev => prev.map(animation => ({
+  const toggleAnimation = useCallback(async (animationId: string) => {
+    const nextAnimations = animations.map(animation => ({
       ...animation,
       isEnabled: animation.id === animationId ? !animation.isEnabled : animation.isEnabled
-    })))
-  }
+    }))
+    setAnimations(nextAnimations)
+    try {
+      await saveDesignUxSettings({ animations: nextAnimations })
+      addNotification({
+        type: "success",
+        title: "Animations",
+        message: "Animation modifiée et sauvegardée."
+      })
+    } catch (error) {
+      addNotification({
+        type: "error",
+        title: "Animations",
+        message: "Erreur lors de la sauvegarde."
+      })
+    }
+  }, [saveDesignUxSettings, addNotification, animations])
 
-  const toggleAccessibilityFeature = (featureId: string) => {
-    setAccessibilityFeatures(prev => prev.map(feature => ({
+  const toggleAccessibilityFeature = useCallback(async (featureId: string) => {
+    const nextFeatures = accessibilityFeatures.map(feature => ({
       ...feature,
       isEnabled: feature.id === featureId ? !feature.isEnabled : feature.isEnabled
-    })))
-  }
+    }))
+    setAccessibilityFeatures(nextFeatures)
+    try {
+      await saveDesignUxSettings({ accessibilityFeatures: nextFeatures })
+      addNotification({
+        type: "success",
+        title: "Accessibilité",
+        message: "Fonctionnalité d'accessibilité mise à jour."
+      })
+    } catch (error) {
+      addNotification({
+        type: "error",
+        title: "Accessibilité",
+        message: "Erreur lors de la sauvegarde."
+      })
+    }
+  }, [saveDesignUxSettings, addNotification, accessibilityFeatures])
 
   const createNewTheme = () => {
     setSelectedTheme(null)
@@ -870,54 +983,127 @@ export default function DesignUX() {
   }
 
   /**
-   * Crée ou met à jour un thème dans l'état local. La persistance DB se fait via le bouton "Appliquer".
-   */
-  const upsertThemeDraft = useCallback(() => {
-    if (!themeDraft) return
+ * Crée ou met à jour un thème dans l'état local ET le persiste dans Supabase.
+ */
+const upsertThemeDraft = useCallback(async () => {
+if (!themeDraft) return
 
-    const nextId = themeDraft.id.trim()
-    if (!nextId) {
-      addNotification({
-        type: 'error',
-        title: 'Thèmes',
-        message: 'ID de thème invalide.'
-      })
-      return
-    }
+const nextId = themeDraft.id.trim()
+if (!nextId) {
+addNotification({
+type: 'error',
+title: 'Thèmes',
+message: 'ID de thème invalide.'
+})
+return
+}
 
-    const nextName = themeDraft.name.trim()
-    if (!nextName) {
-      addNotification({
-        type: 'error',
-        title: 'Thèmes',
-        message: 'Le nom du thème est obligatoire.'
-      })
-      return
-    }
+const nextName = themeDraft.name.trim()
+if (!nextName) {
+addNotification({
+type: 'error',
+title: 'Thèmes',
+message: 'Le nom du thème est obligatoire.'
+})
+return
+}
 
-    setThemes((prev) => {
-      const list = Array.isArray(prev) ? prev : []
-      const idx = list.findIndex((t) => t.id === nextId)
-      if (idx >= 0) {
-        const updated = [...list]
-        updated[idx] = { ...themeDraft, id: nextId, name: nextName, isActive: list[idx]?.isActive ?? false }
-        return updated
-      }
-      return [...list, { ...themeDraft, id: nextId, name: nextName, isActive: false }]
-    })
+const nextThemes = (() => {
+  const list = Array.isArray(themes) ? themes : []
+  const idx = list.findIndex((t) => t.id === nextId)
+  if (idx >= 0) {
+    const updated = [...list]
+    updated[idx] = { ...themeDraft, id: nextId, name: nextName, isActive: list[idx]?.isActive ?? false }
+    return updated
+  }
+  return [...list, { ...themeDraft, id: nextId, name: nextName, isActive: false }]
+})()
+setThemes(nextThemes)
 
-    setShowThemeModal(false)
-  }, [addNotification, themeDraft])
+setShowThemeModal(false)
+// Synchronisation immediate avec Supabase
+try {
+  await saveDesignUxSettings({ themes: nextThemes })
+} catch (error) {
+  console.error('Erreur lors de la synchronisation Supabase:', error)
+}
+}, [addNotification, themeDraft, saveDesignUxSettings, themes, migrateThemeId])
 
-  const createNewAnimation = () => {
+    const createNewAnimation = () => {
     setSelectedAnimation(null)
+    setAnimationDraft({
+      id: `anim_${Date.now()}`,
+      name: '',
+      type: 'fade',
+      duration: 300,
+      easing: 'ease-in-out',
+      isEnabled: true,
+      description: ''
+    })
     setShowAnimationModal(true)
   }
 
   const editAnimation = (animation: Animation) => {
     setSelectedAnimation(animation)
+    setAnimationDraft({ ...animation })
     setShowAnimationModal(true)
   }
+
+  /**
+   * Crée ou met à jour une animation dans l'état local ET le persiste dans Supabase.
+   */
+  const upsertAnimationDraft = useCallback(async () => {
+    if (!animationDraft) return
+
+    const nextId = animationDraft.id.trim()
+    if (!nextId) {
+      addNotification({
+        type: 'error',
+        title: 'Animations',
+        message: 'ID d\'animation invalide.'
+      })
+      return
+    }
+
+    const nextName = animationDraft.name.trim()
+    if (!nextName) {
+      addNotification({
+        type: 'error',
+        title: 'Animations',
+        message: 'Le nom de l\'animation est obligatoire.'
+      })
+      return
+    }
+
+    const nextAnimations = (() => {
+      const list = Array.isArray(animations) ? animations : []
+      const idx = list.findIndex((a) => a.id === nextId)
+      if (idx >= 0) {
+        const updated = [...list]
+        updated[idx] = { ...animationDraft, id: nextId, name: nextName }
+        return updated
+      }
+      return [...list, { ...animationDraft, id: nextId, name: nextName }]
+    })()
+    setAnimations(nextAnimations)
+
+    try {
+      await saveDesignUxSettings({ animations: nextAnimations })
+      addNotification({
+        type: 'success',
+        title: 'Animations',
+        message: 'Animation sauvegardée avec succès.'
+      })
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Animations',
+        message: 'Erreur lors de la sauvegarde de l\'animation.'
+      })
+    }
+
+    setShowAnimationModal(false)
+  }, [addNotification, animationDraft, saveDesignUxSettings, animations])
 
   return (
     <div className="space-y-6">
@@ -1255,12 +1441,29 @@ export default function DesignUX() {
                 <div className="space-y-4">
                   <h4 className="font-medium">Fonctionnalités Responsives</h4>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                                       <div className="flex items-center justify-between">
                       <span className="text-sm">Navigation mobile</span>
                       <input
                         type="checkbox"
                         checked={responsiveFeatures.navigationMobile}
-                        onChange={(e) => setResponsiveFeatures((prev) => ({ ...prev, navigationMobile: e.target.checked }))}
+                        onChange={async (e) => {
+                          const nextResponsiveFeatures = { ...responsiveFeatures, navigationMobile: e.target.checked }
+                          setResponsiveFeatures(nextResponsiveFeatures)
+                          try {
+                            await saveDesignUxSettings({ responsiveFeatures: nextResponsiveFeatures })
+                            addNotification({
+                              type: 'success',
+                              title: 'Responsive',
+                              message: 'Navigation mobile mise à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Responsive',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
                         className="w-4 h-4"
                       />
                     </div>
@@ -1269,7 +1472,24 @@ export default function DesignUX() {
                       <input
                         type="checkbox"
                         checked={responsiveFeatures.adaptiveGrids}
-                        onChange={(e) => setResponsiveFeatures((prev) => ({ ...prev, adaptiveGrids: e.target.checked }))}
+                        onChange={async (e) => {
+                          const nextResponsiveFeatures = { ...responsiveFeatures, adaptiveGrids: e.target.checked }
+                          setResponsiveFeatures(nextResponsiveFeatures)
+                          try {
+                            await saveDesignUxSettings({ responsiveFeatures: nextResponsiveFeatures })
+                            addNotification({
+                              type: 'success',
+                              title: 'Responsive',
+                              message: 'Grilles adaptatives mises à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Responsive',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
                         className="w-4 h-4"
                       />
                     </div>
@@ -1278,7 +1498,24 @@ export default function DesignUX() {
                       <input
                         type="checkbox"
                         checked={responsiveFeatures.responsiveImages}
-                        onChange={(e) => setResponsiveFeatures((prev) => ({ ...prev, responsiveImages: e.target.checked }))}
+                        onChange={async (e) => {
+                          const nextResponsiveFeatures = { ...responsiveFeatures, responsiveImages: e.target.checked }
+                          setResponsiveFeatures(nextResponsiveFeatures)
+                          try {
+                            await saveDesignUxSettings({ responsiveFeatures: nextResponsiveFeatures })
+                            addNotification({
+                              type: 'success',
+                              title: 'Responsive',
+                              message: 'Images responsives mises à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Responsive',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
                         className="w-4 h-4"
                       />
                     </div>
@@ -1287,7 +1524,24 @@ export default function DesignUX() {
                       <input
                         type="checkbox"
                         checked={responsiveFeatures.touchGestures}
-                        onChange={(e) => setResponsiveFeatures((prev) => ({ ...prev, touchGestures: e.target.checked }))}
+                        onChange={async (e) => {
+                          const nextResponsiveFeatures = { ...responsiveFeatures, touchGestures: e.target.checked }
+                          setResponsiveFeatures(nextResponsiveFeatures)
+                          try {
+                            await saveDesignUxSettings({ responsiveFeatures: nextResponsiveFeatures })
+                            addNotification({
+                              type: 'success',
+                              title: 'Responsive',
+                              message: 'Touch gestures activés/désactivés.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Responsive',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
                         className="w-4 h-4"
                       />
                     </div>
@@ -1313,19 +1567,65 @@ export default function DesignUX() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Fade in/out</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={animations.find(a => a.type === 'fade')?.isEnabled ?? false}
+                        onChange={async () => {
+                          const anim = animations.find(a => a.type === 'fade')
+                          if (anim) await toggleAnimation(anim.id)
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Slide transitions</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={animations.find(a => a.type === 'slide')?.isEnabled ?? false}
+                        onChange={async () => {
+                          const anim = animations.find(a => a.type === 'slide')
+                          if (anim) await toggleAnimation(anim.id)
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Hover effects</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={animations.find(a => a.type === 'scale')?.isEnabled ?? false}
+                        onChange={async () => {
+                          const anim = animations.find(a => a.type === 'scale')
+                          if (anim) await toggleAnimation(anim.id)
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Loading spinners</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={personalizationSettings.customAnimations}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, customAnimations: e.target.checked }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Animations',
+                              message: 'Loading spinners mis à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Animations',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1334,15 +1634,23 @@ export default function DesignUX() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Durée par défaut</span>
-                      <span className="text-sm text-gray-600">300ms</span>
+                      <span className="text-sm text-gray-600">{animations.find(a => a.type === 'fade')?.duration ?? 300}ms</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Easing</span>
-                      <span className="text-sm text-gray-600">ease-in-out</span>
+                      <span className="text-sm text-gray-600">{animations.find(a => a.type === 'fade')?.easing ?? 'ease-in-out'}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Réduction motion</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={accessibilityFeatures.find(f => f.id === '4')?.isEnabled ?? false}
+                        onChange={async () => {
+                          const feature = accessibilityFeatures.find(f => f.id === '4')
+                          if (feature) await toggleAccessibilityFeature(feature.id)
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1378,24 +1686,64 @@ export default function DesignUX() {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
+                                <div className="space-y-4">
                   <h4 className="font-medium">Fonctionnalités</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Navigation clavier</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={accessibilityFeatures.find(f => f.id === '2')?.isEnabled ?? true}
+                        onChange={async (e) => {
+                          const feature = accessibilityFeatures.find(f => f.id === '2')
+                          if (feature) {
+                            await toggleAccessibilityFeature(feature.id)
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Lecteurs d'écran</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={accessibilityFeatures.find(f => f.id === '3')?.isEnabled ?? true}
+                        onChange={async (e) => {
+                          const feature = accessibilityFeatures.find(f => f.id === '3')
+                          if (feature) {
+                            await toggleAccessibilityFeature(feature.id)
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Contraste élevé</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={accessibilityFeatures.find(f => f.id === '1')?.isEnabled ?? true}
+                        onChange={async (e) => {
+                          const feature = accessibilityFeatures.find(f => f.id === '1')
+                          if (feature) {
+                            await toggleAccessibilityFeature(feature.id)
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Taille de police</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={accessibilityFeatures.find(f => f.id === '4')?.isEnabled ?? false}
+                        onChange={async (e) => {
+                          const feature = accessibilityFeatures.find(f => f.id === '4')
+                          if (feature) {
+                            await toggleAccessibilityFeature(feature.id)
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1431,24 +1779,112 @@ export default function DesignUX() {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
+                                <div className="space-y-4">
                   <h4 className="font-medium">Optimisations</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Lazy loading</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={performanceOptimizations.lazyLoading}
+                        onChange={async (e) => {
+                          const nextPerformanceOptimizations = { ...performanceOptimizations, lazyLoading: e.target.checked }
+                          setPerformanceOptimizations(nextPerformanceOptimizations)
+                          try {
+                            await saveDesignUxSettings({ performanceOptimizations: nextPerformanceOptimizations })
+                            addNotification({
+                              type: 'success',
+                              title: 'Performance',
+                              message: 'Lazy loading mis à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Performance',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Code splitting</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={performanceOptimizations.codeSplitting}
+                        onChange={async (e) => {
+                          const nextPerformanceOptimizations = { ...performanceOptimizations, codeSplitting: e.target.checked }
+                          setPerformanceOptimizations(nextPerformanceOptimizations)
+                          try {
+                            await saveDesignUxSettings({ performanceOptimizations: nextPerformanceOptimizations })
+                            addNotification({
+                              type: 'success',
+                              title: 'Performance',
+                              message: 'Code splitting mis à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Performance',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Image optimization</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={performanceOptimizations.imageOptimization}
+                        onChange={async (e) => {
+                          const nextPerformanceOptimizations = { ...performanceOptimizations, imageOptimization: e.target.checked }
+                          setPerformanceOptimizations(nextPerformanceOptimizations)
+                          try {
+                            await saveDesignUxSettings({ performanceOptimizations: nextPerformanceOptimizations })
+                            addNotification({
+                              type: 'success',
+                              title: 'Performance',
+                              message: 'Image optimization mise à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Performance',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Minification</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={performanceOptimizations.minification}
+                        onChange={async (e) => {
+                          const nextPerformanceOptimizations = { ...performanceOptimizations, minification: e.target.checked }
+                          setPerformanceOptimizations(nextPerformanceOptimizations)
+                          try {
+                            await saveDesignUxSettings({ performanceOptimizations: nextPerformanceOptimizations })
+                            addNotification({
+                              type: 'success',
+                              title: 'Performance',
+                              message: 'Minification mise à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Performance',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1467,33 +1903,142 @@ export default function DesignUX() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
+                                <div className="space-y-4">
                   <h4 className="font-medium">Interface</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Mode sombre automatique</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={personalizationSettings.darkModeAuto}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, darkModeAuto: e.target.checked }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Personnalisation',
+                              message: 'Mode sombre automatique mis à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Personnalisation',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Animations personnalisées</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={personalizationSettings.customAnimations}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, customAnimations: e.target.checked }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Personnalisation',
+                              message: 'Animations personnalisées activées.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Personnalisation',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Icônes personnalisées</span>
-                      <input type="checkbox" className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={personalizationSettings.customIcons}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, customIcons: e.target.checked }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Personnalisation',
+                              message: 'Icônes personnalisées mises à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Personnalisation',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Layout personnalisable</span>
-                      <input type="checkbox" defaultChecked className="w-4 h-4" />
+                      <input
+                        type="checkbox"
+                        checked={personalizationSettings.customizableLayout}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, customizableLayout: e.target.checked }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Personnalisation',
+                              message: 'Layout personnalisable mis à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Personnalisation',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
+                                <div className="space-y-4">
                   <h4 className="font-medium">Contenu</h4>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Langue par défaut</span>
-                      <select className="text-sm border border-gray-300 rounded px-2 py-1">
+                      <select
+                        className="text-sm border border-gray-300 rounded px-2 py-1"
+                        value={personalizationSettings.defaultLanguage}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, defaultLanguage: e.target.value }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Personnalisation',
+                              message: 'Langue par défaut mise à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Personnalisation',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                      >
                         <option value="fr">Français</option>
                         <option value="en">English</option>
                         <option value="es">Español</option>
@@ -1501,7 +2046,28 @@ export default function DesignUX() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Format de date</span>
-                      <select className="text-sm border border-gray-300 rounded px-2 py-1">
+                      <select
+                        className="text-sm border border-gray-300 rounded px-2 py-1"
+                        value={personalizationSettings.dateFormat}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, dateFormat: e.target.value }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Personnalisation',
+                              message: 'Format de date mis à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Personnalisation',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                      >
                         <option value="dd/mm/yyyy">DD/MM/YYYY</option>
                         <option value="mm/dd/yyyy">MM/DD/YYYY</option>
                         <option value="yyyy-mm-dd">YYYY-MM-DD</option>
@@ -1509,7 +2075,28 @@ export default function DesignUX() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Devise</span>
-                      <select className="text-sm border border-gray-300 rounded px-2 py-1">
+                      <select
+                        className="text-sm border border-gray-300 rounded px-2 py-1"
+                        value={personalizationSettings.currency}
+                        onChange={async (e) => {
+                          const nextPersonalizationSettings = { ...personalizationSettings, currency: e.target.value }
+                          setPersonalizationSettings(nextPersonalizationSettings)
+                          try {
+                            await saveDesignUxSettings({ personalizationSettings: nextPersonalizationSettings })
+                            addNotification({
+                              type: 'success',
+                              title: 'Personnalisation',
+                              message: 'Devise mise à jour.'
+                            })
+                          } catch (error) {
+                            addNotification({
+                              type: 'error',
+                              title: 'Personnalisation',
+                              message: 'Erreur lors de la synchronisation.'
+                            })
+                          }
+                        }}
+                      >
                         <option value="XOF">FCFA (XOF)</option>
                         <option value="EUR">Euro (EUR)</option>
                         <option value="USD">Dollar US (USD)</option>
@@ -1893,12 +2480,13 @@ export default function DesignUX() {
                 <Input 
                   id="animationName" 
                   placeholder="Ex: Fondu d'Entrée"
-                  defaultValue={selectedAnimation?.name || ''}
+                  value={animationDraft?.name || ''}
+                  onChange={(e) => setAnimationDraft(prev => prev ? { ...prev, name: e.target.value } : prev)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="animationType">Type d'animation</Label>
-                <Select defaultValue={selectedAnimation?.type || 'fade'}>
+                <Select value={animationDraft?.type || 'fade'} onValueChange={(value) => setAnimationDraft(prev => prev ? { ...prev, type: value as Animation['type'] } : prev)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1920,7 +2508,8 @@ export default function DesignUX() {
                 <Input 
                   id="animationDuration" 
                   type="number" 
-                  defaultValue={selectedAnimation?.duration || 300}
+                  value={animationDraft?.duration ?? 300}
+                  onChange={(e) => setAnimationDraft(prev => prev ? { ...prev, duration: Number(e.target.value) || 0 } : prev)}
                   min="100"
                   max="2000"
                   step="100"
@@ -1928,7 +2517,7 @@ export default function DesignUX() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="animationEasing">Fonction d'Easing</Label>
-                <Select defaultValue={selectedAnimation?.easing || 'ease-in-out'}>
+                <Select value={animationDraft?.easing || 'ease-in-out'} onValueChange={(value) => setAnimationDraft(prev => prev ? { ...prev, easing: value } : prev)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1948,7 +2537,8 @@ export default function DesignUX() {
               <Textarea 
                 id="animationDescription" 
                 placeholder="Description de l'animation et de son utilisation"
-                defaultValue={selectedAnimation?.description || ''}
+                value={animationDraft?.description || ''}
+                onChange={(e) => setAnimationDraft(prev => prev ? { ...prev, description: e.target.value } : prev)}
                 rows={3}
               />
             </div>
@@ -1956,7 +2546,8 @@ export default function DesignUX() {
             <div className="flex items-center space-x-2">
               <Switch 
                 id="animationEnabled" 
-                defaultChecked={selectedAnimation?.isEnabled || false}
+                checked={animationDraft?.isEnabled ?? false}
+                onCheckedChange={(checked) => setAnimationDraft(prev => prev ? { ...prev, isEnabled: checked } : prev)}
               />
               <Label htmlFor="animationEnabled">Animation activée</Label>
             </div>
@@ -1966,7 +2557,7 @@ export default function DesignUX() {
               <Button variant="outline" onClick={() => setShowAnimationModal(false)}>
                 Annuler
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => void upsertAnimationDraft()}>
                 {selectedAnimation ? 'Modifier' : 'Créer'} l'Animation
               </Button>
             </div>

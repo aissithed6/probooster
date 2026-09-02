@@ -242,12 +242,10 @@ export class EditableMessagesService {
     userId: string
   ): Promise<EditableMessage | null> {
     try {
-      console.log('🔍 Tentative de mise à jour:', { id, updates, userId })
-
-      // Vérifier d'abord que le message existe
-      const { data: existingMessage, error: fetchError } = await supabase
+      // Vérifier d'abord que le message existe (lever une erreur si introuvable)
+      const { error: fetchError } = await supabase
         .from('editable_messages')
-        .select('*')
+        .select('id')
         .eq('id', id)
         .single()
 
@@ -255,8 +253,6 @@ export class EditableMessagesService {
         console.error('❌ Erreur lors de la récupération du message:', fetchError)
         throw new Error(`Message introuvable: ${fetchError.message}`)
       }
-
-      console.log('✅ Message trouvé:', existingMessage)
 
       // Effectuer la mise à jour
       const { data, error } = await supabase
@@ -281,7 +277,6 @@ export class EditableMessagesService {
         throw error
       }
 
-      console.log('✅ Message mis à jour avec succès:', data)
       return data
     } catch (error: any) {
       console.error('❌ Erreur mise à jour message:', {
