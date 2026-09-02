@@ -51,6 +51,9 @@ import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "react-hot-toast"
 import { useState, useCallback } from "react"
 import { supabase } from "@/lib/supabase"
+import { UserGuideModal } from "@/components/support/UserGuideModal"
+import { VideoTutorialsModal } from "@/components/support/VideoTutorialsModal"
+import { ApiDocumentationModal } from "@/components/support/ApiDocumentationModal"
 
 /**
  * Joue un son de notification pour alerter d'un nouveau message
@@ -112,6 +115,9 @@ export default function SupportPage() {
   const { user } = useAuth()
   const { createChatSession, openChatSession, chatSessions, setIsAnyChatOpen, sendMessage, activeChatSession } = useChatContext()
   const [isLoadingChat, setIsLoadingChat] = useState(false)
+  const [showUserGuide, setShowUserGuide] = useState(false)
+  const [showVideoTutorials, setShowVideoTutorials] = useState(false)
+  const [showApiDocs, setShowApiDocs] = useState(false)
 
   /**
    * Envoie un message de support et notifie les admins
@@ -660,31 +666,31 @@ export default function SupportPage() {
                 icon: BookOpen,
                 color: "from-[#ff6600] to-orange-500",
                 action: "Consulter",
-                href: "#"
+                onClick: () => setShowUserGuide(true)
               },
               {
-                title: "Vidéos Tutoriels",
-                description: "Apprenez avec nos vidéos explicatives",
+                title: "Videos Tutoriels",
+                description: "Apprenez avec nos videos explicatives",
                 icon: Video,
                 color: "from-blue-500 to-purple-600",
                 action: "Regarder",
-                href: "#"
+                onClick: () => setShowVideoTutorials(true)
               },
               {
                 title: "Documentation API",
-                description: "Documentation technique pour développeurs",
+                description: "Documentation technique pour developpeurs",
                 icon: FileText,
                 color: "from-green-500 to-emerald-600",
                 action: "Lire",
-                href: "#"
+                onClick: () => setShowApiDocs(true)
               },
               {
-                title: "Téléchargements",
+                title: "Telechargements",
                 description: "Applications mobiles et outils",
                 icon: Download,
                 color: "from-red-500 to-pink-600",
-                action: "Télécharger",
-                href: "#"
+                action: "Telecharger",
+                href: "/applications"
               }
             ].map((resource, index) => (
               <Card 
@@ -709,15 +715,23 @@ export default function SupportPage() {
                     {resource.description}
                   </CardDescription>
                   
-                  <Button 
+                  <Button
                     variant="outline"
                     className="w-full border-[#ff6600] text-[#ff6600] hover:bg-[#ff6600] hover:text-white group-hover:scale-105 transition-all duration-300"
-                    asChild
+                    onClick={"onClick" in resource ? resource.onClick : undefined}
+                    asChild={"href" in resource && !!resource.href}
                   >
-                    <Link href={resource.href} className="flex items-center justify-center">
-                      <span>{resource.action}</span>
-                      <ExternalLink className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
-                    </Link>
+                    {"href" in resource && resource.href ? (
+                      <Link href={resource.href} className="flex items-center justify-center">
+                        <span>{resource.action}</span>
+                        <ExternalLink className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
+                      </Link>
+                    ) : (
+                      <span className="flex items-center justify-center">
+                        <span>{resource.action}</span>
+                        <ExternalLink className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
+                      </span>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
@@ -772,6 +786,11 @@ export default function SupportPage() {
           </div>
         </div>
       </section>
+
+      {/* Resource Modals */}
+      <UserGuideModal open={showUserGuide} onOpenChange={setShowUserGuide} />
+      <VideoTutorialsModal open={showVideoTutorials} onOpenChange={setShowVideoTutorials} />
+      <ApiDocumentationModal open={showApiDocs} onOpenChange={setShowApiDocs} />
     </div>
   )
 } 
