@@ -54,7 +54,7 @@ import { useState } from "react"
 export default function SupportPage() {
   const { currencyCode } = useMoney()
   const { user } = useAuth()
-  const { createChatSession, openChatSession, chatSessions } = useChatContext()
+  const { createChatSession, openChatSession, chatSessions, setIsAnyChatOpen } = useChatContext()
   const [isLoadingChat, setIsLoadingChat] = useState(false)
 
   /**
@@ -70,6 +70,9 @@ export default function SupportPage() {
     setIsLoadingChat(true)
     const loadingToast = toast.loading("Ouverture du chat de support...")
     try {
+      // Ouvrir d'abord l'UI du chat pour afficher le modal
+      setIsAnyChatOpen(true)
+      
       const admin = await ChatService.getSystemAdmin(user.id)
       if (!admin) {
         toast.error("Le système de chat est en cours de maintenance. Veuillez nous contacter par email.")
@@ -239,12 +242,20 @@ export default function SupportPage() {
                   
                   <Button 
                     className={`w-full bg-gradient-to-r ${method.color} hover:from-[#e55a00] hover:to-orange-600 text-white group-hover:scale-105 transition-all duration-300`}
-                    asChild
+                    onClick={method.title === "Chat en Direct" ? handleOpenChat : undefined}
+                    asChild={method.title !== "Chat en Direct"}
                   >
-                    <Link href={method.href} className="flex items-center justify-center">
-                      <span>{method.action}</span>
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
-                    </Link>
+                    {method.title === "Chat en Direct" ? (
+                      <span className="flex items-center justify-center">
+                        <span>{isLoadingChat ? "Ouverture..." : method.action}</span>
+                        <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
+                      </span>
+                    ) : (
+                      <Link href={method.href} className="flex items-center justify-center">
+                        <span>{method.action}</span>
+                        <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
+                      </Link>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
