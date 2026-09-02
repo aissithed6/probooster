@@ -144,16 +144,19 @@ export default function SupportPage() {
     const loadingToast = toast.loading("Ouverture du chat de support...")
     try {
       // 1. Recuperer l'admin (toujours un UUID valide grace au fallback systeme)
-      const admin = await ChatService.getSystemAdmin(user.id)
+      let admin = await ChatService.getSystemAdmin(user.id)
       if (!admin) {
         toast.error("Le systeme de chat est en cours de maintenance. Veuillez nous contacter par email.")
         return
       }
 
-      // 2. Verifier que l'admin est different de l'utilisateur (evite l'auto-chat)
+      // 2. Si l'admin est l'utilisateur lui-meme, utiliser l'ID systeme
       if (admin.id === user.id) {
-        toast.error("Le chat de support n'est pas disponible actuellement. Veuillez nous contacter par email.")
-        return
+        admin = {
+          id: '00000000-0000-1000-8000-000000000000',
+          name: 'Support Probooster',
+          avatar_url: undefined
+        }
       }
 
       // 3. Verifier si une session de support existe deja
