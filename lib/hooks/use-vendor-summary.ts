@@ -34,7 +34,8 @@ async function fetchVendorSummary(vendorId: string): Promise<VendorSummary | nul
   return {
     averageRating: Number.isFinite(avg) ? avg : 0,
     reviewCount: Number.isFinite(count) ? count : 0,
-    avgResponseSeconds: normalizedRespSec
+    avgResponseSeconds: normalizedRespSec,
+    isVerified: Boolean(data?.isVerified)
   }
 }
 
@@ -42,6 +43,7 @@ export type VendorSummary = {
   averageRating: number
   reviewCount: number
   avgResponseSeconds: number | null
+  isVerified: boolean
 }
 
 async function doFetchAndCache(normalized: string): Promise<VendorSummary | null> {

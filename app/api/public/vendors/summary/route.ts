@@ -11,6 +11,7 @@ type VendorSummary = {
   averageRating: number
   reviewCount: number
   avgResponseSeconds: number | null
+  isVerified: boolean
 }
 
 /**
@@ -81,6 +82,20 @@ export async function GET(request: NextRequest) {
     // 3) Temps de réponse moyen (client -> vendeur)
     // Fenêtre: 30 jours, limite: 5000 messages
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    // 4) Statut vérifié du vendeur (depuis user_profiles.verification)
+    let isVerified = false
+    const { data: vendorProfile } = await supabase
+      .from('user_profiles')
+      .select('verification, email_confirmed_at')
+      .eq('user_id', vendorId)
+      .maybeSingle()
+
+    if (vendorProfile) {
+      // Vérifier le champ verification (JSON) ou email_confirmed_at
+      const verification = vendorProfile.verification as any
+      isVerified = Boolean(verification?.isVerified) || Boolean(vendorProfile.email_confirmed_at)
+    }
 
     const { data: chats, error: chatsError } = await supabase
       .from('user_chats')
@@ -154,7 +169,8 @@ export async function GET(request: NextRequest) {
       vendorId,
       averageRating,
       reviewCount,
-      avgResponseSeconds
+      avgResponseSeconds,
+      isVerified
     }
 
     return NextResponse.json({ data }, { status: 200 })

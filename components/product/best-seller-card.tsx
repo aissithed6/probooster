@@ -109,8 +109,14 @@ export default function BestSellerCard({
 
   const { summary: vendorSummary } = useVendorSummary(String((product as any)?.vendorId ?? '').trim())
   const { isOnline } = useVendorPresence(String((product as any)?.vendorId ?? '').trim())
-  const ratingForUi = typeof vendorSummary?.averageRating === 'number' ? vendorSummary.averageRating : product.rating
-  const reviewsForUi = typeof vendorSummary?.reviewCount === 'number' ? vendorSummary.reviewCount : product.reviews
+  // Priorité à la note PRODUIT (source: product_statistics, synchronisée par triggers Supabase).
+  // Fallback: note du VENDEUR (vendor_rating_snapshot) si le produit n'a pas encore d'avis.
+  const productRating = Number(product?.rating ?? 0) || 0
+  const productReviews = Number(product?.reviews ?? 0) || 0
+  const vendorRating = typeof vendorSummary?.averageRating === 'number' ? vendorSummary.averageRating : 0
+  const vendorReviews = typeof vendorSummary?.reviewCount === 'number' ? vendorSummary.reviewCount : 0
+  const ratingForUi = productRating > 0 ? productRating : vendorRating
+  const reviewsForUi = productRating > 0 ? productReviews : vendorReviews
 
   useEffect(() => {
     setIsClient(true)
@@ -237,6 +243,7 @@ export default function BestSellerCard({
   const sellerName = String(product.seller ?? '').trim() || 'Boutique'
   const sellerSlug = toSellerSlug(sellerName) || 'boutique'
   const sellerHref = `/seller/${sellerSlug}`
+  const isVendorVerified = vendorSummary?.isVerified === true
 
 
 
@@ -424,13 +431,13 @@ export default function BestSellerCard({
                 <Star
                   key={i}
                   className={`h-4 w-4 ${
-                    i < Math.floor(product.rating) ? "text-yellow-400 fill-current" : "text-gray-300"
+                    i < Math.floor(ratingForUi) ? "text-yellow-400 fill-current" : "text-gray-300"
                   }`}
                 />
               ))}
             </div>
             <span className="text-sm text-gray-600">
-              {product.rating} ({product.reviews})
+              {Number(ratingForUi ?? 0).toFixed(1)} ({Number(reviewsForUi ?? 0)})
             </span>
           </div>
 
@@ -467,6 +474,13 @@ export default function BestSellerCard({
                       >
                         {sellerName}
                       </Link>
+                      {isVendorVerified && (
+                        <span className="ml-1 inline-flex items-center text-blue-600" title="Vendeur vérifié">
+                          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                      )}
                     </span>
                     {isOnline === true ? (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
@@ -518,10 +532,17 @@ export default function BestSellerCard({
                 <Star className="h-4 w-4 mr-1 text-yellow-500" />
                 {Number(ratingForUi ?? 0).toFixed(1)}/5 ({Number(reviewsForUi ?? 0)} avis)
               </span>
-              <span className="text-purple-600 flex items-center">
-                <Crown className="h-4 w-4 mr-1" />
-                Vendeur vérifié
-              </span>
+              {isVendorVerified ? (
+                <span className="text-purple-600 flex items-center">
+                  <Crown className="h-4 w-4 mr-1" />
+                  Vendeur vérifié
+                </span>
+              ) : (
+                <span className="text-gray-500 flex items-center">
+                  <Award className="h-4 w-4 mr-1" />
+                  Vendeur standard
+                </span>
+              )}
             </div>
           </div>
         </div>

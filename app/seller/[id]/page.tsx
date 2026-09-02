@@ -443,7 +443,7 @@ export default function SellerPage({ params }: { params: Promise<{ id: string }>
           setResolvedVendorId(vendorId)
         }
 
-        const [productsRes2, profileRes, categoriesRes] = await Promise.all([
+        const [productsRes2, profileRes, categoriesRes, summaryRes] = await Promise.all([
           vendorId
             ? fetch(`/api/public/products/by-vendor?vendorId=${encodeURIComponent(vendorId)}&limit=96`, { method: 'GET' }).catch(() => null as any)
             : Promise.resolve(null as any),
@@ -451,7 +451,10 @@ export default function SellerPage({ params }: { params: Promise<{ id: string }>
             ? fetch(`/api/public/vendors/profile?vendorId=${encodeURIComponent(vendorId)}`, { method: 'GET' }).catch(() => null as any)
             : Promise.resolve(null as any)
           ,
-          fetch('/api/catalog/categories', { method: 'GET', cache: 'no-store' }).catch(() => null as any)
+          fetch('/api/catalog/categories', { method: 'GET', cache: 'no-store' }).catch(() => null as any),
+          vendorId
+            ? fetch(`/api/public/vendors/summary?vendorId=${encodeURIComponent(vendorId)}`, { method: 'GET' }).catch(() => null as any)
+            : Promise.resolve(null as any)
         ])
 
         const productsJson = productsRes2 ? await productsRes2.json().catch(() => null) : null
@@ -468,6 +471,9 @@ export default function SellerPage({ params }: { params: Promise<{ id: string }>
           const cname = String((row as any)?.name ?? '').trim()
           if (cid && cname) categoryNameById.set(cid, cname)
         }
+
+        const summaryJson = summaryRes ? await summaryRes.json().catch(() => null) : null
+        const isVendorVerified = Boolean(summaryJson?.data?.isVerified)
 
         const sellerName = String(profile?.name ?? vendorFromApi?.name ?? '').trim() || "Vendeur"
         const sellerAvatar = String(profile?.avatar ?? vendorFromApi?.avatar ?? '').trim() || "/placeholder-user.jpg"
@@ -536,10 +542,10 @@ export default function SellerPage({ params }: { params: Promise<{ id: string }>
           reviews: 0,
           products: items.length,
           sales: 0,
-          isVerified: true,
+          isVerified: isVendorVerified,
           isPremium: false,
-          badge: "Vérifié",
-          badgeColor: "bg-green-500",
+          badge: isVendorVerified ? "Vérifié" : "Standard",
+          badgeColor: isVendorVerified ? "bg-green-500" : "bg-gray-500",
           avatarColor: "bg-gradient-to-r from-purple-500 to-blue-600",
           description: String(profile?.description ?? '').trim(),
           specialties: Array.isArray(profile?.specialties) ? profile!.specialties : [],

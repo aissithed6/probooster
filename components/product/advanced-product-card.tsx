@@ -165,10 +165,15 @@ export default function AdvancedProductCard({
   const { isOnline } = useVendorPresence(resolvedVendorId)
   const { summary: vendorSummary } = useVendorSummary(resolvedVendorId)
   const isSellerOnline = isOnline === true
+  const isVendorVerified = vendorSummary?.isVerified === true
   const vendorRating = typeof vendorSummary?.averageRating === 'number' ? vendorSummary.averageRating : null
   const vendorReviewCount = typeof vendorSummary?.reviewCount === 'number' ? vendorSummary.reviewCount : null
-  const ratingForUi = vendorRating !== null ? vendorRating : product.rating
-  const reviewsForUi = vendorReviewCount !== null ? vendorReviewCount : product.reviews
+  // Priorité à la note PRODUIT (product_statistics, synchronisée par triggers Supabase).
+  // Fallback: note du VENDEUR (vendor_rating_snapshot) si le produit n'a pas encore d'avis.
+  const productRating = Number(product?.rating ?? 0) || 0
+  const productReviews = Number(product?.reviews ?? 0) || 0
+  const ratingForUi = productRating > 0 ? productRating : (vendorRating ?? 0)
+  const reviewsForUi = productRating > 0 ? productReviews : (vendorReviewCount ?? 0)
   const responseTimeLabel = (() => {
     const secs = vendorSummary?.avgResponseSeconds
     if (typeof secs !== 'number') return ''
@@ -744,6 +749,13 @@ export default function AdvancedProductCard({
                     >
                       {sellerName}
                     </Link>
+                    {isVendorVerified && (
+                      <span className="ml-1 inline-flex items-center text-blue-600" title="Vendeur vérifié">
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </span>
+                    )}
                     <span className="mx-1">•</span>
                     <span className={isSellerOnline ? "text-green-700" : "text-gray-600"}>
                       {isSellerOnline ? 'En ligne' : 'Hors ligne'}
