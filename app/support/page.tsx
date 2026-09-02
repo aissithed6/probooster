@@ -45,9 +45,65 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useChatContext } from "@/lib/chat-context-supabase"
+import { ChatService } from "@/lib/services/chat-service"
+import { useAuth } from "@/contexts/AuthContext"
+import { toast } from "react-hot-toast"
+import { useState } from "react"
 
 export default function SupportPage() {
   const { currencyCode } = useMoney()
+  const { user } = useAuth()
+  const { createChatSession, openChatSession, chatSessions } = useChatContext()
+  const [isLoadingChat, setIsLoadingChat] = useState(false)
+
+  /**
+   * Ouvre le chat de support avec l'administrateur système.
+   * Crée une nouvelle session si nécessaire, sinon réouvre la session existante.
+   */
+  const handleOpenChat = async () => {
+    if (!user) {
+      toast.error("Veuillez vous connecter pour accéder au chat.")
+      return
+    }
+
+    setIsLoadingChat(true)
+    const loadingToast = toast.loading("Ouverture du chat de support...")
+    try {
+      const admin = await ChatService.getSystemAdmin(user.id)
+      if (!admin) {
+        toast.error("Le système de chat est en cours de maintenance. Veuillez nous contacter par email.")
+        return
+      }
+
+      // Vérifier si une session existe déjà avec cet admin
+      const existingSession = chatSessions.find(s => 
+        (s.sellerId === admin.id) || 
+        (s.sellerName === admin.name)
+      )
+
+      if (existingSession) {
+        openChatSession(existingSession.id)
+      } else {
+        const sessionId = await createChatSession(admin.id, admin.name, admin.avatar_url)
+        if (sessionId) {
+          openChatSession(sessionId)
+          
+          // Petit délai pour laisser le temps à la session de s'ouvrir
+          setTimeout(() => {
+            toast.info("Un conseiller vous répondra dès que possible.", { duration: 5000 })
+          }, 1000)
+        }
+      }
+      toast.success("Chat de support ouvert !")
+    } catch (error) {
+      console.error("Erreur ouverture chat support:", error)
+      toast.error("Erreur lors de l'ouverture du chat.")
+    } finally {
+      toast.dismiss(loadingToast)
+      setIsLoadingChat(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
@@ -594,12 +650,13 @@ export default function SupportPage() {
               size="lg"
               variant="secondary"
               className="bg-white text-[#ff6600] hover:bg-gray-100 px-8 py-4 text-lg group relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-xl"
-              asChild
+              onClick={handleOpenChat}
+              disabled={isLoadingChat}
             >
-              <Link href="#chat" className="flex items-center">
-                <span className="relative z-10">Chat en direct</span>
+              <span className="relative z-10 flex items-center">
+                {isLoadingChat ? "Ouverture..." : "Chat en direct"}
                 <MessageCircle className="ml-2 h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
-              </Link>
+              </span>
             </Button>
             
             <Button
