@@ -540,12 +540,9 @@ export class ChatService {
         return await this.buildParticipantFromUser(anyOtherUser.id, 'admin')
       }
 
-      // 4. Fallback ultime: Pas de currentUserId comme admin (evite l'auto-chat)
-      // Retourner null pour indiquer qu'aucun admin n'est disponible
-
-      // 5. Hardcoded fallback ID (Si vraiment tout échoue)
-      // On utilise un ID de super admin probable ou système
-      const systemId = '00000000-0000-0000-0000-000000000000' // ID fictif
+      // 4. Fallback ultime: ID système valide (UUID v4 valide)
+      // On utilise un ID valide pour éviter les erreurs de validation UUID
+      const systemId = '00000000-0000-1000-8000-000000000000' // ID valide (UUID format)
       return {
         id: systemId,
         name: 'Support Probooster',

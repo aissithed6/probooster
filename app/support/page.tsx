@@ -143,12 +143,22 @@ export default function SupportPage() {
     setIsLoadingChat(true)
     const loadingToast = toast.loading("Ouverture du chat de support...")
     try {
-      // 1. Récupérer l'admin (peut être null si hors ligne)
+      // 1. Recuperer l'admin (toujours un UUID valide grace au fallback systeme)
       const admin = await ChatService.getSystemAdmin(user.id)
+      if (!admin) {
+        toast.error("Le systeme de chat est en cours de maintenance. Veuillez nous contacter par email.")
+        return
+      }
 
-      // 2. Vérifier si une session de support existe déjà
+      // 2. Verifier que l'admin est different de l'utilisateur (evite l'auto-chat)
+      if (admin.id === user.id) {
+        toast.error("Le chat de support n'est pas disponible actuellement. Veuillez nous contacter par email.")
+        return
+      }
+
+      // 3. Verifier si une session de support existe deja
       const existingSession = chatSessions.find(s =>
-        (admin && (s.sellerId === admin.id || s.sellerName === admin.name)) ||
+        (s.sellerId === admin.id) ||
         (s.sellerName?.toLowerCase().includes('support'))
       )
 
@@ -156,14 +166,10 @@ export default function SupportPage() {
       if (existingSession) {
         sessionId = existingSession.id
       } else {
-        // 3. Créer une nouvelle session (même si admin est null, on crée avec un ID support)
-        const adminId = admin?.id || `support-${user.id}`
-        const adminName = admin?.name || 'Support Probooster'
-        const adminAvatar = admin?.avatar_url || undefined
-
-        const newSessionId = await createChatSession(adminId, adminName, adminAvatar)
+        // 3. Creer une nouvelle session avec l'admin (UUID valide garanti par getSystemAdmin)
+        const newSessionId = await createChatSession(admin.id, admin.name, admin.avatar_url)
         if (!newSessionId) {
-          toast.error("Impossible de créer la conversation. Veuillez réessayer ou nous contacter par email.")
+          toast.error("Impossible de creer la conversation. Veuillez reessayer ou nous contacter par email.")
           return
         }
         sessionId = newSessionId
@@ -175,13 +181,9 @@ export default function SupportPage() {
       // 5. Ouvrir l'UI du chat
       setIsAnyChatOpen(true)
 
-      // 6. Message de succès
+      // 6. Message de succes
       toast.success("Chat de support ouvert !")
-      if (!admin) {
-        toast.info("Un conseiller vous répondra dès que possible. Vous pouvez laisser un message.", { duration: 5000 })
-      } else {
-        toast.info("Un conseiller vous répondra dès que possible.", { duration: 5000 })
-      }
+      toast.info("Un conseiller vous repondra des que possible. Vous pouvez laisser un message.", { duration: 5000 })
     } catch (error) {
       console.error("Erreur ouverture chat support:", error)
       toast.error("Erreur lors de l'ouverture du chat. Veuillez réessayer.")
