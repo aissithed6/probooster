@@ -24,6 +24,7 @@ interface AnalyticsTopProduct {
   categoryName: string | null
   revenue: number
   sales: number
+  growthPercent: number
 }
 
 interface AnalyticsTimeseriesPoint {
@@ -692,6 +693,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // 2sexies) Métriques système (automation_events: system.metric)
+    // Lues en dernier sur la fenêtre complète : connexions DB actives + espace de stockage.
+    const [systemMetricsRes] = await Promise.all([
+      supabase
+        .from('automation_events')
+        .select('payload, created_at')
+        .eq('event_type', 'system.metric')
+        .order('created_at', { ascending: false })
+        .limit(20)
+    ])
+    const systemMetricRows = systemMetricsRes.error ? [] : (systemMetricsRes.data ?? [])
+    const latestMetric = systemMetricRows[0] as any
+    const latestPayload = (latestMetric?.payload ?? {}) as any
+    const activeConnections =
+      typeof latestPayload?.activeConnections === 'number' && Number.isFinite(latestPayload.activeConnections)
+        ? latestPayload.activeConnections
+        : null
+    const storageUsedBytes =
+      typeof latestPayload?.storageUsedBytes === 'number' && Number.isFinite(latestPayload.storageUsedBytes)
+        ? latestPayload.storageUsedBytes
+        : null
+
     // 3) Récupérer catégories principales des produits.
     const productIds = Array.from(
       new Set(
@@ -809,6 +832,14 @@ export async function GET(request: NextRequest) {
       .slice(0, 10)
       .map(([pid]) => pid)
 
+    // Revenus cumulés par produit sur la période précédente (pour la croissance).
+    const prevRevenueByProduct = new Map<string, number>()
+    for (const row of compareItems) {
+      const pid = String((row as any)?.product_id ?? '').trim()
+      if (!pid) continue
+      prevRevenueByProduct.set(pid, (prevRevenueByProduct.get(pid) ?? 0) + safeNumber((row as any)?.total_price))
+    }
+
     const productNameById = new Map<string, string>()
     if (topProductIds.length > 0) {
       const { data: productRows, error } = await supabase
@@ -828,13 +859,20 @@ export async function GET(request: NextRequest) {
     const topProducts: AnalyticsTopProduct[] = topProductIds.map((pid) => {
       const agg = productAgg.get(pid) ?? { revenue: 0, sales: 0 }
       const cat = categoryByProductId.get(pid) ?? { categoryId: null, categoryName: null }
+
+      // Croissance du produit : revenus courants vs revenus de la période précédente (même produit).
+      const prevRevenue = prevRevenueByProduct.get(pid) ?? 0
+      const growthPercent =
+        prevRevenue > 0 ? ((agg.revenue - prevRevenue) / prevRevenue) * 100 : agg.revenue > 0 ? 100 : 0
+
       return {
         productId: pid,
         name: productNameById.get(pid) ?? 'Produit',
         categoryId: cat.categoryId,
         categoryName: cat.categoryName,
         revenue: agg.revenue,
-        sales: agg.sales
+        sales: agg.sales,
+        growthPercent
       }
     })
 
@@ -864,6 +902,10 @@ export async function GET(request: NextRequest) {
           reviews: reviewsSummary,
           webVitals: webVitalsSummary,
           uptime: uptimeSummary,
+          system: {
+            activeConnections,
+            storageUsedBytes
+          },
           salesByCategory,
           topProducts,
           timeseries: timeseriesPoints

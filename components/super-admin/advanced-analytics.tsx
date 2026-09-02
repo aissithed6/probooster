@@ -223,7 +223,12 @@ interface AdvancedAnalyticsApiResponse {
     categoryName: string | null
     revenue: number
     sales: number
+    growthPercent: number
   }>
+  system: {
+    activeConnections: number | null
+    storageUsedBytes: number | null
+  }
   timeseries: Array<{
     date: string
     revenue: number
@@ -391,6 +396,18 @@ export default function AdvancedAnalytics() {
   const formatFcfa = (value: number) => {
     const n = Number.isFinite(value) ? value : 0
     return `${formatNumber(Math.round(n))} FCFA`
+  }
+
+  /**
+   * Formate une taille en octets (ko/Mo/Go) lisible.
+   */
+  const formatBytes = (bytes: number) => {
+    const n = Number.isFinite(bytes) ? bytes : 0
+    if (n <= 0) return '0 o'
+    const units = ['o', 'Ko', 'Mo', 'Go', 'To']
+    const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)))
+    const value = n / Math.pow(1024, i)
+    return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[i]}`
   }
 
   /**
@@ -1341,7 +1358,11 @@ export default function AdvancedAnalytics() {
                         </div>
                         <div className="text-center">
                           <p className="text-sm text-gray-600">Croissance</p>
-                          <p className="font-medium text-gray-500">--</p>
+                          <p className={`font-medium ${
+                            product.growthPercent >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {product.growthPercent >= 0 ? '+' : ''}{product.growthPercent.toFixed(1)}%
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1416,11 +1437,19 @@ export default function AdvancedAnalytics() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Connexions actives</span>
-                      <span className="font-medium">--</span>
+                      <span className="font-medium">
+                        {analyticsData && analyticsData.system.activeConnections != null
+                          ? formatNumber(analyticsData.system.activeConnections)
+                          : '--'}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm">Espace utilisé</span>
-                      <span className="font-medium">--</span>
+                      <span className="font-medium">
+                        {analyticsData && analyticsData.system.storageUsedBytes != null
+                          ? formatBytes(analyticsData.system.storageUsedBytes)
+                          : '--'}
+                      </span>
                     </div>
                   </div>
                 </div>

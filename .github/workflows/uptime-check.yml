@@ -60,3 +60,18 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.UPTIME_REPORT_TOKEN }}" \
             --data "$BODY" \
             --max-time 20
+
+      - name: Report system metrics
+        shell: bash
+        run: |
+          set -e
+          URL="${{ secrets.UPTIME_SITE_URL }}"
+          METRICS="$URL/api/public/system-metrics"
+
+          # Endpoint interne : lit les connexions DB actives + l'espace de stockage
+          # et les persiste dans automation_events (event_type: system.metric).
+          curl -sS -X POST "$METRICS" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.UPTIME_REPORT_TOKEN }}" \
+            --data '{}' \
+            --max-time 30
