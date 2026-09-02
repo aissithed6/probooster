@@ -2,7 +2,7 @@
 
 import { Search, Grid, List, Sparkles, TrendingUp, ArrowRight, Heart, ShoppingCart } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 
 type Category = {
-  id: number
+  id: string
   name: string
   description: string
   image: string
@@ -22,118 +22,98 @@ type Category = {
   isTrending: boolean
   color: string
   badge: string | null
+  slug: string | null
 }
 
 export default function CategoriesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const categories: Category[] = [
-    {
-      id: 1,
-      name: "Électronique",
-      description: "Smartphones, ordinateurs, accessoires tech",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 1250,
-      icon: "📱",
-      isHot: true,
-      isNew: false,
-      isTrending: true,
-      color: "from-blue-500 to-purple-600",
-      badge: "🔥 Populaire",
-    },
-    {
-      id: 2,
-      name: "Mode & Beauté",
-      description: "Vêtements, chaussures, cosmétiques",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 890,
-      icon: "👗",
-      isHot: false,
-      isNew: true,
-      isTrending: true,
-      color: "from-pink-500 to-rose-600",
-      badge: "🆕 Nouveau",
-    },
-    {
-      id: 3,
-      name: "Maison & Jardin",
-      description: "Meubles, décoration, outils de jardinage",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 650,
-      icon: "🏠",
-      isHot: false,
-      isNew: false,
-      isTrending: false,
-      color: "from-green-500 to-emerald-600",
-      badge: null,
-    },
-    {
-      id: 4,
-      name: "Sports & Loisirs",
-      description: "Équipements sportifs, jeux, loisirs créatifs",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 420,
-      icon: "⚽",
-      isHot: true,
-      isNew: false,
-      isTrending: false,
-      color: "from-orange-500 to-red-600",
-      badge: "⚡ Tendance",
-    },
-    {
-      id: 5,
-      name: "Automobile",
-      description: "Pièces auto, accessoires, entretien",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 380,
-      icon: "🚗",
-      isHot: false,
-      isNew: false,
-      isTrending: false,
-      color: "from-gray-500 to-slate-600",
-      badge: null,
-    },
-    {
-      id: 6,
-      name: "Livres & Médias",
-      description: "Livres, films, musique, jeux vidéo",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 290,
-      icon: "📚",
-      isHot: false,
-      isNew: false,
-      isTrending: true,
-      color: "from-indigo-500 to-blue-600",
-      badge: "📈 En croissance",
-    },
-    {
-      id: 7,
-      name: "Santé & Bien-être",
-      description: "Compléments, équipements fitness, soins",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 180,
-      icon: "💊",
-      isHot: false,
-      isNew: true,
-      isTrending: false,
-      color: "from-teal-500 to-cyan-600",
-      badge: "🆕 Nouveau",
-    },
-    {
-      id: 8,
-      name: "Enfants & Bébés",
-      description: "Jouets, vêtements enfants, puériculture",
-      image: "/placeholder.svg?height=200&width=200",
-      productCount: 340,
-      icon: "🧸",
-      isHot: false,
-      isNew: false,
-      isTrending: false,
-      color: "from-yellow-500 to-amber-600",
-      badge: null,
-    },
-  ]
+  /**
+   * Retourne une classe Tailwind de dégradé stable pour une catégorie.
+   */
+  const getCategoryGradient = (index: number) => {
+    const gradients = [
+      'from-blue-500 to-purple-600',
+      'from-pink-500 to-red-500',
+      'from-green-500 to-emerald-600',
+      'from-orange-500 to-red-600',
+      'from-indigo-500 to-blue-600',
+      'from-teal-500 to-cyan-600',
+      'from-yellow-500 to-orange-600',
+      'from-rose-500 to-pink-600'
+    ]
+    const safeIndex = Number.isFinite(index) ? Math.max(0, index) : 0
+    return gradients[safeIndex % gradients.length]
+  }
+
+  /**
+   * Charge les catégories réelles depuis Supabase via l'API publique.
+   * Compte le nombre de produits actifs par catégorie.
+   */
+  useEffect(() => {
+    let cancelled = false
+
+    const loadCategories = async () => {
+      setIsLoading(true)
+      try {
+        const res = await fetch('/api/catalog/categories', { method: 'GET', cache: 'no-store' })
+        const json = await res.json().catch(() => null)
+        const raw = Array.isArray(json?.data?.items) ? json.data.items : []
+
+        if (cancelled) return
+
+        // Pour chaque catégorie, compter les produits actifs
+        const categoriesWithCounts = await Promise.all(
+          raw.map(async (cat: any) => {
+            const catId = String(cat?.id ?? '').trim()
+            const catName = String(cat?.name ?? '').trim()
+            
+            // Compter les produits actifs dans cette catégorie
+            let productCount = 0
+            try {
+              const countRes = await fetch(`/api/catalog/categories/${catId}/product-count`, { 
+                method: 'GET', 
+                cache: 'no-store' 
+              })
+              const countJson = await countRes.json().catch(() => null)
+              productCount = Number(countJson?.data?.count ?? 0) || 0
+            } catch {
+              productCount = 0
+            }
+
+            return {
+              id: catId,
+              name: catName,
+              description: String(cat?.description ?? `Découvrez nos produits ${catName}`),
+              image: "/placeholder.svg?height=200&width=200",
+              productCount,
+              icon: String(cat?.icon ?? '🏷️'),
+              isHot: false,
+              isNew: false,
+              isTrending: false,
+              color: getCategoryGradient(raw.indexOf(cat)),
+              badge: null,
+              slug: cat?.slug ?? catName.toLowerCase().replace(/\s+/g, '-'),
+            }
+          })
+        )
+
+        if (!cancelled) {
+          setCategories(categoriesWithCounts)
+        }
+      } catch {
+        if (!cancelled) setCategories([])
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+
+    loadCategories()
+    return () => { cancelled = true }
+  }, [])
 
   const filteredCategories = categories.filter(
     (category) =>
@@ -212,11 +192,20 @@ export default function CategoriesPage() {
         </div>
 
         {/* Enhanced Categories Grid */}
-        <div
-          className={`grid gap-6 animate-fade-in-up animation-delay-800 ${
-            viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
-          }`}
-        >
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-orange-200 border-t-[#ff6600] rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Chargement des catégories...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              className={`grid gap-6 animate-fade-in-up animation-delay-800 ${
+                viewMode === "grid" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
+              }`}
+            >
           {filteredCategories.map((category, index) => (
             <Card
               key={category.id}
@@ -321,19 +310,21 @@ export default function CategoriesPage() {
               </Link>
             </Card>
           ))}
-        </div>
+            </div>
 
-        {filteredCategories.length === 0 && (
-          <div className="text-center py-12 animate-fade-in-up">
-            <div className="text-6xl mb-4">🔍</div>
-            <p className="text-gray-500 text-lg">Aucune catégorie trouvée pour "{searchQuery}"</p>
-            <Button 
-              className="mt-4 bg-[#ff6600] hover:bg-[#e55a00]"
-              onClick={() => setSearchQuery("")}
-            >
-              Effacer la recherche
-            </Button>
-          </div>
+            {filteredCategories.length === 0 && (
+              <div className="text-center py-12 animate-fade-in-up">
+                <div className="text-6xl mb-4">🔍</div>
+                <p className="text-gray-500 text-lg">Aucune catégorie trouvée pour "{searchQuery}"</p>
+                <Button 
+                  className="mt-4 bg-[#ff6600] hover:bg-[#e55a00]"
+                  onClick={() => setSearchQuery("")}
+                >
+                  Effacer la recherche
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

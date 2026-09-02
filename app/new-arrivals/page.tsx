@@ -74,129 +74,6 @@ export default function NewArrivalsPage() {
     setIsModalOpen(true)
   }
 
-  const newArrivals = [
-    {
-      id: "1",
-      name: "iPhone 16 Pro Max 512GB",
-      price: 1450000,
-      pointsPrice: 14500,
-      originalPrice: 1600000,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.9,
-      reviews: 23,
-      seller: "Apple Store Official",
-      shareData: { facebook: 12, twitter: 8, whatsapp: 19, instagram: 15 },
-      discount: 9,
-      daysAgo: 1,
-      isNew: true,
-      isHot: true,
-      isLimited: false,
-      sharePoints: 120,
-      badges: ["🆕 Nouveau", "🔥 Bestseller", "⚡ Livraison Express"],
-      color: "from-blue-500 to-purple-600",
-    },
-    {
-      id: "2",
-      name: "Samsung Galaxy Z Fold 6",
-      price: 1800000,
-      pointsPrice: 18000,
-      originalPrice: 2000000,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.7,
-      reviews: 18,
-      seller: "Samsung Premium",
-      shareData: { facebook: 8, twitter: 5, whatsapp: 14, instagram: 11 },
-      discount: 10,
-      daysAgo: 2,
-      isNew: true,
-      isHot: true,
-      isLimited: false,
-      sharePoints: 100,
-      badges: ["🆕 Nouveau", "📱 Smartphone Pro", "⚡ Livraison Express"],
-      color: "from-green-500 to-emerald-600",
-    },
-    {
-      id: "3",
-      name: "MacBook Air M3 15 pouces",
-      price: 1650000,
-      pointsPrice: 16500,
-      originalPrice: 1800000,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.8,
-      reviews: 31,
-      seller: "Tech Innovation",
-      shareData: { facebook: 15, twitter: 9, whatsapp: 22, instagram: 18 },
-      discount: 8,
-      daysAgo: 3,
-      isNew: true,
-      isHot: false,
-      isLimited: false,
-      sharePoints: 90,
-      badges: ["🆕 Nouveau", "💻 Laptop Pro", "⚡ Livraison Express"],
-      color: "from-orange-500 to-red-600",
-    },
-    {
-      id: "4",
-      name: "PlayStation 5 Pro",
-      price: 850000,
-      pointsPrice: 8500,
-      originalPrice: 950000,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.6,
-      reviews: 45,
-      seller: "Gaming Paradise",
-      shareData: { facebook: 28, twitter: 16, whatsapp: 35, instagram: 24 },
-      discount: 11,
-      daysAgo: 5,
-      isNew: true,
-      isHot: true,
-      isLimited: true,
-      sharePoints: 80,
-      badges: ["🆕 Nouveau", "🎮 Gaming Pro", "⏰ Offre Limitée"],
-      color: "from-purple-500 to-indigo-600",
-    },
-    {
-      id: "5",
-      name: "Tesla Model Y Accessories Kit",
-      price: 450000,
-      pointsPrice: 4500,
-      originalPrice: 520000,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.5,
-      reviews: 12,
-      seller: "Auto Premium",
-      shareData: { facebook: 6, twitter: 3, whatsapp: 11, instagram: 8 },
-      discount: 13,
-      daysAgo: 4,
-      isNew: true,
-      isHot: false,
-      isLimited: false,
-      sharePoints: 70,
-      badges: ["🆕 Nouveau", "🚗 Auto Pro", "⚡ Livraison Express"],
-      color: "from-red-500 to-pink-600",
-    },
-    {
-      id: "6",
-      name: "Dyson V15 Detect Absolute",
-      price: 680000,
-      pointsPrice: 6800,
-      originalPrice: 750000,
-      image: "/placeholder.svg?height=300&width=300",
-      rating: 4.7,
-      reviews: 27,
-      seller: "Home & Living",
-      shareData: { facebook: 18, twitter: 11, whatsapp: 26, instagram: 19 },
-      discount: 9,
-      daysAgo: 6,
-      isNew: true,
-      isHot: false,
-      isLimited: false,
-      sharePoints: 60,
-      badges: ["🆕 Nouveau", "🏠 Home Pro", "⚡ Livraison Express"],
-      color: "from-teal-500 to-cyan-600",
-    },
-  ]
-
   /**
    * Charge les catégories réelles du site depuis la base (via API publique).
    */
@@ -279,15 +156,6 @@ export default function NewArrivalsPage() {
       window.clearTimeout(handle)
     }
   }, [phoneNumber, email, showAlertsModal])
-
-  const categories = [
-    { id: "tech", name: "Technologie", icon: "💻", color: "from-blue-500 to-purple-600" },
-    { id: "fashion", name: "Mode", icon: "👗", color: "from-pink-500 to-red-500" },
-    { id: "home", name: "Maison", icon: "🏠", color: "from-green-500 to-emerald-600" },
-    { id: "sports", name: "Sport", icon: "⚽", color: "from-orange-500 to-red-600" },
-    { id: "beauty", name: "Beauté", icon: "💄", color: "from-purple-500 to-pink-600" },
-    { id: "gaming", name: "Gaming", icon: "🎮", color: "from-indigo-500 to-purple-600" },
-  ]
 
   const [upcomingEvents, setUpcomingEvents] = useState<
     Array<{
@@ -965,7 +833,7 @@ export default function NewArrivalsPage() {
                     ) : upcomingEvents.length === 0 ? (
                       <div className="col-span-1 md:col-span-2 text-sm text-gray-600">Aucun événement disponible pour le moment.</div>
                     ) : upcomingEvents.map((event) => {
-                      const category = categories.find((cat) => cat.id === event.categoryKey)
+                      const category = siteCategories.find((cat) => cat.id === event.categoryKey)
                       const categoryName = event.categoryLabel || category?.name || ''
                       const categoryIcon = event.categoryIcon || category?.icon || '📅'
                       const eventDate = new Date(event.date)
@@ -1045,7 +913,7 @@ export default function NewArrivalsPage() {
                       <div className="text-sm text-gray-600">Événements à venir</div>
                     </div>
                     <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                      <div className="text-2xl font-bold text-blue-600">{siteEventStats?.categoriesCount ?? categories.length}</div>
+                      <div className="text-2xl font-bold text-blue-600">{siteEventStats?.categoriesCount ?? siteCategories.length}</div>
                       <div className="text-sm text-gray-600">Catégories</div>
                     </div>
                     <div className="text-center p-4 bg-white rounded-lg shadow-sm">
