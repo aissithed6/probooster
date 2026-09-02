@@ -67,7 +67,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ exp
     const cookieHeader = request.headers.get('cookie') ?? ''
 
     const periodKey = typeof payload?.period === 'string' && payload.period ? payload.period : '30d'
-    const analyticsRes = await fetch(`${origin}/api/super-admin/advanced-analytics?period=${encodeURIComponent(periodKey)}`, {
+    let analyticsUrl = `${origin}/api/super-admin/advanced-analytics?period=${encodeURIComponent(periodKey)}`
+    if (periodKey === 'custom') {
+      if (payload?.startDate) analyticsUrl += `&start=${encodeURIComponent(payload.startDate)}`
+      if (payload?.endDate) analyticsUrl += `&end=${encodeURIComponent(payload.endDate)}`
+    }
+    const analyticsRes = await fetch(analyticsUrl, {
       method: 'GET',
       headers: {
         authorization: request.headers.get('authorization') ?? '',

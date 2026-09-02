@@ -396,11 +396,16 @@ export default function AdvancedAnalytics() {
   /**
    * Charge les analytics depuis l'API Super Admin.
    */
-  const loadAdvancedAnalytics = async (period: string) => {
+  const loadAdvancedAnalytics = async (period: string, startDate?: string, endDate?: string) => {
     setIsLoading(true)
     setAnalyticsError(null)
     try {
-      const res = await fetch(`/api/super-admin/advanced-analytics?period=${encodeURIComponent(period)}`, {
+      let url = `/api/super-admin/advanced-analytics?period=${encodeURIComponent(period)}`
+      if (period === 'custom') {
+        if (startDate) url += `&start=${encodeURIComponent(startDate)}`
+        if (endDate) url += `&end=${encodeURIComponent(endDate)}`
+      }
+      const res = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -434,7 +439,12 @@ export default function AdvancedAnalytics() {
 
   // Charger les analytics à l'initialisation et lors du changement de période.
   useEffect(() => {
-    void loadAdvancedAnalytics(selectedPeriod)
+    if (selectedPeriod === 'custom') {
+      void loadAdvancedAnalytics('custom', exportConfig.startDate || undefined, exportConfig.endDate || undefined)
+    } else {
+      void loadAdvancedAnalytics(selectedPeriod)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod])
 
   // Charger l'historique export + rapports depuis l'API (pas de données mock)
@@ -610,18 +620,37 @@ export default function AdvancedAnalytics() {
     }
   }
 
-  const toggleReportStatus = (reportId: string) => {
+  const toggleReportStatus = async (reportId: string) => {
     const next = reports.find((r) => r.id === reportId)
     if (!next) return
 
-    const isActive = !Boolean(next.isActive)
+    const isActive = !next.isActive
     setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, isActive } : r)))
 
-    void fetch(`/api/super-admin/analytics-reports/${encodeURIComponent(reportId)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isActive })
-    }).catch(() => null)
+    try {
+      const res = await fetch(`/api/super-admin/analytics-reports/${encodeURIComponent(reportId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive })
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(String((json as any)?.error ?? 'Échec de la mise à jour'))
+      }
+      addNotification({
+        type: 'success',
+        title: 'Rapport',
+        message: isActive ? 'Rapport activé.' : 'Rapport désactivé.'
+      })
+    } catch (error) {
+      // Revenir à l'état persistant en base en cas d'échec.
+      setReports((prev) => prev.map((r) => (r.id === reportId ? { ...r, isActive: next.isActive } : r)))
+      addNotification({
+        type: 'error',
+        title: 'Rapport',
+        message: error instanceof Error ? error.message : "Impossible de modifier le rapport."
+      })
+    }
   }
 
   const deleteReport = async (reportId: string) => {
@@ -1529,7 +1558,12 @@ export default function AdvancedAnalytics() {
               </Button>
               <Button 
                 className="bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => setShowPeriodModal(false)}
+                onClick={() => {
+                  setShowPeriodModal(false)
+                  if (selectedPeriod === 'custom') {
+                    void loadAdvancedAnalytics('custom', exportConfig.startDate || undefined, exportConfig.endDate || undefined)
+                  }
+                }}
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Appliquer
@@ -1571,8 +1605,6 @@ export default function AdvancedAnalytics() {
                         <SelectItem value="all">Données complètes</SelectItem>
                         <SelectItem value="sales">Données de ventes</SelectItem>
                         <SelectItem value="users">Analytics utilisateurs</SelectItem>
-                        <SelectItem value="products">Performance produits</SelectItem>
-                        <SelectItem value="financial">Données financières</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -2788,7 +2820,7 @@ export default function AdvancedAnalytics() {
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={report.isActive}
-                            onCheckedChange={() => toggleReportStatus(report.id)}
+                            onCheckedChange={() => void toggleReportStatus(report.id)}
                           />
                           <Button
                             size="sm"
