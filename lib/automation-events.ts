@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 
 import { getSupabaseAdmin } from '@/lib/supabase'
+import { processAutomationEvent } from '@/lib/automation/engine'
 
 export type RecordAutomationEventParams = {
   source?: string
@@ -58,7 +59,16 @@ export async function recordAutomationEvent(params: RecordAutomationEventParams)
     }
 
     const id = (data as any)?.id
-    return typeof id === 'string' && id.length > 0 ? id : null
+    const eventId = typeof id === 'string' && id.length > 0 ? id : null
+
+    // Déclenche le moteur d'automatisation (best-effort, ne bloque pas l'appelant).
+    if (eventId) {
+      void processAutomationEvent(eventId).catch((e) => {
+        console.warn('⚠️ processAutomationEvent failed:', e)
+      })
+    }
+
+    return eventId
   } catch (error) {
     console.warn('⚠️ recordAutomationEvent unexpected error:', error)
     return null

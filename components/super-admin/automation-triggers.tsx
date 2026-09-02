@@ -77,6 +77,7 @@ interface AutomationExecution {
   id: string
   triggerId: string
   triggerName: string
+  eventId?: string
   status: 'success' | 'failed' | 'running' | 'cancelled'
   startTime: string
   endTime?: string
@@ -532,6 +533,7 @@ export default function AutomationTriggers() {
       id: String(row?.id ?? ''),
       triggerId,
       triggerName,
+      eventId: row?.event_id ? String(row.event_id) : undefined,
       status,
       startTime: startedAt,
       endTime: finishedAt || undefined,
@@ -539,6 +541,45 @@ export default function AutomationTriggers() {
       errorMessage: row?.error_message ? String(row.error_message) : undefined,
       retryCount: 0,
       data: output
+    }
+  }
+
+  /**
+   * Relance le traitement de l'événement d'une exécution via le moteur d'automatisation
+   * (POST /api/super-admin/automation-executions), puis recharge la liste.
+   */
+  const relaunchExecution = async (execution: AutomationExecution) => {
+    if (!execution.eventId) {
+      addNotification({
+        type: 'warning',
+        title: 'Relance',
+        message: "Aucun événement source associé à cette exécution : relance impossible."
+      })
+      return
+    }
+    try {
+      const res = await fetch('/api/super-admin/automation-executions', {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: execution.eventId })
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(String(json?.error ?? 'Relance échouée'))
+      }
+      addNotification({
+        type: 'success',
+        title: 'Relance',
+        message: String(json?.data?.message ?? 'Relance effectuée.')
+      })
+      await loadAutomationExecutions()
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Relance',
+        message: error instanceof Error ? error.message : 'Erreur lors de la relance.'
+      })
     }
   }
 
@@ -1942,6 +1983,12 @@ export default function AutomationTriggers() {
                           <Eye className="h-4 w-4 mr-2" />
                           Voir détails
                         </Button>
+                        {execution.eventId && (
+                          <Button size="sm" variant="outline" onClick={() => void relaunchExecution(execution)}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Relancer
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
