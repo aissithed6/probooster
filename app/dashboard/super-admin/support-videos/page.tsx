@@ -1,7 +1,6 @@
 "use client"
 
-import { createClientComponentClient } from '@supabase/auth-helpers-react'
-import { Database } from '@/lib/database/types'
+import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -40,7 +39,6 @@ const CATEGORIES = [
 export default function SupportVideosAdminPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [supabase] = useState(() => createClientComponentClient<Database>())
   const [videos, setVideos] = useState<SupportVideo[]>([])
   const [filteredVideos, setFilteredVideos] = useState<SupportVideo[]>([])
   const [isLoading, setIsLoading] = useState(true)
