@@ -360,7 +360,7 @@ export default function SupportVideosAdminPage() {
 
         {/* Dialog d'ajout/édition */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingVideo ? 'Modifier la vidéo' : 'Ajouter une vidéo'}
@@ -430,7 +430,7 @@ export default function SupportVideosAdminPage() {
                 </div>
               </div>
               {formData.youtube_id && (
-                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                <div className="aspect-video bg-black rounded-lg overflow-hidden max-h-[40vh]">
                   <iframe
                     src={`https://www.youtube.com/embed/${formData.youtube_id}`}
                     title="Aperçu"
