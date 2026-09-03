@@ -122,8 +122,12 @@ export default function NewArrivalsSection({ onProductClick, onStartChat, search
             badges: Array.isArray(p?.badges) ? p.badges : [],
             color: String(p?.color ?? 'black'),
             rank: idx + 1,
-            sales: Number(p?.sales ?? 0) || 0,
-            daysAgo: 30
+            sales: Number(p?.totalSales ?? p?.sales ?? 0) || 0,
+            daysAgo: (() => {
+              const created = p?.createdAt ? new Date(String(p.createdAt)).getTime() : NaN
+              if (!Number.isFinite(created)) return 0
+              return Math.max(0, Math.floor((Date.now() - created) / (24 * 60 * 60 * 1000)))
+            })()
           }
         })
 

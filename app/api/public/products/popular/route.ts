@@ -45,6 +45,8 @@ type PublicPopularProduct = {
   stockQuantity: number | null
   manageStock: boolean | null
   totalSales: number
+  rating: number
+  reviews: number
   shareCount: number
   viewCount: number
   chatCount: number
@@ -208,6 +210,8 @@ export async function GET(request: NextRequest) {
         stockQuantity: stockCount,
         manageStock,
         totalSales,
+        rating: toNumber(stats?.average_rating ?? 0, 0),
+        reviews: toNumber(stats?.review_count ?? 0, 0),
         shareCount,
         viewCount,
         chatCount,

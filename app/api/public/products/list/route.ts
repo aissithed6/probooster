@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('user_products')
       .select(
-        'id,name,price,sale_price,original_price,vendor_id,product_status,main_image,images,is_virtual,is_downloadable,created_at,stock_quantity,manage_stock,free_shipping,product_category_assignments(category_id)'
+        'id,name,price,sale_price,original_price,vendor_id,product_status,main_image,images,is_virtual,is_downloadable,created_at,stock_quantity,manage_stock,free_shipping,product_category_assignments(category_id),product_statistics(total_sales,average_rating,review_count)'
       )
       .neq('product_status', 'archived')
       .order('created_at', { ascending: false })
@@ -245,7 +245,10 @@ export async function GET(request: NextRequest) {
         manageStock: manageStock === null ? null : manageStock,
         inStock,
         shares: includeShareStats ? (shareStats?.total ?? 0) : 0,
-        shareData: includeShareStats ? (shareStats?.byPlatform ?? {}) : {}
+        shareData: includeShareStats ? (shareStats?.byPlatform ?? {}) : {},
+        totalSales: Number((row as any)?.product_statistics?.total_sales ?? 0) || 0,
+        rating: Number((row as any)?.product_statistics?.average_rating ?? 0) || 0,
+        reviews: Number((row as any)?.product_statistics?.review_count ?? 0) || 0
       }
     })
 

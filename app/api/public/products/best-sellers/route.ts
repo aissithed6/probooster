@@ -45,6 +45,8 @@ type PublicBestSellerProduct = {
   stockQuantity: number | null
   manageStock: boolean | null
   totalSales: number
+  rating: number
+  reviews: number
   discount: number
   createdAt: string | null
 }
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('user_products')
       .select(
-        'id,name,price,sale_price,original_price,vendor_id,product_status,main_image,images,created_at,stock_quantity,manage_stock,product_statistics(total_sales)'
+        'id,name,price,sale_price,original_price,vendor_id,product_status,main_image,images,created_at,stock_quantity,manage_stock,product_statistics(total_sales,average_rating,review_count)'
       )
       .neq('product_status', 'archived')
       .order('total_sales', { ascending: false, nullsFirst: false, referencedTable: 'product_statistics' } as any)
@@ -164,6 +166,8 @@ export async function GET(request: NextRequest) {
         stockQuantity: stockCount,
         manageStock,
         totalSales,
+        rating: Number((row as any)?.product_statistics?.average_rating ?? 0) || 0,
+        reviews: Number((row as any)?.product_statistics?.review_count ?? 0) || 0,
         discount,
         createdAt
       }
