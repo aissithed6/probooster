@@ -22,7 +22,8 @@ export function middleware(request: NextRequest) {
     automatisation: 'automation',
     analyses: 'analytics',
     design: 'design',
-    'messages-conseils': 'messages-conseils'
+    'messages-conseils': 'messages-conseils',
+    'support-videos': 'support-videos'
   }
 
   const sellerTabBySlug: Record<string, string> = {
