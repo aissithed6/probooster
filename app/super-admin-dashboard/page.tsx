@@ -10,7 +10,7 @@ import {
   CheckCircle, AlertTriangle, Clock,
   Heart, Share2, CreditCard, Truck,
   FileText, Lock, Mail, Smartphone, Trash2,
-  MessageCircleMore, Loader2
+  MessageCircleMore, Loader2, Video
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -54,7 +54,8 @@ const SECTION_SLUG_BY_ID: Record<string, string> = {
   automation: 'automatisation',
   analytics: 'analyses',
   design: 'design',
-  'messages-conseils': 'messages-conseils'
+  'messages-conseils': 'messages-conseils',
+  'support-videos': 'support-videos'
 }
 
 const SECTION_ID_BY_SLUG: Record<string, string> = Object.entries(SECTION_SLUG_BY_ID).reduce(
@@ -83,6 +84,7 @@ const AdvancedAnalytics = dynamic(() => import('@/components/super-admin/advance
 const DesignUX = dynamic(() => import('@/components/super-admin/design-ux'), { ssr: false })
 const SharesEngagementSuperAdmin = dynamic(() => import('@/components/super-admin/shares-engagement'), { ssr: false })
 const EditableMessagesManager = dynamic(() => import('@/components/admin/editable-messages-manager'), { ssr: false })
+const SupportVideosAdmin = dynamic(() => import('@/app/dashboard/super-admin/support-videos/page'), { ssr: false })
 
 const EMPTY_OVERVIEW: SuperAdminOverviewStats = {
   totalUsers: 0,
@@ -740,6 +742,13 @@ function SuperAdminDashboardClient() {
       icon: MessageCircleMore,
       description: 'Gérer les messages affichés aux utilisateurs',
       color: 'from-teal-500 to-teal-600'
+    },
+    {
+      id: 'support-videos',
+      title: 'Vidéos Tutoriels',
+      icon: Video,
+      description: 'Gérer les vidéos YouTube du centre de ressources',
+      color: 'from-red-500 to-red-600'
     }
   ]
 
@@ -796,6 +805,8 @@ function SuperAdminDashboardClient() {
         return <DesignUX />
       case 'messages-conseils':
         return <EditableMessagesManager userId={user?.id || ''} />
+      case 'support-videos':
+        return <SupportVideosAdmin />
       default:
         return <SuperAdminOverview stats={stats} />
     }
