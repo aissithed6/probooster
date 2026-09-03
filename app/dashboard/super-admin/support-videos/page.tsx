@@ -65,13 +65,15 @@ export default function SupportVideosAdminPage() {
         return
       }
 
-      const { data: profile } = await supabase
-        .from('profiles')
+      const { data: userRow } = await supabase
+        .from('users')
         .select('role')
         .eq('id', user.id)
         .single()
 
-      if (profile?.role !== 'super_admin' && profile?.role !== 'admin') {
+      const role = userRow?.role
+
+      if (role !== 'super_admin' && role !== 'admin') {
         toast({
           title: 'Accès refusé',
           description: 'Vous devez être administrateur pour accéder à cette page.',

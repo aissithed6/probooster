@@ -52,14 +52,14 @@ create policy "support_videos_admin_all"
   on public.support_videos for all
   using (
     exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role in ('super_admin', 'admin')
+      select 1 from public.users u
+      where u.id = auth.uid() and u.role in ('super_admin', 'admin')
     )
   )
   with check (
     exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.role in ('super_admin', 'admin')
+      select 1 from public.users u
+      where u.id = auth.uid() and u.role in ('super_admin', 'admin')
     )
   );
 
