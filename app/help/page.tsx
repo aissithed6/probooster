@@ -49,6 +49,7 @@ import { useChatContext } from "@/lib/chat-context-supabase"
 import { ChatService } from "@/lib/services/chat-service"
 import { toast } from "react-hot-toast"
 import Link from "next/link"
+import { VideoTutorialsModal } from "@/components/support/VideoTutorialsModal"
 
 const ICON_MAP: Record<string, any> = {
   HelpCircle,
@@ -85,6 +86,7 @@ export default function HelpCenterPage() {
 
   // Support Ticket Form
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false)
+  const [showVideoTutorials, setShowVideoTutorials] = useState(false)
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false)
   const [ticketData, setTicketData] = useState({
     name: "",
@@ -230,7 +232,7 @@ export default function HelpCenterPage() {
       description: "Guides visuels",
       icon: Video,
       color: "from-purple-500 to-violet-500",
-      action: () => toast.info("Bientôt disponible !")
+      action: () => setShowVideoTutorials(true)
     }
   ]
 
@@ -611,6 +613,8 @@ export default function HelpCenterPage() {
              </DialogFooter>
            </DialogContent>
          </Dialog>
+
+         <VideoTutorialsModal open={showVideoTutorials} onOpenChange={setShowVideoTutorials} />
        </div>
      </div>
    )
