@@ -126,16 +126,23 @@ export class HelpService {
 
   private static getFallbackCategories(): HelpCategory[] {
     return [
-      { id: '1', name: 'Général', description: 'Questions courantes', icon: 'HelpCircle', color: 'from-blue-500 to-cyan-500', articles_count: 5 },
-      { id: '2', name: 'Compte', description: 'Gestion profil', icon: 'Users', color: 'from-green-500 to-emerald-500', articles_count: 3 },
-      { id: '3', name: 'Shopping', description: 'Achats & Commandes', icon: 'ShoppingCart', color: 'from-orange-500 to-red-500', articles_count: 8 }
+      { id: 'gen', name: 'Général', description: 'Questions courantes sur Probooster', icon: 'HelpCircle', color: 'from-blue-500 to-cyan-500', articles_count: 5 },
+      { id: 'compte', name: 'Compte & Profil', description: 'Gestion de votre compte et informations personnelles', icon: 'Users', color: 'from-green-500 to-emerald-500', articles_count: 4 },
+      { id: 'shopping', name: 'Shopping', description: 'Tout sur l\'achat de produits et services', icon: 'ShoppingCart', color: 'from-orange-500 to-red-500', articles_count: 4 },
+      { id: 'points', name: 'Système de Points', description: 'Comment gagner et utiliser vos points', icon: 'Gift', color: 'from-purple-500 to-violet-500', articles_count: 3 },
+      { id: 'paiement', name: 'Paiement', description: 'Méthodes de paiement et sécurité', icon: 'CreditCard', color: 'from-yellow-500 to-orange-500', articles_count: 4 },
+      { id: 'livraison', name: 'Livraison', description: 'Suivi de commande et délais de livraison', icon: 'Truck', color: 'from-indigo-500 to-purple-500', articles_count: 5 }
     ]
   }
 
   private static getFallbackPopularArticles(): HelpArticle[] {
     return [
-      { id: 'p1', category_id: '1', title: 'Comment créer un compte ?', content: '...', views: 1200, rating: 4.8, is_popular: true },
-      { id: 'p2', category_id: '3', title: 'Suivre ma commande', content: '...', views: 950, rating: 4.7, is_popular: true }
+      { id: 'fp1', category_id: 'gen', title: 'Bienvenue sur Probooster : guide de démarrage', content: '<h2>Bienvenue sur Probooster</h2><p>Guide de démarrage complet pour créer votre compte, explorer les catégories et passer votre première commande.</p>', views: 1500, rating: 4.9, is_popular: true },
+      { id: 'fp2', category_id: 'shopping', title: 'Suivre ma commande en temps réel', content: '<h2>Suivi de commande</h2><p>Suivez l\'état de votre commande : confirmée, préparée, expédiée ou livrée.</p>', views: 1420, rating: 4.9, is_popular: true },
+      { id: 'fp3', category_id: 'livraison', title: 'Quels sont les délais de livraison ?', content: '<h2>Délais indicatifs</h2><p>2 à 5 jours ouvrés en standard, 1 à 2 jours en express.</p>', views: 1390, rating: 4.8, is_popular: true },
+      { id: 'fp4', category_id: 'livraison', title: 'Suivre ma livraison', content: '<h2>Suivi du colis</h2><p>Utilisez le numéro de suivi reçu par email pour suivre votre colis en temps réel.</p>', views: 1340, rating: 4.9, is_popular: true },
+      { id: 'fp5', category_id: 'compte', title: 'Comment créer un compte ?', content: '<h2>Créer votre compte</h2><p>Créez votre compte gratuit en quelques minutes et validez votre email.</p>', views: 1320, rating: 4.8, is_popular: true },
+      { id: 'fp6', category_id: 'paiement', title: 'Les paiements sont-ils sécurisés ?', content: '<h2>Sécurité des transactions</h2><p>Cryptage SSL de niveau bancaire pour toutes vos transactions.</p>', views: 1320, rating: 4.9, is_popular: true }
     ]
   }
 
