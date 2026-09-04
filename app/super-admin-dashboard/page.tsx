@@ -954,7 +954,18 @@ function SuperAdminDashboardClient() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-r from-red-50 to-red-100 border-red-200">
+          <Card
+            className="bg-gradient-to-r from-red-50 to-red-100 border-red-200 cursor-pointer transition-shadow hover:shadow-md"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigateToSection('seller-applications')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                navigateToSection('seller-applications')
+              }
+            }}
+          >
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
