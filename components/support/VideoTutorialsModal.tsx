@@ -182,6 +182,7 @@ export function VideoTutorialsModal({ open, onOpenChange }: VideoTutorialsModalP
                           </div>
                         </div>
                     </div>
+                    </div>
                   ))}
                 </div>
               )}
