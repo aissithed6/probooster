@@ -1,6 +1,7 @@
 "use client"
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { 
   Users, Package, ShoppingCart, DollarSign, 
   TrendingUp, Settings, Bell, MessageSquare,
@@ -121,6 +122,7 @@ export default function SuperAdminDashboard() {
 
 function SuperAdminDashboardClient() {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { formatMoney } = useMoney()
@@ -293,6 +295,18 @@ function SuperAdminDashboardClient() {
       setActiveSection(section)
     }
   }, [activeSection, searchParams])
+
+  // Résout la section depuis le slug d'URL (/super-admin-dashboard/<slug>)
+  useEffect(() => {
+    const segments = pathname?.split('/').filter(Boolean) ?? []
+    const slug = segments.length > 1 ? segments[segments.length - 1] : ''
+    if (!slug) return
+
+    const sectionId = SECTION_ID_BY_SLUG[slug]
+    if (sectionId && sectionId !== activeSection) {
+      setActiveSection(sectionId)
+    }
+  }, [activeSection, pathname])
 
   useEffect(() => {
     let cancelled = false
