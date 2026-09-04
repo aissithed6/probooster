@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type FormEvent } from "react"
+import { useState, useEffect, type FormEvent } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -31,6 +31,17 @@ import {
   FileText,
   Clipboard
 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
+
+type SellerTestimonial = {
+  name: string
+  business: string
+  image: string
+  rating: number
+  text: string
+  sales: string
+  time: string
+}
 
 export default function BecomeSellerPage() {
   const [formData, setFormData] = useState({
@@ -103,7 +114,7 @@ export default function BecomeSellerPage() {
     }
   ]
 
-  const testimonials = [
+  const fallbackTestimonials: SellerTestimonial[] = [
     {
       name: "Fatou Diallo",
       business: "Mode Africaine",
@@ -132,6 +143,42 @@ export default function BecomeSellerPage() {
       time: "8 mois"
     }
   ]
+
+  // Témoignages chargés depuis Supabase (table `testimonials`).
+  // En cas d'échec ou de table absente, on garde les témoignages de secours ci-dessus.
+  const [testimonials, setTestimonials] = useState<SellerTestimonial[]>(fallbackTestimonials)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from("testimonials")
+          .select("name, business, avatar_url, rating, content, sales_growth, duration")
+          .eq("is_active", true)
+          .order("display_order", { ascending: true })
+
+        if (cancelled || error || !data || data.length === 0) return
+
+        const mapped: SellerTestimonial[] = data.map((t: any) => ({
+          name: t.name,
+          business: t.business,
+          image: t.avatar_url || "/placeholder-user.jpg",
+          rating: t.rating ?? 5,
+          text: t.content,
+          sales: t.sales_growth || "+100%",
+          time: t.duration || "6 mois"
+        }))
+
+        if (mapped.length > 0) setTestimonials(mapped)
+      } catch {
+        // Silencieux : les témoignages de secours restent affichés
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const resources = [
     {
