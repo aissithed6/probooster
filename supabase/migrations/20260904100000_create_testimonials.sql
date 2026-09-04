@@ -30,7 +30,7 @@ create policy "lecture_publique_temoignages_actifs"
 
 -- Trigger updated_at (fonction locale, migration autonome)
 create or replace function public.set_testimonials_updated_at()
-returns trigger language plpgsql as $$
+returns trigger as $$
 begin
   new.updated_at = now();
   return new;
