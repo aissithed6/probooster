@@ -31,7 +31,10 @@ import {
   FileText,
   Clipboard
 } from "lucide-react"
-import { supabase } from "@/lib/supabase"
+import { supabase, getClientAccessTokenSafe } from "@/lib/supabase"
+import { useAuth } from "@/contexts/AuthContext"
+import { useRouter } from "next/navigation"
+import { Loader2, LogIn, Store as StoreIcon } from "lucide-react"
 
 type SellerTestimonial = {
   name: string
@@ -59,6 +62,18 @@ export default function BecomeSellerPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submissionStep, setSubmissionStep] = useState(1)
+  const { user, userProfile, session, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  // Préremplit le formulaire avec les informations du compte connecté
+  useEffect(() => {
+    if (!user) return
+    setFormData((prev) => ({
+      ...prev,
+      email: prev.email || user.email || '',
+      ownerName: prev.ownerName || [userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ')
+    }))
+  }, [user, userProfile])
 
   const benefits = [
     {
@@ -290,17 +305,30 @@ export default function BecomeSellerPage() {
     setIsSubmitting(true)
     
     try {
+      // Connexion obligatoire pour postuler
+      if (!user) {
+        alert('Vous devez être connecté pour soumettre une candidature vendeur.')
+        router.push('/auth/login?redirect=/become-seller')
+        return
+      }
+
       // Validation des données
       if (!formData.businessName || !formData.ownerName || !formData.email || !formData.phone) {
         alert('Veuillez remplir tous les champs obligatoires')
         setIsSubmitting(false)
         return
       }
-      
+
+      // Jeton de session pour l'authentification côté API
+      const token = session?.access_token ?? (await getClientAccessTokenSafe())
+
       // Soumission réelle vers l'API (insertion dans Supabase, table seller_applications)
       const res = await fetch('/api/sellers/apply', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           businessName: formData.businessName,
           ownerName: formData.ownerName,
@@ -575,7 +603,33 @@ export default function BecomeSellerPage() {
 
             <Card className="border-0 shadow-xl">
               <CardContent className="p-8">
-                {submissionStep === 1 && (
+                {submissionStep === 1 && authLoading && (
+                  <div className="flex items-center justify-center py-16 text-gray-500">
+                    <Loader2 className="h-6 w-6 animate-spin mr-3" />
+                    <span>Vérification de votre session…</span>
+                  </div>
+                )}
+
+                {submissionStep === 1 && !authLoading && user?.role === 'vendor' && (
+                  <div className="text-center py-12 space-y-4">
+                    <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                      <StoreIcon className="h-8 w-8 text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">Vous êtes déjà vendeur</h3>
+                    <p className="text-gray-600 max-w-md mx-auto">
+                      Votre compte dispose déjà du rôle vendeur. Accédez directement à votre espace vendeur pour gérer votre boutique.
+                    </p>
+                    <Button
+                      className="bg-[#ff6600] hover:bg-[#e55c00] text-white"
+                      onClick={() => router.push('/seller-dashboard')}
+                    >
+                      Accéder à mon espace vendeur
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {submissionStep === 1 && !authLoading && user && user.role !== 'vendor' && (
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="space-y-2">
@@ -716,6 +770,35 @@ export default function BecomeSellerPage() {
                       )}
                     </Button>
                   </form>
+                )}
+
+                {submissionStep === 1 && !authLoading && !user && (
+                  <div className="text-center py-12 space-y-4">
+                    <div className="mx-auto w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center">
+                      <LogIn className="h-8 w-8 text-[#ff6600]" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">Connexion requise</h3>
+                    <p className="text-gray-600 max-w-md mx-auto">
+                      Vous devez être connecté à votre compte pour soumettre une candidature vendeur.
+                      Cela permet de lier automatiquement votre boutique à votre compte lors de l'approbation.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <Button
+                        className="bg-[#ff6600] hover:bg-[#e55c00] text-white"
+                        onClick={() => router.push('/auth/login?redirect=/become-seller')}
+                      >
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Se connecter
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="border-[#ff6600] text-[#ff6600] hover:bg-orange-50"
+                        onClick={() => router.push('/auth/register?redirect=/become-seller')}
+                      >
+                        Créer un compte
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 {submissionStep === 2 && (

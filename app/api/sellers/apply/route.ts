@@ -4,13 +4,34 @@ import { getSupabaseAdmin } from '@/lib/supabase'
 
 /**
  * POST /api/sellers/apply
- * Endpoint public : soumission du formulaire "Devenir Vendeur".
- * Insère la candidature dans Supabase (table seller_applications).
- * Aucune authentification requise (formulaire public).
+ * Soumission du formulaire "Devenir Vendeur" — connexion obligatoire.
+ * Le jeton Bearer est vérifié via Supabase Auth ; l'identifiant de
+ * l'utilisateur authentifié est enregistré sur la candidature afin que
+ * l'approbation puisse lui attribuer le rôle vendeur automatiquement.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null)
+
+    // Authentification requise
+    const authHeader = request.headers.get('authorization') ?? ''
+    const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : ''
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Connexion requise pour soumettre une candidature vendeur.' },
+        { status: 401 }
+      )
+    }
+
+    const supabase = getSupabaseAdmin()
+    const { data: authData, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !authData?.user) {
+      return NextResponse.json(
+        { error: 'Session invalide ou expirée. Veuillez vous reconnecter.' },
+        { status: 401 }
+      )
+    }
+    const authUserId: string = authData.user.id
 
     const businessName = String(body?.businessName ?? '').trim()
     const ownerName = String(body?.ownerName ?? '').trim()
@@ -29,13 +50,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Adresse email invalide.' }, { status: 400 })
     }
 
-    const supabase = getSupabaseAdmin()
     const applicationNumber = `SELL-${Date.now().toString().slice(-6)}`
 
     const { data, error } = await supabase
       .from('seller_applications')
       .insert({
         application_number: applicationNumber,
+        user_id: authUserId,
         business_name: businessName,
         owner_name: ownerName,
         email,
