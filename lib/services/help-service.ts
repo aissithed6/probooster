@@ -127,10 +127,10 @@ export class HelpService {
   private static getFallbackCategories(): HelpCategory[] {
     return [
       { id: 'gen', name: 'Général', description: 'Questions courantes sur Probooster', icon: 'HelpCircle', color: 'from-blue-500 to-cyan-500', articles_count: 5 },
-      { id: 'compte', name: 'Compte & Profil', description: 'Gestion de votre compte et informations personnelles', icon: 'Users', color: 'from-green-500 to-emerald-500', articles_count: 4 },
-      { id: 'shopping', name: 'Shopping', description: 'Tout sur l\'achat de produits et services', icon: 'ShoppingCart', color: 'from-orange-500 to-red-500', articles_count: 4 },
-      { id: 'points', name: 'Système de Points', description: 'Comment gagner et utiliser vos points', icon: 'Gift', color: 'from-purple-500 to-violet-500', articles_count: 3 },
-      { id: 'paiement', name: 'Paiement', description: 'Méthodes de paiement et sécurité', icon: 'CreditCard', color: 'from-yellow-500 to-orange-500', articles_count: 4 },
+      { id: 'compte', name: 'Compte & Profil', description: 'Gestion de votre compte et informations personnelles', icon: 'Users', color: 'from-green-500 to-emerald-500', articles_count: 5 },
+      { id: 'shopping', name: 'Shopping', description: 'Tout sur l\'achat de produits et services', icon: 'ShoppingCart', color: 'from-orange-500 to-red-500', articles_count: 5 },
+      { id: 'points', name: 'Système de Points', description: 'Comment gagner et utiliser vos points', icon: 'Gift', color: 'from-purple-500 to-violet-500', articles_count: 5 },
+      { id: 'paiement', name: 'Paiement', description: 'Méthodes de paiement et sécurité', icon: 'CreditCard', color: 'from-yellow-500 to-orange-500', articles_count: 5 },
       { id: 'livraison', name: 'Livraison', description: 'Suivi de commande et délais de livraison', icon: 'Truck', color: 'from-indigo-500 to-purple-500', articles_count: 5 }
     ]
   }

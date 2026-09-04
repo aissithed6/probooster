@@ -132,7 +132,7 @@ BEGIN
   SELECT id INTO v_livraison FROM public.help_categories WHERE name = 'Livraison';
 
 -- =====================================================================
-  -- 2. INSERTION DES ARTICLES (4-5 par catégorie, idempotent par titre)
+  -- 2. INSERTION DES ARTICLES (5 par catégorie, idempotent par titre)
   -- =====================================================================
   -- Catégorie Général
   INSERT INTO public.help_articles (category_id, title, content, views, rating, is_popular)
@@ -169,7 +169,10 @@ BEGIN
      760, 4.7, false),
     ('Changer ou récupérer mon mot de passe',
      '<h2>Mot de passe oublié ?</h2><p>Cliquez sur « Mot de passe oublié » à l''écran de connexion. Vous recevrez un lien de réinitialisation par email. Pensez à utiliser un mot de passe d''au moins 8 caractères combinant lettres, chiffres et symboles.</p>',
-     690, 4.5, false)
+     690, 4.5, false),
+    ('Fermer ou supprimer mon compte',
+     '<h2>Clôturer votre compte</h2><p>Vous pouvez désactiver temporairement ou supprimer définitivement votre compte depuis « Paramètres du compte ». La suppression est définitive : vos points, avis et commandes seront supprimés après une période de vérification de 30 jours.</p>',
+     420, 4.3, false)
   ) AS t(title, content, views, rating, is_popular)
   WHERE NOT EXISTS (SELECT 1 FROM public.help_articles a WHERE a.title = t.title);
 
@@ -187,7 +190,10 @@ BEGIN
      960, 4.7, false),
     ('Évaluer un produit acheté',
      '<h2>Partagez votre avis</h2><p>Après réception, vous pouvez laisser une note et un commentaire sur le produit. Vos avis aident la communauté à faire les bons choix et récompensent les vendeurs de qualité.</p>',
-     610, 4.5, false)
+     610, 4.5, false),
+    ('Utiliser mes favoris et le panier',
+     '<h2>Panier et favoris</h2><p>Enregistrez les produits qui vous plaisent dans vos favoris pour les retrouver facilement, et utilisez le panier pour grouper vos achats. Vous recevrez une alerte quand un favori est en promotion.</p>',
+     560, 4.5, false)
   ) AS t(title, content, views, rating, is_popular)
   WHERE NOT EXISTS (SELECT 1 FROM public.help_articles a WHERE a.title = t.title);
 
@@ -202,7 +208,13 @@ BEGIN
      820, 4.6, false),
     ('Système de parrainage',
      '<h2>Parrainez et gagnez</h2><p>Invitez vos amis à rejoindre Probooster via votre lien de parrainage. Vous gagnez des points bonus, et votre filleul reçoit aussi un cadeau de bienvenue.</p>',
-     700, 4.7, false)
+     700, 4.7, false),
+    ('Gagner des points avec vos avis',
+     '<h2>Points de récompense</h2><p>Rédigez un avis détaillé après un achat pour gagner des points bonus. Les avis de qualité avec photos rapportent davantage et sont mis en avant sur la fiche produit.</p>',
+     640, 4.6, false),
+    ('Vérifier mon solde de points',
+     '<h2>Consulter votre solde</h2><p>Votre solde de points, votre historique et vos bons d''achat sont consultables en temps réel depuis « Mes points ». Chaque transaction y est détaillée avec son montant en valeur.</p>',
+     510, 4.5, false)
   ) AS t(title, content, views, rating, is_popular)
   WHERE NOT EXISTS (SELECT 1 FROM public.help_articles a WHERE a.title = t.title);
 
@@ -220,7 +232,10 @@ BEGIN
      540, 4.4, false),
     ('Factures et reçus de commande',
      '<h2>Obtenir votre facture</h2><p>Chaque commande confirmée génère un reçu. Vous pouvez le télécharger en PDF depuis « Mes commandes » pour vos archives ou vos remboursements.</p>',
-     480, 4.5, false)
+     480, 4.5, false),
+    ('Payer avec le mobile money',
+     '<h2>Mobile money accepté</h2><p>Payez facilement via MTN Mobile Money, Moov Money ou tout autre opérateur mobile. Saisissez votre numéro dans l''étape de paiement, validez la notification sur votre téléphone et votre commande est confirmée immédiatement.</p><p>Le mobile money est disponible dans la plupart des pays d''Afrique de l''Ouest.</p>',
+     730, 4.7, true)
   ) AS t(title, content, views, rating, is_popular)
   WHERE NOT EXISTS (SELECT 1 FROM public.help_articles a WHERE a.title = t.title);
 
