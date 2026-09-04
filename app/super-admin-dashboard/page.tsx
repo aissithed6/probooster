@@ -55,7 +55,8 @@ const SECTION_SLUG_BY_ID: Record<string, string> = {
   analytics: 'analyses',
   design: 'design',
   'messages-conseils': 'messages-conseils',
-  'support-videos': 'support-videos'
+  'support-videos': 'support-videos',
+  'seller-applications': 'candidatures-vendeurs'
 }
 
 const SECTION_ID_BY_SLUG: Record<string, string> = Object.entries(SECTION_SLUG_BY_ID).reduce(
@@ -85,6 +86,7 @@ const DesignUX = dynamic(() => import('@/components/super-admin/design-ux'), { s
 const SharesEngagementSuperAdmin = dynamic(() => import('@/components/super-admin/shares-engagement'), { ssr: false })
 const EditableMessagesManager = dynamic(() => import('@/components/admin/editable-messages-manager'), { ssr: false })
 const SupportVideosAdmin = dynamic(() => import('@/app/dashboard/super-admin/support-videos/page'), { ssr: false })
+const SellerApplicationsAdmin = dynamic(() => import('@/components/super-admin/seller-applications'), { ssr: false })
 
 const EMPTY_OVERVIEW: SuperAdminOverviewStats = {
   totalUsers: 0,
@@ -749,6 +751,13 @@ function SuperAdminDashboardClient() {
       icon: Video,
       description: 'Gérer les vidéos YouTube du centre de ressources',
       color: 'from-red-500 to-red-600'
+    },
+    {
+      id: 'seller-applications',
+      title: 'Candidatures Vendeur',
+      icon: Store,
+      description: 'Étudier et approuver les demandes des futurs vendeurs',
+      color: 'from-emerald-500 to-emerald-600'
     }
   ]
 
@@ -807,6 +816,8 @@ function SuperAdminDashboardClient() {
         return <EditableMessagesManager userId={user?.id || ''} />
       case 'support-videos':
         return <SupportVideosAdmin />
+      case 'seller-applications':
+        return <SellerApplicationsAdmin />
       default:
         return <SuperAdminOverview stats={stats} />
     }
