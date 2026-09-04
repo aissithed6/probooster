@@ -10,7 +10,7 @@ import {
   CheckCircle, AlertTriangle, Clock,
   Heart, Share2, CreditCard, Truck,
   FileText, Lock, Mail, Smartphone, Trash2,
-  MessageCircleMore, Loader2, Video
+  MessageCircleMore, Loader2, Video, Store
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
