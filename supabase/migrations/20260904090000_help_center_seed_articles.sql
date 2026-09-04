@@ -42,17 +42,13 @@ CREATE TABLE IF NOT EXISTS public.help_faqs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.support_tickets (
+CREATE TABLE IF NOT EXISTS public.help_faqs (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    message TEXT NOT NULL,
-    department TEXT DEFAULT 'general',
-    status TEXT DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
-    priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
-    metadata JSONB DEFAULT '{}'::jsonb,
+    category_id UUID REFERENCES public.help_categories(id) ON DELETE SET NULL,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -60,32 +56,24 @@ CREATE TABLE IF NOT EXISTS public.support_tickets (
 ALTER TABLE public.help_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.help_articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.help_faqs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "lecture_publique_help_categories" ON public.help_categories;
 DROP POLICY IF EXISTS "lecture_publique_help_articles" ON public.help_articles;
 DROP POLICY IF EXISTS "lecture_publique_help_faqs" ON public.help_faqs;
-DROP POLICY IF EXISTS "insertion_publique_support_tickets" ON public.support_tickets;
-DROP POLICY IF EXISTS "lecture_tickets_proprietaire" ON public.support_tickets;
 
 CREATE POLICY "lecture_publique_help_categories" ON public.help_categories FOR SELECT USING (is_active = true);
 CREATE POLICY "lecture_publique_help_articles" ON public.help_articles FOR SELECT USING (is_active = true);
 CREATE POLICY "lecture_publique_help_faqs" ON public.help_faqs FOR SELECT USING (is_active = true);
-CREATE POLICY "insertion_publique_support_tickets" ON public.support_tickets FOR INSERT WITH CHECK (true);
-CREATE POLICY "lecture_tickets_proprietaire" ON public.support_tickets FOR SELECT USING (auth.uid() = user_id OR email = (SELECT email FROM public.users WHERE id = auth.uid()));
 
 DROP TRIGGER IF EXISTS update_help_categories_updated_at ON public.help_categories;
 DROP TRIGGER IF EXISTS update_help_articles_updated_at ON public.help_articles;
 DROP TRIGGER IF EXISTS update_help_faqs_updated_at ON public.help_faqs;
-DROP TRIGGER IF EXISTS update_support_tickets_updated_at ON public.support_tickets;
 
 CREATE TRIGGER update_help_categories_updated_at BEFORE UPDATE ON public.help_categories
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 CREATE TRIGGER update_help_articles_updated_at BEFORE UPDATE ON public.help_articles
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 CREATE TRIGGER update_help_faqs_updated_at BEFORE UPDATE ON public.help_faqs
-    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-CREATE TRIGGER update_support_tickets_updated_at BEFORE UPDATE ON public.support_tickets
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- =====================================================================
