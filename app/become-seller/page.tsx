@@ -297,37 +297,44 @@ export default function BecomeSellerPage() {
         return
       }
       
-      // Simulation d'un délai de traitement
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Sauvegarder les données dans localStorage pour simulation
-      const sellerApplications = JSON.parse(localStorage.getItem('sellerApplications') || '[]')
-      const newApplication = {
-        id: Date.now(),
-        ...formData,
-        status: 'pending',
-        submittedAt: new Date().toISOString(),
-        applicationNumber: `SELL-${Date.now().toString().slice(-6)}`
+      // Soumission réelle vers l'API (insertion dans Supabase, table seller_applications)
+      const res = await fetch('/api/sellers/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: formData.businessName,
+          ownerName: formData.ownerName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          category: formData.businessType,
+          description: formData.description,
+          website: formData.website
+        })
+      })
+
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.error || 'Impossible de soumettre la candidature.')
       }
-      sellerApplications.push(newApplication)
-      localStorage.setItem('sellerApplications', JSON.stringify(sellerApplications))
-      
+
+      const applicationNumber: string = json?.data?.application_number || 'SELL-XXXXXX'
       setSubmissionStep(2)
-      
+
       // Notification de succès
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('showNotification', {
           detail: {
             type: 'success',
             title: 'Candidature soumise !',
-            message: `Votre candidature #${newApplication.applicationNumber} a été reçue. Nous vous contacterons dans les 24h.`
+            message: `Votre candidature #${applicationNumber} a été reçue. Nous vous contacterons dans les 24h.`
           }
         }))
       }
-      
+
     } catch (error) {
       console.error('Erreur lors de la soumission:', error)
-      alert('Une erreur est survenue. Veuillez réessayer.')
+      alert(error instanceof Error ? error.message : 'Une erreur est survenue. Veuillez réessayer.')
     } finally {
       setIsSubmitting(false)
     }
