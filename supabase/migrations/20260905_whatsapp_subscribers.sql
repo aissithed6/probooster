@@ -12,7 +12,7 @@ create table if not exists public.whatsapp_subscribers (
   country_flag text null default '🇧🇯',
   interests text[] not null default '{}',
   status text not null default 'active' check (status in ('active', 'inactive', 'unsubscribed')),
-  engagement_score integer not null default 0,
+  engagement_score integer not null default 0,S
   source text not null default 'footer' check (source in ('footer', 'landing', 'popup', 'campaign', 'referral')),
   metadata jsonb null,
   subscribed_at timestamptz not null default now(),

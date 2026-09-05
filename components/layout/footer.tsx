@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { usePublicGlobalSettings } from "@/contexts/PublicGlobalSettingsContext"
+import { toast } from "react-hot-toast"
 
 export default function Footer() {
   const { data: publicSettings } = usePublicGlobalSettings()
@@ -48,12 +49,12 @@ export default function Footer() {
 
   const handleSubscribe = async () => {
     if (!whatsappNumber.trim()) {
-      alert("Veuillez entrer votre numéro WhatsApp")
+      toast.error("Veuillez entrer votre numéro WhatsApp")
       return
     }
     const cleanNumber = whatsappNumber.replace(/[\s\-\(\)]/g, "")
     if (cleanNumber.replace(/\D/g, "").length < 8) {
-      alert("Veuillez entrer un numéro WhatsApp valide")
+      toast.error("Veuillez entrer un numéro WhatsApp valide")
       return
     }
     setIsSubmitting(true)
@@ -71,11 +72,11 @@ export default function Footer() {
         setSelectedInterests([])
         setSubscriberCount(prev => (prev || 0) + 1)
       } else {
-        alert(data.error || "Une erreur est survenue. Veuillez réessayer.")
+        toast.error(data.error || "Une erreur est survenue. Veuillez réessayer.")
       }
     } catch (error) {
       console.error("Erreur lors de l'abonnement:", error)
-      alert("Une erreur est survenue. Veuillez réessayer.")
+      toast.error("Une erreur est survenue. Veuillez réessayer.")
     } finally {
       setIsSubmitting(false)
     }
