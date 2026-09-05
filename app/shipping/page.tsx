@@ -104,7 +104,7 @@ export default function ShippingPage() {
         ],
         popular: isExpress
       }
-    }).filter(Boolean)
+    }).filter((z): z is NonNullable<typeof z> => Boolean(z))
   }, [deliveryRules, formatMoney])
 
   // Zones de livraison basées sur les règles réelles
@@ -135,7 +135,7 @@ export default function ShippingPage() {
         icon: zType === 'international' ? Globe : MapPin,
         color: color
       }
-    }).filter(Boolean)
+    }).filter((z): z is NonNullable<typeof z> => Boolean(z))
 
     return zones
   }, [deliveryRules, formatMoney])
