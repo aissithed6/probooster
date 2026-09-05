@@ -51,73 +51,34 @@ export default function Footer() {
       alert("Veuillez entrer votre numéro WhatsApp")
       return
     }
-
-    // Validation du format du numéro
-    const phoneRegex = /^(\+?229|229)?[0-9]{8}$/
-    const cleanNumber = whatsappNumber.replace(/\s/g, "")
-    
-    if (!phoneRegex.test(cleanNumber)) {
-      alert("Veuillez entrer un numéro WhatsApp valide (format: +229 XX XX XX XX)")
+    const cleanNumber = whatsappNumber.replace(/[\s\-\(\)]/g, "")
+    if (cleanNumber.replace(/\D/g, "").length < 8) {
+      alert("Veuillez entrer un numéro WhatsApp valide")
       return
     }
-
     setIsSubmitting(true)
-
     try {
-      // Préparer le message WhatsApp
-      const message = `🆕 Nouvel abonnement Newsletter Probooster
-
-📱 Numéro: ${whatsappNumber}
-📅 Date: ${new Date().toLocaleDateString('fr-FR')}
-⏰ Heure: ${new Date().toLocaleTimeString('fr-FR')}
-
-✅ L'utilisateur souhaite recevoir les alertes et nouveautés de Probooster.
-
----
-Probooster - Marketplace Innovante`
-
-      // Encoder le message pour l'URL WhatsApp
-      const encodedMessage = encodeURIComponent(message)
-      const whatsappUrl = `https://wa.me/22991505757?text=${encodedMessage}`
-
-      // Ouvrir WhatsApp
-      window.open(whatsappUrl, '_blank')
-
-      // Simuler l'envoi d'un email à l'administrateur
-      await sendAdminNotification(whatsappNumber)
-
-      // Afficher le modal de succès
-      setShowSuccessModal(true)
-      setWhatsappNumber("")
-
+      const response = await fetch("/api/public/whatsapp-subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: whatsappNumber, interests: selectedInterests, source: "footer" })
+      })
+      const data = await response.json()
+      if (data.success) {
+        setDetectedCountry({ name: data.data.country, flag: data.data.flag })
+        setShowSuccessModal(true)
+        setWhatsappNumber("")
+        setSelectedInterests([])
+        setSubscriberCount(prev => (prev || 0) + 1)
+      } else {
+        alert(data.error || "Une erreur est survenue. Veuillez réessayer.")
+      }
     } catch (error) {
       console.error("Erreur lors de l'abonnement:", error)
       alert("Une erreur est survenue. Veuillez réessayer.")
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const sendAdminNotification = async (phoneNumber: string) => {
-    // Simulation d'envoi d'email à l'administrateur
-    const adminEmail = "admin@probooster.online"
-    const subject = "Nouvel abonnement Newsletter Probooster"
-    const body = `
-Nouvel abonnement reçu :
-
-📱 Numéro WhatsApp: ${phoneNumber}
-📅 Date: ${new Date().toLocaleDateString('fr-FR')}
-⏰ Heure: ${new Date().toLocaleTimeString('fr-FR')}
-
-L'utilisateur a été ajouté à la liste des abonnés.
-Un message WhatsApp a été envoyé à l'administrateur.
-
----
-Probooster Dashboard
-    `
-
-    // En production, vous utiliseriez un service d'email comme SendGrid, Mailgun, etc.
-    console.log("Email envoyé à l'administrateur:", { adminEmail, subject, body })
   }
 
   // Afficher un état de chargement si le client n'est pas encore prêt

@@ -88,6 +88,7 @@ const SharesEngagementSuperAdmin = dynamic(() => import('@/components/super-admi
 const EditableMessagesManager = dynamic(() => import('@/components/admin/editable-messages-manager'), { ssr: false })
 const SupportVideosAdmin = dynamic(() => import('@/app/dashboard/super-admin/support-videos/page'), { ssr: false })
 const SellerApplicationsAdmin = dynamic(() => import('@/components/super-admin/seller-applications'), { ssr: false })
+const WhatsAppPulseDashboard = dynamic(() => import('@/components/super-admin/whatsapp-pulse-dashboard'), { ssr: false })
 
 const EMPTY_OVERVIEW: SuperAdminOverviewStats = {
   totalUsers: 0,
@@ -832,6 +833,8 @@ function SuperAdminDashboardClient() {
         return <SupportVideosAdmin />
       case 'seller-applications':
         return <SellerApplicationsAdmin />
+      case 'whatsapp':
+        return <WhatsAppPulseDashboard />
       default:
         return <SuperAdminOverview stats={stats} />
     }
