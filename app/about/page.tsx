@@ -60,54 +60,54 @@ export default function AboutPage() {
 
   const team = [
     {
-      name: "Sarah Johnson",
-      role: "CEO & Fondatrice",
+      name: "Gildas Tossou",
+      role: "CEO & Fondateur",
       image: "/placeholder-user.jpg",
-      bio: "15 ans d&apos;expérience dans le e-commerce et l&apos;innovation technologique."
+      bio: "15 ans d&apos;expérience dans le commerce et l&apos;innovation technologique en Afrique de l&apos;Ouest."
     },
     {
-      name: "Michael Chen",
+      name: "Hervé Agbodjélou",
       role: "CTO",
       image: "/placeholder-user.jpg",
-      bio: "Expert en développement d&apos;applications et architecture cloud."
+      bio: "Expert en développement d&apos;applications et architecture cloud, passionné par la tech au service du continent."
     },
     {
-      name: "Amina Diallo",
+      name: "Carmelle Hounsa",
       role: "Directrice Marketing",
       image: "/placeholder-user.jpg",
-      bio: "Spécialiste en marketing digital et croissance d'entreprise."
+      bio: "Spécialiste en marketing digital et croissance d&apos;entreprise, originaire de Cotonou."
     },
     {
-      name: "David Osei",
+      name: "Clément Sègla",
       role: "Directeur Commercial",
       image: "/placeholder-user.jpg",
-      bio: "Expert en développement commercial et relations partenaires."
+      bio: "Expert en développement commercial et relations partenaires au Bénin et dans la région."
     }
   ]
 
   const milestones = [
     {
-      year: "2020",
+      year: "2023",
       title: "Fondation",
       description: "Création de Probooster avec une vision révolutionnaire du commerce en ligne."
     },
     {
-      year: "2021",
+      year: "2024",
       title: "Lancement Beta",
       description: "Premier lancement avec 1000 utilisateurs pionniers et système de points."
     },
     {
-      year: "2022",
+      year: "2025",
       title: "Expansion",
       description: "Ouverture dans 10 nouveaux pays et 100K utilisateurs actifs."
     },
     {
-      year: "2023",
+      year: "2026",
       title: "Innovation",
       description: "Lancement de l'application mobile et système de récompenses avancé."
     },
     {
-      year: "2024",
+      year: "2027",
       title: "Leader",
       description: "Devenu la référence du commerce en ligne en Afrique de l'Ouest."
     }
