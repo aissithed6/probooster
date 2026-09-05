@@ -312,10 +312,12 @@ export default function ShippingPage() {
                           </li>
                         ))}
                       </ul>
-                      <Button className="w-full mt-4 bg-[#ff6600] hover:bg-[#e55a00] group transition-all duration-300 hover:scale-105">
-                        <span className="group-hover:translate-x-1 transition-transform duration-300">Choisir cette option</span>
-                        <ArrowRight className="ml-2 h-4 w-4 group-hover:animate-bounce" />
-                      </Button>
+                      <Link href="/products">
+                        <Button className="w-full mt-4 bg-[#ff6600] hover:bg-[#e55a00] group transition-all duration-300 hover:scale-105">
+                          <span className="group-hover:translate-x-1 transition-transform duration-300">Choisir cette option</span>
+                          <ArrowRight className="ml-2 h-4 w-4 group-hover:animate-bounce" />
+                        </Button>
+                      </Link>
                     </CardContent>
                   </Card>
                 )
