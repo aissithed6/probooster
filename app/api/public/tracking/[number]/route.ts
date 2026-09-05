@@ -23,7 +23,8 @@ export async function GET(
         *,
         carrier:carrier_id (*),
         shipping_method:shipping_method_id (*),
-        events:delivery_events (*)
+        events:delivery_events (*),
+        proofs:delivery_proofs (*)
       `)
       .eq('tracking_number', trackingNumber)
       .maybeSingle()
@@ -73,8 +74,18 @@ export async function GET(
         description: e.description,
         location: e.location,
         occurredAt: e.occurred_at,
+        coordinates: e.latitude ? { lat: e.latitude, lng: e.longitude } : null,
         data: e.data
       })).sort((a: any, b: any) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()),
+      proofs: (delivery.proofs || []).map((p: any) => ({
+        id: p.id,
+        type: p.proof_type,
+        url: p.url,
+        thumbnailUrl: p.thumbnail_url,
+        caption: p.caption,
+        uploadedAt: p.created_at,
+        metadata: p.metadata
+      })).sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()),
       createdAt: delivery.created_at,
       updatedAt: delivery.updated_at
     }

@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -33,8 +33,11 @@ import {
   X,
   Warehouse,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  Navigation
 } from "lucide-react"
+import Image from "next/image"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import Link from "next/link"
 import { useDeliveryConfig } from "@/contexts/DeliveryConfigContext"
@@ -193,7 +196,7 @@ export default function ShippingPage() {
     { icon: Star, value: "4.9/5", label: "Note moyenne", color: "text-yellow-500" }
   ]
 
-  const handleTrackPackage = async () => {
+  const handleTrackPackage = useCallback(async () => {
     if (!trackingNumber.trim()) return
 
     setIsTracking(true)
@@ -213,7 +216,98 @@ export default function ShippingPage() {
     } finally {
       setIsTracking(false)
     }
-  }
+  }, [trackingNumber])
+
+  // Realtime: écoute les mises à jour de la livraison suivie
+  const realtimeChannelRef = useRef<{ unsubscribe: () => void } | null>(null)
+  
+  useEffect(() => {
+    if (!trackingResult?.id) return
+
+    // S'abonner aux mises à jour en temps réel via Supabase Realtime
+    const setupRealtime = async () => {
+      try {
+        const { getSupabaseClient } = await import("@/lib/supabase")
+        const supabase = await getSupabaseClient()
+        
+        const channel = supabase
+          .channel(`tracking-${trackingResult.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'delivery_events',
+              filter: `delivery_id=eq.${trackingResult.id}`
+            },
+            (payload: any) => {
+              const newEvent = payload.new
+              if (newEvent) {
+                setTrackingResult(prev => {
+                  if (!prev) return prev
+                  const formattedEvent = {
+                    id: newEvent.id,
+                    type: newEvent.event_type,
+                    status: newEvent.status,
+                    description: newEvent.description,
+                    location: newEvent.location,
+                    occurredAt: newEvent.occurred_at,
+                    coordinates: newEvent.latitude ? { lat: newEvent.latitude, lng: newEvent.longitude } : null,
+                    data: newEvent.data
+                  }
+                  // Éviter les doublons
+                  if (prev.events.some(e => e.id === formattedEvent.id)) return prev
+                  const mergedEvents = [formattedEvent, ...prev.events].sort(
+                    (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+                  )
+                  return { ...prev, events: mergedEvents, updatedAt: new Date().toISOString() }
+                })
+                toast.success("Nouvel événement de suivi détecté !")
+              }
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'deliveries',
+              filter: `id=eq.${trackingResult.id}`
+            },
+            (payload: any) => {
+              const updated = payload.new
+              if (updated) {
+                setTrackingResult(prev => {
+                  if (!prev) return prev
+                  return {
+                    ...prev,
+                    status: updated.status ?? prev.status,
+                    progressPercent: updated.progress_percent ?? prev.progressPercent,
+                    currentLocation: updated.current_location ?? prev.currentLocation,
+                    coordinates: updated.latitude ? { lat: updated.latitude, lng: updated.longitude } : prev.coordinates,
+                    updatedAt: updated.updated_at ?? prev.updatedAt
+                  }
+                })
+              }
+            }
+          )
+          .subscribe()
+
+        realtimeChannelRef.current = channel
+      } catch (err) {
+        console.warn("⚠️ Realtime non disponible:", err)
+      }
+    }
+
+    setupRealtime()
+
+    return () => {
+      if (realtimeChannelRef.current) {
+        realtimeChannelRef.current.unsubscribe()
+        realtimeChannelRef.current = null
+      }
+    }
+  }, [trackingResult?.id])
 
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, { label: string, color: string }> = {
