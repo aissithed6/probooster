@@ -28,6 +28,7 @@ import {
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
 import { DashboardService } from "@/lib/services/dashboard-service"
+import { getClientAccessTokenSafe } from "@/lib/supabase"
 import { toast } from "react-hot-toast"
 import { 
   Select, 
@@ -159,16 +160,27 @@ export default function ReturnsPage() {
         return
       }
 
-      const { error } = await DashboardService.createReturnRequest({
-        orderId: order.id,
-        userId: user.id,
-        vendorId: order.vendor_id || "",
-        reason: returnReason,
-        description: description,
-        refundCurrency: order.currency || "XOF"
+      // Passer par l'API persistante : order_returns + statut commande 'returned'
+      // + historique + notification vendeur et super admins.
+      const token = await getClientAccessTokenSafe()
+      const res = await fetch('/api/client/returns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          reason: returnReason,
+          description,
+          refundCurrency: order.currency || 'XOF'
+        })
       })
 
-      if (error) throw error
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(json?.error || `Échec de la soumission (${res.status}).`)
+      }
       
       setSubmitted(true)
       toast.success("Votre demande de retour a été enregistrée.")

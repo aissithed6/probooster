@@ -231,7 +231,8 @@ export async function fetchOverviewStats(
     const [
       usersCount,
       vendorsCount,
-      pendingVendorsCount,
+      sellerAppsPendingCount,
+      legacyPendingVendorsCount,
       alertsCount,
       productsCount,
       ordersInProgressCount,
@@ -244,7 +245,9 @@ export async function fetchOverviewStats(
       supabase.from('users').select('id', { count: 'exact', head: true }),
       // Vendeurs total
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'vendor'),
-      // Vendeurs en attente d'approbation (règle utilisée dans l'UI: role=vendor + status=pending)
+      // Vendeurs en attente d'approbation: candidatures "Devenir Vendeur" (seller_applications.status=pending).
+      supabase.from('seller_applications' as any).select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      // Fallback legacy: utilisateurs avec rôle vendeur en attente (ancienne règle UI).
       supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'vendor').eq('status', 'pending'),
       // Alertes système
       // On cible d'abord le statut utilisé côté UI (status='active') puis fallback sur is_active.
@@ -293,16 +296,23 @@ export async function fetchOverviewStats(
 
     const totalUsers = safeCount(usersCount.count)
     const totalVendors = safeCount(vendorsCount.count)
-    const pendingVendors = safeCount(pendingVendorsCount.count)
+    // Priorité aux candidatures "Devenir Vendeur" ; si la table n'existe pas encore
+    // (migration non jouée) ou renvoie une erreur, on retombe sur l'ancienne règle.
+    const sellerAppsPending: any = sellerAppsPendingCount as any
+    const legacyPending: any = legacyPendingVendorsCount as any
+    const pendingVendors =
+      !sellerAppsPending?.error && typeof sellerAppsPending?.count === 'number'
+        ? safeCount(sellerAppsPending.count)
+        : safeCount(legacyPending?.count)
 
     if (debugEnabled) {
       debug.counts = {
         users: { ok: !(usersCount as any)?.error, error: (usersCount as any)?.error ?? null, count: (usersCount as any)?.count ?? null },
         vendors: { ok: !(vendorsCount as any)?.error, error: (vendorsCount as any)?.error ?? null, count: (vendorsCount as any)?.count ?? null },
         pendingVendors: {
-          ok: !(pendingVendorsCount as any)?.error,
-          error: (pendingVendorsCount as any)?.error ?? null,
-          count: (pendingVendorsCount as any)?.count ?? null
+          ok: !(sellerAppsPending as any)?.error,
+          error: (sellerAppsPending as any)?.error ?? (legacyPending as any)?.error ?? null,
+          count: pendingVendors
         },
         alerts: { ok: !(alertsCount as any)?.error, error: (alertsCount as any)?.error ?? null, count: (alertsCount as any)?.count ?? null },
         products: { ok: !(productsCount as any)?.error, error: (productsCount as any)?.error ?? null, count: (productsCount as any)?.count ?? null },
