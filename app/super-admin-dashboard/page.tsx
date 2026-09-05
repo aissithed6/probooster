@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { 
   Users, Package, ShoppingCart, DollarSign, 
-  TrendingUp, Settings, Bell, MessageSquare,
+  TrendingUp, Settings, Bell, MessageSquare, MessageCircle,
   Star, Gift, Target, BarChart3, Shield,
   Globe, Zap, Database, Activity, Eye,
   Plus, Search, Filter, MoreHorizontal,
