@@ -378,7 +378,7 @@ export default function AboutPage() {
                 <MapPin className="h-8 w-8 text-white group-hover:animate-bounce" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-[#ff6600] transition-colors duration-300">Notre Adresse</h3>
-              <p className="text-gray-600 group-hover:text-gray-800 transition-colors duration-300">Abomey-Calavi, Bénin<br />Plateau, Rue du Commerce</p>
+              <p className="text-gray-600 group-hover:text-gray-800 transition-colors duration-300">Cotonou, Bénin<br />Rue du Commerce</p>
             </div>
             
             <div className="text-center group">
