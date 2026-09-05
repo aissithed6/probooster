@@ -773,6 +773,13 @@ function SuperAdminDashboardClient() {
       icon: Store,
       description: 'Étudier et approuver les demandes des futurs vendeurs',
       color: 'from-emerald-500 to-emerald-600'
+    },
+    {
+      id: 'whatsapp',
+      title: 'WhatsApp Pulse',
+      icon: MessageCircle,
+      description: 'Abonnés newsletter WhatsApp et marketing',
+      color: 'from-green-500 to-green-600'
     }
   ]
 
