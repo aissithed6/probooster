@@ -321,14 +321,14 @@ Probooster Dashboard
         <div className="border-t border-gray-600 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="text-sm text-gray-300 hover:text-white transition-colors duration-300">
-              © 2025 Probooster. Tous droits réservés. Développé par{" "}
+              © 2026 Probooster. Tous droits réservés. Développé par{" "}
               <a
                 href="https://wa.me/22996567436"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#ff6600] hover:text-orange-400 transition-colors duration-300 underline"
               >
-                Ultra Web
+                Genuis Box
               </a>
             </div>
             <div className="flex space-x-6 text-sm">

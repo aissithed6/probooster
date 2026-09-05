@@ -105,11 +105,6 @@ export default function AboutPage() {
       year: "2026",
       title: "Innovation",
       description: "Lancement de l'application mobile et système de récompenses avancé."
-    },
-    {
-      year: "2027",
-      title: "Leader",
-      description: "Devenu la référence du commerce en ligne en Afrique de l'Ouest."
     }
   ]
 
