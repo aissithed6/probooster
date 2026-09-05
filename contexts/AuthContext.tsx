@@ -640,18 +640,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
 
       const { error } = await supabase
         .from('user_sessions')
-        .insert({
+        .upsert({
           user_id: userId,
           session_token: token.slice(0, 24),
-          // device_info est une colonne text : on stocke un objet JSON sérialisé.
           device_info: JSON.stringify(device_info_obj),
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
           is_active: true,
           last_activity_at: nowIso,
-          // Certaines tables user_sessions exigent expires_at NOT NULL : on fournit une
-          // date d'expiration (session valable 30 jours) pour ne pas violer la contrainte.
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        } as any)
+        } as any, {
+          onConflict: 'session_token',
+          ignoreDuplicates: false
+        })
 
       if (error) {
         console.warn('⚠️ user_sessions: enregistrement de la session impossible:', error.message)

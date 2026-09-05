@@ -13,9 +13,19 @@ import { toast } from "react-hot-toast"
 export default function Footer() {
   const { data: publicSettings } = usePublicGlobalSettings()
   const [whatsappNumber, setWhatsappNumber] = useState("")
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([])
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [detectedCountry, setDetectedCountry] = useState<{name: string; flag: string} | null>(null)
+  const [subscriberCount, setSubscriberCount] = useState<number | null>(null)
+
+  const interestOptions = [
+    { id: 'promotions', label: '🏷️ Promotions', icon: '🏷️' },
+    { id: 'news', label: '✨ Nouveautés', icon: '✨' },
+    { id: 'stock', label: '📦 Alertes Stock', icon: '📦' },
+    { id: 'events', label: '🎉 Événements', icon: '🎉' }
+  ]
 
   const resolvedLogoSrc = (() => {
     const candidate = (publicSettings?.siteConfig?.logoUrl ?? '').toString().trim()
@@ -42,10 +52,22 @@ export default function Footer() {
     return email || 'support@probooster.online'
   })()
 
-  // Chargement progressif
+  // Chargement progressif et récupération du nombre d'abonnés
   useEffect(() => {
     setIsClient(true)
+    fetch('/api/public/whatsapp-subscribe')
+      .then(res => res.json())
+      .then(data => {
+        if (data.data?.total) setSubscriberCount(data.data.total)
+      })
+      .catch(() => {})
   }, [])
+
+  const toggleInterest = (id: string) => {
+    setSelectedInterests(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
 
   const handleSubscribe = async () => {
     if (!whatsappNumber.trim()) {
