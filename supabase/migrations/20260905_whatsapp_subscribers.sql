@@ -20,9 +20,9 @@ create table if not exists public.whatsapp_subscribers (
 );
 
 create index if not exists whatsapp_subscribers_phone_idx on public.whatsapp_subscribers (phone);
-create index if not_exists whatsapp_subscribers_status_idx on public.whatsapp_subscribers (status);
-create index if not_exists whatsapp_subscribers_interests_idx on public.whatsapp_subscribers using gin (interests);
-create index if not_exists whatsapp_subscribers_subscribed_at_idx on public.whatsapp_subscribers (subscribed_at desc);
+create index if not exists whatsapp_subscribers_status_idx on public.whatsapp_subscribers (status);
+create index if not exists whatsapp_subscribers_interests_idx on public.whatsapp_subscribers using gin (interests);
+create index if not exists whatsapp_subscribers_subscribed_at_idx on public.whatsapp_subscribers (subscribed_at desc);
 
 -- RLS: lecture/écriture uniquement via service_role (routes API serveur)
 alter table public.whatsapp_subscribers enable row level security;
