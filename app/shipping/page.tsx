@@ -375,7 +375,7 @@ export default function ShippingPage() {
           <div className="mb-16">
             <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center hover:text-[#ff6600] transition-colors duration-300">Points de retrait</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {pickupPoints.map((point, index) => (
+              {pickupPoints.map((point: any, index: number) => (
                 <Card 
                   key={point.id}
                   className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 group"
@@ -478,7 +478,7 @@ export default function ShippingPage() {
                                <p className="text-sm text-gray-600">{event.description}</p>
                                <div className="flex items-center gap-4 text-[10px] text-gray-400">
                                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(event.occurredAt!).toLocaleDateString('fr-FR')}</span>
-                                 <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {new Date(event.occurredAt!).toLocaleTimeString('fr-FR', { hour: '2-2-digit', minute: '2-2-digit' })}</span>
+                                 <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {new Date(event.occurredAt!).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                                  {event.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {event.location}</span>}
                                </div>
                              </div>

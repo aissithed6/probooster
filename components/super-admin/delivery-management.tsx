@@ -134,7 +134,7 @@ function formatProgressLabel(progress: number): string {
 /**
  * Section de gestion complète des livraisons côté super administrateur.
  */
-export default function DeliveryManagement(): JSX.Element {
+export default function DeliveryManagement() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { addNotification } = useNotifications()
@@ -1275,7 +1275,7 @@ export default function DeliveryManagement(): JSX.Element {
         const pickupRaw: unknown = (settings as any)?.pickupConfig ?? (cfg as any)?.pickupConfig
 
         const next = {
-          shippingCostAggregationDefault: cfg?.shippingCostAggregationDefault === 'sum' ? 'sum' : 'max',
+          shippingCostAggregationDefault: (cfg?.shippingCostAggregationDefault === 'sum' ? 'sum' : 'max') as 'max' | 'sum',
           allowCustomerShippingAggregationOverride: cfg?.allowCustomerShippingAggregationOverride !== false
         }
 
@@ -2214,7 +2214,7 @@ export default function DeliveryManagement(): JSX.Element {
           <TabsTrigger value="free_shipping">
                         Livraison gratuite
                         {(() => {
-                          const count = Array.isArray(freeShippingConfig?.rules) ? freeShippingConfig.rules.filter(rule => rule?.active !== false).length : 0
+                          const count = Array.isArray(freeShippingConfig?.rules) ? freeShippingConfig.rules.filter(rule => rule?.isActive !== false).length : 0
                           return count > 0 ? (
                             <Badge variant="secondary" className="ml-2">{count}</Badge>
                           ) : null
@@ -3822,7 +3822,7 @@ export default function DeliveryManagement(): JSX.Element {
                       <Label>Zone</Label>
                       <Select
                         value={editRuleDraft.zone ?? '*'}
-                        onValueChange={(value) => setEditRuleDraft((p) => (p ? { ...p, zone: value } : p))}
+                        onValueChange={(value) => setEditRuleDraft((p) => (p ? ({ ...p, zone: value } as FreeShippingRule) : p))}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Toutes" />
