@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { 
   MessageCircle, Users, Trash2, Search, RefreshCw, 
   TrendingUp, Globe, Filter, CheckSquare, Square,
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotifications } from '@/components/ui/modern-notification'
+import { supabase } from '@/lib/supabase'
 
 interface Subscriber {
   id: string
@@ -88,6 +89,42 @@ export default function WhatsAppPulseDashboard() {
     fetchSubscribers()
     fetchStats()
   }, [fetchSubscribers, fetchStats])
+
+  // Ref toujours à jour vers les dernières fonctions de fetch, pour que l'écouteur
+  // Realtime ne s'installe qu'UNE seule fois tout en utilisant les filtres actuels.
+  const refreshRef = useRef<() => void>(() => {})
+  useEffect(() => {
+    refreshRef.current = () => {
+      void fetchSubscribers()
+      void fetchStats()
+    }
+  }, [fetchSubscribers, fetchStats])
+
+  // Realtime: rafraîchit automatiquement la liste et les stats dès qu'un abonné
+  // WhatsApp est créé, modifié ou supprimé — sans actualiser la page.
+  useEffect(() => {
+    const channel = supabase
+      .channel('whatsapp-subscribers-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'whatsapp_subscribers' },
+        (payload) => {
+          console.log('📡 WhatsApp Realtime:', payload.eventType, payload.new ?? payload.old)
+          refreshRef.current()
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime whatsapp_subscribers abonné')
+        } else if (err) {
+          console.warn('⚠️ Realtime whatsapp_subscribers:', status, err?.message)
+        }
+      })
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [])
 
   const handleBulkAction = async (action: string) => {
     if (selectedIds.size === 0) {
