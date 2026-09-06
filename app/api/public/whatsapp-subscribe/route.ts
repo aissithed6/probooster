@@ -85,28 +85,32 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseAdmin()
-    const { data, error } = await supabase.rpc('upsert_whatsapp_subscriber', {
-      p_phone: normalizedPhone,
-      p_country_code: country.code,
-      p_country_name: country.name,
-      p_country_flag: country.flag,
-      p_interests: interests,
-      p_subscription_source: source,
-      p_metadata: JSON.stringify({
-        userAgent: request.headers.get('user-agent'),
-        timestamp: new Date().toISOString()
+    
+    // Utilisation de upsert directement sur la table (plus fiable que RPC)
+    const { data, error } = await supabase
+      .from('whatsapp_subscribers')
+      .upsert({
+        phone: normalizedPhone,
+        country_code: country.code,
+        country_name: country.name,
+        country_flag: country.flag,
+        interests: interests,
+        subscription_source: source,
+        metadata: JSON.stringify({
+          userAgent: request.headers.get('user-agent'),
+          timestamp: new Date().toISOString()
+        }),
+        status: 'active',
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'phone',
+        ignoreDuplicates: false
       })
-    })
+      .select()
+      .single()
 
     if (error) {
       console.error('❌ Error upserting subscriber:', error)
-      // Vérifier si c'est une erreur de table/fonction manquante
-      if (error.message?.includes('function') && error.message?.includes('does not exist')) {
-        return NextResponse.json(
-          { error: 'Le système d\'abonnement n\'est pas encore configuré. Veuillez contacter l\'administrateur.' },
-          { status: 503 }
-        )
-      }
       return NextResponse.json({ error: 'Erreur lors de l\'abonnement' }, { status: 500 })
     }
 
@@ -129,13 +133,23 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin()
-    const { data, error } = await supabase.rpc('get_whatsapp_subscribers_stats')
+    
+    // Statistiques directes sans fonction RPC
+    const { count: total } = await supabase
+      .from('whatsapp_subscribers')
+      .select('*', { count: 'exact', head: true })
+    
+    const { count: active } = await supabase
+      .from('whatsapp_subscribers')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'active')
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ data })
+    return NextResponse.json({
+      data: {
+        total: total || 0,
+        active: active || 0
+      }
+    })
   } catch (error: any) {
     return NextResponse.json({ error: 'Erreur interne' }, { status: 500 })
   }

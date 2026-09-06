@@ -28,15 +28,6 @@ interface Subscriber {
 interface Stats {
   total: number
   active: number
-  inactive: number
-  unsubscribed: number
-  today: number
-  thisWeek: number
-  thisMonth: number
-  byCountry: Array<{ country: string; flag: string; count: number }>
-  byInterest: Array<{ interest: string; count: number }>
-  bySource: Array<{ source: string; count: number }>
-  recentSubscribers: Array<{ id: string; phone: string; countryFlag: string; interests: string[]; subscribedAt: string }>
 }
 
 const INTEREST_LABELS: Record<string, string> = {
@@ -84,7 +75,10 @@ export default function WhatsAppPulseDashboard() {
     try {
       const res = await fetch('/api/public/whatsapp-subscribe')
       const json = await res.json()
-      setStats(json.data)
+      setStats({
+        total: json.data?.total || 0,
+        active: json.data?.active || 0
+      })
     } catch (error) {
       console.error('Error fetching stats:', error)
     }
