@@ -144,6 +144,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Synchronisation avec whatsapp_subscribers (si numéro WhatsApp fourni et activé)
+    if (phone.length > 0 && preferences.whatsapp) {
+      try {
+        await supabase
+          .from('whatsapp_subscribers')
+          .upsert({
+            phone: phone,
+            country_code: '+229',
+            country_name: 'Bénin',
+            country_flag: '🇧🇯',
+            interests: ['promotions', 'news', 'stock', 'events'],
+            subscription_source: 'modal',
+            metadata: {
+              sourcePage: parsed.data.sourcePage,
+              preferences: preferences,
+              categoryIds: parsed.data.categoryIds
+            },
+            status: 'active',
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'phone',
+            ignoreDuplicates: false
+          })
+      } catch (syncError) {
+        console.warn('⚠️ Sync whatsapp_subscribers échouée:', syncError)
+      }
+    }
+
     return NextResponse.json(
       {
         ok: true,

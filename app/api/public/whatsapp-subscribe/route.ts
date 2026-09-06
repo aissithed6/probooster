@@ -114,6 +114,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Erreur lors de l\'abonnement' }, { status: 500 })
     }
 
+    // Synchronisation avec client_alert_subscriptions
+    try {
+      await supabase
+        .from('client_alert_subscriptions')
+        .upsert({
+          phone: normalizedPhone,
+          category_ids: [],
+          preferences: {
+            whatsapp: true,
+            email: false,
+            sms: false,
+            push: false
+          },
+          is_active: true,
+          source_page: 'footer'
+        }, {
+          onConflict: 'phone',
+          ignoreDuplicates: false
+        })
+    } catch (syncError) {
+      console.warn('⚠️ Sync client_alert_subscriptions échouée:', syncError)
+    }
+
     return NextResponse.json({
       success: true,
       data: {
