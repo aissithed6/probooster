@@ -100,6 +100,13 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('❌ Error upserting subscriber:', error)
+      // Vérifier si c'est une erreur de table/fonction manquante
+      if (error.message?.includes('function') && error.message?.includes('does not exist')) {
+        return NextResponse.json(
+          { error: 'Le système d\'abonnement n\'est pas encore configuré. Veuillez contacter l\'administrateur.' },
+          { status: 503 }
+        )
+      }
       return NextResponse.json({ error: 'Erreur lors de l\'abonnement' }, { status: 500 })
     }
 

@@ -609,25 +609,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
 
       const token = String(authSession.access_token)
       const tokenPrefix = token.slice(0, 24)
-      const nowIso = new Date().toISOString()
-
-      // Dé-duplication: si une session active existe déjà avec ce token,
-      // on met juste à jour last_activity_at au lieu de créer une nouvelle ligne.
-      const { data: existing } = await supabase
-        .from('user_sessions')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('session_token', tokenPrefix)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (existing?.id) {
-        await supabase
-          .from('user_sessions')
-          .update({ last_activity_at: nowIso } as any)
-          .eq('id', existing.id)
-        return
-      }
 
       const device_info_obj = {
         browser: typeof navigator !== 'undefined' ? (navigator as any).userAgentData?.brands?.[0]?.brand ?? null : null,
@@ -638,24 +619,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
         screen: typeof window !== 'undefined' ? `${(window as any).screen?.width ?? 0}x${(window as any).screen?.height ?? 0}` : null
       }
 
-      const { error } = await supabase
-        .from('user_sessions')
-        .upsert({
-          user_id: userId,
-          session_token: token.slice(0, 24),
-          device_info: JSON.stringify(device_info_obj),
-          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-          is_active: true,
-          last_activity_at: nowIso,
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        } as any, {
-          onConflict: 'session_token',
-          ignoreDuplicates: false
+      // Appel API serveur pour contourner RLS (le client anon ne peut pas insérer dans user_sessions)
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          sessionToken: token,
+          deviceInfo: device_info_obj,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null
         })
-
-      if (error) {
-        console.warn('⚠️ user_sessions: enregistrement de la session impossible:', error.message)
-      }
+      })
     } catch (error) {
       // Best-effort: ne jamais bloquer la connexion pour ça.
       console.warn('⚠️ user_sessions: erreur inattendue lors de l\'enregistrement', error)
