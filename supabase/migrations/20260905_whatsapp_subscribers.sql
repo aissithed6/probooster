@@ -37,6 +37,9 @@ with check (auth.role() = 'service_role');
 -- =====================================================
 -- 2) Fonction de détection de doublons et upsert
 -- =====================================================
+-- Drop l'ancienne fonction (changement de nom de paramètre non supporté par CREATE OR REPLACE)
+drop function if exists public.upsert_whatsapp_subscriber(text,text,text,text,text[],text,jsonb);
+
 create or replace function public.upsert_whatsapp_subscriber(
   p_phone text,
   p_country_code text,
