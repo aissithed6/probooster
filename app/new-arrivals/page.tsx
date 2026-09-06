@@ -6,7 +6,7 @@ import { Grid, List, Search, Star, Heart, ShoppingCart, Clock, Sparkles, Trendin
 import Image from "next/image"
 import { useClientPoints } from "@/lib/hooks/use-client-points"
 import { ShareEngagementService } from "@/lib/services/share-engagement-service"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -24,7 +24,6 @@ import { useDateTime } from "@/lib/hooks/use-date-time"
 
 export default function NewArrivalsPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const { locale, formatDate } = useDateTime()
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [searchQuery, setSearchQuery] = useState("")
@@ -462,11 +461,13 @@ export default function NewArrivalsPage() {
           searchQuery={searchQuery}
           sort={sortKey}
           onStartChat={(product) => {
-            openChatWidget(product, { name: product.seller, id: product.seller.toLowerCase().replace(/\s+/g, '-') })
-          }}
-          onCompare={(product) => {
-            // Cette fonction sera gérée par NewArrivalsSection elle-même
-            // car elle a déjà sa propre logique de comparaison
+            if (typeof window !== 'undefined') {
+              const sellerName = String((product as any)?.seller ?? '').trim()
+              const sellerId = String((product as any)?.vendorId ?? '').trim() || `seller-${sellerName.toLowerCase().replace(/\s+/g, '-')}`
+              window.dispatchEvent(new CustomEvent('openGlobalChat', {
+                detail: { sellerId, sellerName, sellerAvatar: undefined, product }
+              }))
+            }
           }}
         />
 
