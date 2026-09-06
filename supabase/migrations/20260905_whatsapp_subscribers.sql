@@ -2,6 +2,13 @@
 -- Objectif: Stocker les abonnés avec leurs intérêts, pays détecté, et métadonnées
 
 -- =====================================================
+-- Nettoyage (suppression des anciens objets si existent)
+-- =====================================================
+drop function if exists public.get_whatsapp_subscribers_stats();
+drop function if exists public.upsert_whatsapp_subscriber(text,text,text,text,text[],text,jsonb);
+drop table if exists public.whatsapp_subscribers cascade;
+
+-- =====================================================
 -- 1) Table whatsapp_subscribers
 -- =====================================================
 create table if not exists public.whatsapp_subscribers (
