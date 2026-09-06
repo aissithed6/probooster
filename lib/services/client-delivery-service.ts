@@ -141,26 +141,47 @@ function hasAuthorizationHeader(headers: HeadersInit): boolean {
 
 /**
  * Garantit la présence d'un en-tête Authorization valide.
- * Si buildAuthHeaders() ne fournit pas de token (race condition avec onAuthStateChange),
- * récupère directement la session Supabase.
+ * Si buildAuthHeaders() ne fournit pas de token ou si le token est expiré,
+ * récupère directement la session Supabase et tente de la rafraîchir.
  */
 async function ensureAuthHeaders(): Promise<HeadersInit> {
-  const headers = await buildAuthHeaders()
-  if (hasAuthorizationHeader(headers)) {
+  let headers = await buildAuthHeaders()
+
+  // Si pas de token, essaie de récupérer la session directement
+  if (!hasAuthorizationHeader(headers)) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        return {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        }
+      }
+    } catch {
+      // Ignore
+    }
     return headers
   }
 
-  // Fallback: récupère la session directement depuis Supabase
+  // Vérifie si le token est expiré (décodage JWT)
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.access_token) {
-      return {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`
+    const authHeader = (headers as Record<string, string>)['Authorization'] || (headers as Record<string, string>)['authorization']
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7)
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      // Si le token expire dans moins de 60 secondes, le rafraîchir
+      if (payload?.exp && (payload.exp * 1000) < Date.now() + 60000) {
+        const { data: { session } } = await supabase.auth.refreshSession()
+        if (session?.access_token) {
+          return {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`
+          }
+        }
       }
     }
   } catch {
-    // Ignore — on laissera l'appel suivant échouer proprement si pas de session
+    // Ignore les erreurs de décodage — on garde les en-têtes existants
   }
 
   return headers
@@ -212,17 +233,38 @@ export class ClientDeliveryService {
       }
     }
 
-    const headers = await ensureAuthHeaders()
+    let headers = await ensureAuthHeaders()
     if (!hasAuthorizationHeader(headers)) {
       return { data: [] }
     }
 
-    const response = await fetch('/api/client/deliveries', {
+    let response = await fetch('/api/client/deliveries', {
       method: 'GET',
       headers,
       credentials: 'include',
       cache: 'no-store'
     })
+
+    // Si 401, tente de rafraîchir la session et de réessayer
+    if (response.status === 401) {
+      try {
+        const { data: { session } } = await supabase.auth.refreshSession()
+        if (session?.access_token) {
+          headers = {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`
+          }
+          response = await fetch('/api/client/deliveries', {
+            method: 'GET',
+            headers,
+            credentials: 'include',
+            cache: 'no-store'
+          })
+        }
+      } catch {
+        // Ignore — on laissera l'erreur 401 originale se propager
+      }
+    }
 
     if (!response.ok) {
       throw new Error("Impossible de récupérer les livraisons client.")
