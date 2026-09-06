@@ -2860,7 +2860,7 @@ function SellerDashboardPageInner() {
 
       {/* Modal Notifications */}
       <Dialog open={showNotificationsModal} onOpenChange={setShowNotificationsModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center text-[#ff6600]">
               <Bell className="w-5 h-5 mr-2" />

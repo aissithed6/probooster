@@ -7466,7 +7466,7 @@ Pro Booster - Votre marketplace de confiance
                 
                 {/* Menu déroulant des notifications */}
                 {showNotificationsDropdown && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 notifications-dropdown">
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-[9999] notifications-dropdown max-h-[70vh] flex flex-col">
                     <div className="p-4 border-b border-gray-200">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-gray-900">Notifications</h3>
@@ -7480,7 +7480,7 @@ Pro Booster - Votre marketplace de confiance
                         </Button>
                       </div>
                     </div>
-                    <div className="max-h-64 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto min-h-0">
                       {notifications.length > 0 ? notifications.slice(0, 10).map((notification) => (
                         <div 
                           key={notification.id} 

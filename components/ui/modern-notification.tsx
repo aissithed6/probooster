@@ -130,7 +130,7 @@ export function ModernNotification({
   return (
     <div
       className={cn(
-        'fixed top-4 right-4 z-[9999] max-w-sm w-full transform transition-all duration-300 ease-out',
+        'w-full transform transition-all duration-300 ease-out',
         isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0',
         isLeaving ? 'translate-x-full opacity-0 scale-95' : 'scale-100',
         className
@@ -184,14 +184,15 @@ export function NotificationContainer() {
   const { notifications, removeNotification } = useNotifications()
 
   return (
-    <>
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none">
       {notifications.map(notification => (
-        <ModernNotification
-          key={notification.id}
-          {...notification}
-          onClose={removeNotification}
-        />
+        <div key={notification.id} className="pointer-events-auto">
+          <ModernNotification
+            {...notification}
+            onClose={removeNotification}
+          />
+        </div>
       ))}
-    </>
+    </div>
   )
 }
