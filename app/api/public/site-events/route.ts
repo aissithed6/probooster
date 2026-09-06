@@ -39,25 +39,25 @@ export async function GET(request: NextRequest) {
       const todayIso = new Date().toISOString().slice(0, 10)
 
       // 'exact' peut être lent selon la taille des tables. 'estimated' est nettement plus rapide.
-      const [upcomingRes, peopleRes, statsRes] = await Promise.all([
+      const [upcomingRes, whatsappRes, statsRes] = await Promise.all([
         supabase
           .from('site_events')
           .select('id', { count: 'estimated', head: true })
           .eq('is_active', true)
           .gte('event_date', todayIso),
         supabase
-          .from('client_alert_subscriptions')
+          .from('whatsapp_subscribers')
           .select('id', { count: 'estimated', head: true })
-          .eq('is_active', true),
+          .eq('status', 'active'),
         supabase
           .from('site_event_stats')
-          .select('people_registered,satisfaction_rate')
+          .select('satisfaction_rate')
           .eq('id', 1)
           .maybeSingle()
       ])
 
       if (upcomingRes.error) throw new Error(upcomingRes.error.message)
-      if (peopleRes.error) throw new Error(peopleRes.error.message)
+      if (whatsappRes.error) throw new Error(whatsappRes.error.message)
       if (statsRes.error) throw new Error(statsRes.error.message)
 
       const categoriesCount = new Set(
@@ -66,9 +66,9 @@ export async function GET(request: NextRequest) {
           .filter((x) => x.length > 0)
       ).size
 
-      const peopleFromSubscriptions = Number(peopleRes.count ?? 0) || 0
-      const peopleFromStats = Number((statsRes.data as any)?.people_registered ?? 0) || 0
-      const peopleRegistered = Math.max(peopleFromSubscriptions, peopleFromStats)
+      // Source de vérité = vrais abonnés WhatsApp actifs (whatsapp_subscribers),
+      // exactement la même source que la section WhatsApp du Super Admin.
+      const peopleRegistered = Number(whatsappRes.count ?? 0) || 0
 
       const satisfactionRateRaw = Number((statsRes.data as any)?.satisfaction_rate ?? 0)
 

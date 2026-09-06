@@ -7,6 +7,7 @@ import Image from "next/image"
 import { useClientPoints } from "@/lib/hooks/use-client-points"
 import { ShareEngagementService } from "@/lib/services/share-engagement-service"
 import { toast } from "react-hot-toast"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -275,6 +276,41 @@ export default function NewArrivalsPage() {
     if (!showCalendarModal) return
     void loadSiteEvents({ force: false })
   }, [showCalendarModal])
+
+  /**
+   * Realtime: synchronisation temps réel des stats du modal Calendrier des Événements.
+   *
+   * Dès qu'un abonné WhatsApp est créé, modifié ou supprimé (via le modal
+   * "Configurer les Alertes WhatsApp" ou toute autre entrée), le callback
+   * force un refetch des événements et stats via l'API publique site-events.
+   *
+   * Le client navigateur utilise la clé anon : une politique RLS SELECT
+   * (status = 'active') a été ajoutée sur whatsapp_subscribers pour permettre
+   * la réception d'événements Realtime côté public.
+   */
+  useEffect(() => {
+    const channel = supabase
+      .channel('new-arrivals-whatsapp-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'whatsapp_subscribers' },
+        (payload) => {
+          console.log('📡 WhatsApp Realtime (new-arrivals):', payload.eventType, payload.new ?? payload.old)
+          void loadSiteEvents({ force: true, silent: true })
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Realtime whatsapp_subscribers abonné (new-arrivals)')
+        } else if (err) {
+          console.warn('⚠️ Realtime whatsapp_subscribers (new-arrivals):', status, err?.message)
+        }
+      })
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [])
 
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategories(prev => 
