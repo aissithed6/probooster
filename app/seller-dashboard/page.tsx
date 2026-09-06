@@ -1740,23 +1740,17 @@ function SellerDashboardPageInner() {
 
   // Fonctions de gestion du chat support
   const handleChatSupportClick = () => {
-    setShowChatSupportModal(true)
     setShowHelpModal(false)
-    setChatStatus('connecting')
-    
-    // Simuler la connexion
-    setTimeout(() => {
-      setChatStatus('connected')
-      // Message de bienvenue automatique
-      const welcomeMessage = {
-        id: Date.now(),
-        type: 'admin',
-        message: 'Bonjour ! Je suis l\'équipe support de Probooster. Comment puis-je vous aider aujourd\'hui ?',
-        timestamp: new Date().toISOString(),
-        sender: 'Support Probooster'
+
+    // Utiliser le nouveau système de chat global
+    window.dispatchEvent(new CustomEvent('openGlobalChat', {
+      detail: {
+        sellerId: 'support-probooster',
+        sellerName: 'Support Probooster',
+        sellerAvatar: undefined,
+        product: undefined
       }
-      setChatMessages([welcomeMessage])
-    }, 1000)
+    }))
   }
 
   const handleChatMessageSubmit = () => {

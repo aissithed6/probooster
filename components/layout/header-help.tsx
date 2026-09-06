@@ -307,7 +307,22 @@ export default function HeaderHelp() {
                     Notre équipe support est disponible 24h/24 pour vous aider.
                   </p>
                   <div className="flex space-x-2 mt-2">
-                    <Button size="sm" variant="outline" className="text-blue-600 border-blue-600">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-blue-600 border-blue-600"
+                      onClick={() => {
+                        setShowHelpModal(false)
+                        window.dispatchEvent(new CustomEvent('openGlobalChat', {
+                          detail: {
+                            sellerId: 'support-probooster',
+                            sellerName: 'Support Probooster',
+                            sellerAvatar: undefined,
+                            product: undefined
+                          }
+                        }))
+                      }}
+                    >
                       <MessageCircle className="h-3 w-3 mr-1" />
                       Chat support
                     </Button>
