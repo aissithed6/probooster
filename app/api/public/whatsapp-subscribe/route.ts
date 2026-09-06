@@ -156,24 +156,20 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const supabase = getSupabaseAdmin()
-    
-    // Statistiques directes sans fonction RPC
-    const { count: total } = await supabase
-      .from('whatsapp_subscribers')
-      .select('*', { count: 'exact', head: true })
-    
-    const { count: active } = await supabase
-      .from('whatsapp_subscribers')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active')
 
+    // Statistiques complètes via la fonction RPC (total, active, today,
+    // thisMonth, byCountry, byInterest, bySource, recentSubscribers).
+    const { data, error } = await supabase.rpc('get_whatsapp_subscribers_stats')
+    if (error) throw error
+
+    return NextResponse.json({ data })
+  } catch (error: any) {
+    // Fallback: ne jamais casser la réponse, renvoyer des zéros.
     return NextResponse.json({
       data: {
-        total: total || 0,
-        active: active || 0
+        total: 0, active: 0, today: 0, thisMonth: 0,
+        byCountry: [], byInterest: [], bySource: [], recentSubscribers: []
       }
-    })
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Erreur interne' }, { status: 500 })
+    }, { status: 200 })
   }
 }

@@ -20,7 +20,7 @@ create table if not exists public.whatsapp_subscribers (
   interests text[] not null default '{}',
   status text not null default 'active' check (status in ('active', 'inactive', 'unsubscribed')),
   engagement_score integer not null default 0,
-  subscription_source text not null default 'footer' check (subscription_source in ('footer', 'landing', 'popup', 'campaign', 'referral')),
+  subscription_source text not null default 'footer' check (subscription_source in ('footer', 'landing', 'popup', 'campaign', 'referral', 'modal')),
   metadata jsonb null,
   subscribed_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
