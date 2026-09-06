@@ -502,7 +502,7 @@ export default function HowItWorksPage() {
               className="bg-white text-[#ff6600] hover:bg-gray-100 px-8 py-4 text-lg group relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-xl"
               asChild
             >
-              <Link href="/auth/register?role=buyer" className="flex items-center">
+              <Link href="/auth/register?type=acheteur" className="flex items-center">
                 <span className="relative z-10 group-hover:translate-x-1 transition-transform duration-300">Devenir Acheteur</span>
                 <ShoppingBag className="ml-2 h-5 w-5 group-hover:animate-bounce" />
               </Link>
@@ -514,7 +514,7 @@ export default function HowItWorksPage() {
               className="border-2 border-white text-white hover:bg-white hover:text-[#ff6600] px-8 py-4 text-lg group relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-xl bg-transparent"
               asChild
             >
-              <Link href="/auth/register?role=seller" className="flex items-center">
+              <Link href="/auth/register?type=vendeur" className="flex items-center">
                 <span className="relative z-10 group-hover:translate-x-1 transition-transform duration-300">Devenir Vendeur</span>
                 <Star className="ml-2 h-5 w-5 group-hover:animate-bounce" />
               </Link>

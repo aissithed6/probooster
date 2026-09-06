@@ -53,7 +53,7 @@ export default function RegisterPageClient() {
     newsletter: false,
   })
 
-  // État pour les notifications
+    // État pour les notifications
   const [showNotification, setShowNotification] = useState(false)
   const [notificationData, setNotificationData] = useState({
     type: "info" as "info" | "success",
@@ -61,10 +61,23 @@ export default function RegisterPageClient() {
     message: "",
   })
 
-  // Détecter le type de compte depuis l'URL
+  // Détecter le type de compte depuis l'URL (supporte type=vendeur/acheteur
+  // et role=seller/buyer pour compatibilité avec tous les liens existants)
   useEffect(() => {
+    // Sécurité: searchParams peut être null pendant le rendu statique
+    if (!searchParams) return
+
+    // Supporte les deux formats: ?type=vendeur et ?role=seller
     const typeFromUrl = searchParams.get("type")
-    if (typeFromUrl === "vendeur") {
+    const roleFromUrl = searchParams.get("role")
+    // Normalise: "vendeur" → seller, "acheteur" → buyer, "seller" → seller, "buyer" → buyer
+    const normalized = typeFromUrl === "vendeur" ? "seller"
+      : typeFromUrl === "acheteur" ? "buyer"
+      : roleFromUrl === "seller" ? "seller"
+      : roleFromUrl === "buyer" ? "buyer"
+      : null
+
+    if (normalized === "seller") {
       setUserType("seller")
 
       // Notification locale pour informer l'utilisateur
@@ -77,7 +90,7 @@ export default function RegisterPageClient() {
 
       // Masquer la notification après 5 secondes
       setTimeout(() => setShowNotification(false), 5000)
-    } else if (typeFromUrl === "acheteur") {
+    } else if (normalized === "buyer") {
       setUserType("buyer")
 
       // Notification locale pour informer l'utilisateur
