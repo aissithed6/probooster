@@ -313,9 +313,10 @@ export default function HeaderHelp() {
                       className="text-blue-600 border-blue-600"
                       onClick={() => {
                         setShowHelpModal(false)
+                        // UUID valide pour le support technique
                         window.dispatchEvent(new CustomEvent('openGlobalChat', {
                           detail: {
-                            sellerId: 'support-probooster',
+                            sellerId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                             sellerName: 'Support Probooster',
                             sellerAvatar: undefined,
                             product: undefined

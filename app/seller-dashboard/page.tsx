@@ -1743,9 +1743,10 @@ function SellerDashboardPageInner() {
     setShowHelpModal(false)
 
     // Utiliser le nouveau système de chat global
+    // UUID valide pour le support technique
     window.dispatchEvent(new CustomEvent('openGlobalChat', {
       detail: {
-        sellerId: 'support-probooster',
+        sellerId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         sellerName: 'Support Probooster',
         sellerAvatar: undefined,
         product: undefined
@@ -1797,21 +1798,39 @@ function SellerDashboardPageInner() {
       alert('Veuillez remplir tous les champs')
       return
     }
-    
+
     setIsSendingEmail(true)
-    
+
     try {
-      // Simuler l'envoi d'email
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
+      // Import dynamique du HelpService
+      const { HelpService } = await import('@/lib/services/help-service')
+
+      // Créer un ticket de support dans Supabase
+      const { data, error } = await HelpService.createTicket({
+        user_id: (sellerProfile as any)?.id || undefined,
+        name: sellerProfile?.name || 'Vendeur Probooster',
+        email: (sellerProfile as any)?.email || '',
+        subject: emailSubject,
+        message: emailMessage,
+        department: emailCategory,
+        priority: 'medium'
+      })
+
+      if (error) {
+        console.error('Erreur lors de la création du ticket:', error)
+        alert('❌ Erreur lors de l\'envoi. Veuillez réessayer.')
+        return
+      }
+
       // Succès
-      alert('✅ Email envoyé avec succès ! L\'administrateur vous répondra dans les plus brefs délais.')
+      alert('✅ Demande de support envoyée avec succès ! L\'administrateur vous répondra dans les plus brefs délais.')
       setShowEmailSupportModal(false)
       setEmailSubject('')
       setEmailMessage('')
       setEmailCategory('general')
     } catch (error) {
-      alert('❌ Erreur lors de l\'envoi de l\'email. Veuillez réessayer.')
+      console.error('Erreur lors de l\'envoi du email:', error)
+      alert('❌ Erreur lors de l\'envoi. Veuillez réessayer.')
     } finally {
       setIsSendingEmail(false)
     }
