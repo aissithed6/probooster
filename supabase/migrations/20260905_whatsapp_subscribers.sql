@@ -12,8 +12,8 @@ create table if not exists public.whatsapp_subscribers (
   country_flag text null default '🇧🇯',
   interests text[] not null default '{}',
   status text not null default 'active' check (status in ('active', 'inactive', 'unsubscribed')),
-  engagement_score integer not null default 0,S
-  source text not null default 'footer' check (source in ('footer', 'landing', 'popup', 'campaign', 'referral')),
+  engagement_score integer not null default 0,
+  subscription_source text not null default 'footer' check (subscription_source in ('footer', 'landing', 'popup', 'campaign', 'referral')),
   metadata jsonb null,
   subscribed_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -43,7 +43,7 @@ create or replace function public.upsert_whatsapp_subscriber(
   p_country_name text,
   p_country_flag text,
   p_interests text[],
-  p_source text,
+  p_subscription_source text,
   p_metadata jsonb
 )
 returns public.whatsapp_subscribers
@@ -55,10 +55,10 @@ declare
 begin
   insert into public.whatsapp_subscribers (
     phone, country_code, country_name, country_flag,
-    interests, source, metadata, status, updated_at
+    interests, subscription_source, metadata, status, updated_at
   ) values (
     p_phone, p_country_code, p_country_name, p_country_flag,
-    p_interests, coalesce(p_source, 'footer'),
+    p_interests, coalesce(p_subscription_source, 'footer'),
     coalesce(p_metadata, '{}'::jsonb),
     'active', now()
   )
@@ -108,11 +108,11 @@ as $$
       ) t
     ),
     'bySource', (
-      select json_agg(json_build_object('source', source, 'count', cnt))
+      select json_agg(json_build_object('source', subscription_source, 'count', cnt))
       from (
-        select source, count(*) as cnt
+        select subscription_source, count(*) as cnt
         from public.whatsapp_subscribers
-        group by source
+        group by subscription_source
         order by cnt desc
       ) t
     ),

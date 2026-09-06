@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       p_country_name: country.name,
       p_country_flag: country.flag,
       p_interests: interests,
-      p_source: source,
+      p_subscription_source: source,
       p_metadata: JSON.stringify({
         userAgent: request.headers.get('user-agent'),
         timestamp: new Date().toISOString()
