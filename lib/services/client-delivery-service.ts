@@ -1,4 +1,5 @@
 import { ClientAuthService } from '@/lib/services/client-auth-service'
+import { supabase } from '@/lib/supabase'
 
 export interface ClientDeliveryDriver {
   name: string | null
@@ -138,6 +139,33 @@ function hasAuthorizationHeader(headers: HeadersInit): boolean {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+/**
+ * Garantit la présence d'un en-tête Authorization valide.
+ * Si buildAuthHeaders() ne fournit pas de token (race condition avec onAuthStateChange),
+ * récupère directement la session Supabase.
+ */
+async function ensureAuthHeaders(): Promise<HeadersInit> {
+  const headers = await buildAuthHeaders()
+  if (hasAuthorizationHeader(headers)) {
+    return headers
+  }
+
+  // Fallback: récupère la session directement depuis Supabase
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      return {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`
+      }
+    }
+  } catch {
+    // Ignore — on laissera l'appel suivant échouer proprement si pas de session
+  }
+
+  return headers
+}
+
 export interface ClientDeliveryConfig {
   shippingCostAggregationDefault: 'max' | 'sum'
   allowCustomerShippingAggregationOverride: boolean
@@ -184,7 +212,7 @@ export class ClientDeliveryService {
       }
     }
 
-    const headers = await buildAuthHeaders()
+    const headers = await ensureAuthHeaders()
     if (!hasAuthorizationHeader(headers)) {
       return { data: [] }
     }
@@ -207,7 +235,7 @@ export class ClientDeliveryService {
    * Récupère le détail d'une livraison particulière.
    */
   static async getById(id: string): Promise<ClientDeliveryResponse> {
-    const headers = await buildAuthHeaders()
+    const headers = await ensureAuthHeaders()
     if (!hasAuthorizationHeader(headers)) {
       throw new Error('Authentification requise.')
     }
@@ -230,7 +258,7 @@ export class ClientDeliveryService {
    * Récupère les préférences de livraison du client.
    */
   static async getPreferences(): Promise<{ data: ClientDeliveryPreferences }> {
-    const headers = await buildAuthHeaders()
+    const headers = await ensureAuthHeaders()
     if (!hasAuthorizationHeader(headers)) {
       throw new Error('Authentification requise.')
     }
@@ -253,7 +281,7 @@ export class ClientDeliveryService {
    * Met à jour les préférences de livraison du client.
    */
   static async updatePreferences(payload: ClientDeliveryPreferencesUpdate): Promise<{ data: ClientDeliveryPreferences }> {
-    const headers = await buildAuthHeaders()
+    const headers = await ensureAuthHeaders()
     if (!hasAuthorizationHeader(headers)) {
       throw new Error('Authentification requise.')
     }
@@ -306,7 +334,7 @@ export class ClientDeliveryService {
       throw new Error('Identifiant livraison requis.')
     }
 
-    const headers = await buildAuthHeaders()
+    const headers = await ensureAuthHeaders()
     if (!hasAuthorizationHeader(headers)) {
       throw new Error('Authentification requise.')
     }
