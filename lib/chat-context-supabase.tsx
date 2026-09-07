@@ -749,7 +749,10 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Créer une nouvelle session de chat
    */
   const createChatSession = useCallback(async (sellerId: string, sellerName: string, sellerAvatar?: string): Promise<string> => {
+    console.log('🔍 createChatSession appelé avec:', { sellerId, sellerName, userId })
+
     if (!userId) {
+      console.error('❌ userId manquant - utilisateur non connecté')
       toast({
         title: "Erreur",
         description: "Vous devez être connecté pour démarrer une conversation",
@@ -759,6 +762,7 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!sellerId || !UUID_REGEX.test(String(sellerId))) {
+      console.error('❌ sellerId invalide:', sellerId)
       toast({
         title: 'Chat indisponible',
         description: "Impossible d'identifier le destinataire. Veuillez réessayer depuis une fiche produit valide.",
@@ -770,13 +774,17 @@ export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Vérifier si une session existe déjà localement (via ref pour éviter les re-renders)
     const existingSession = chatSessionsRef.current.find(session => session.sellerId === sellerId)
     if (existingSession) {
+      console.log('✅ Session existante trouvée:', existingSession.id)
       return existingSession.id
     }
 
     // Créer ou récupérer la session depuis Supabase
+    console.log('🔍 Appel ChatService.getOrCreateChatSession...')
     const session = await ChatService.getOrCreateChatSession(userId, sellerId)
+    console.log('🔍 Résultat ChatService.getOrCreateChatSession:', session)
 
     if (!session) {
+      console.error('❌ ChatService.getOrCreateChatSession a retourné null')
       toast({
         title: "Erreur",
         description:

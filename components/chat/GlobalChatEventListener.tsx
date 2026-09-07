@@ -47,18 +47,30 @@ export const GlobalChatEventListener: React.FC = () => {
 
       try {
         console.log('🔍 Création de la session de chat pour:', sellerId)
+        console.log('🔍 userId (from context):', handlersRef.current ? 'available' : 'null')
 
         // Créer une nouvelle session de chat
         const sessionId = await createChatSession(sellerId, sellerName, sellerAvatar)
-        console.log('✅ Session créée avec ID:', sessionId)
+        console.log('✅ Session créée avec ID:', JSON.stringify(sessionId))
+        console.log('✅ sessionId type:', typeof sessionId)
+        console.log('✅ sessionId length:', sessionId?.length)
+        console.log('✅ sessionId truthy?', !!sessionId)
+
+        // Vérifier si le toast d'erreur a été affiché
+        console.log('🔍 Vérification des toasts...')
 
         // Ouvrir la session
         if (sessionId) {
           console.log('🔍 Ouverture de la session:', sessionId)
           openChatSession(sessionId)
-          console.log('✅ Session ouverte')
+          console.log('✅ Session ouverte - isAnyChatOpen devrait être true')
         } else {
           console.error('❌ sessionId vide ou null - Impossible d\'ouvrir le chat')
+          console.error('❌ Causes possibles:');
+          console.error('   1. userId manquant (utilisateur non connecté)');
+          console.error('   2. sellerId invalide (UUID non valide)');
+          console.error('   3. API /api/chat/sessions a retourné une erreur');
+          console.error('   4. ChatService.getOrCreateChatSession a retourné null');
         }
 
         // Si un produit est fourni, l'ajouter au chat
