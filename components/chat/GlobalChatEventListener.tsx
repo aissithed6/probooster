@@ -24,12 +24,29 @@ export const GlobalChatEventListener: React.FC = () => {
 
     const handleOpenGlobalChat = async (event: CustomEvent) => {
       console.log('📡 Événement openGlobalChat reçu:', event.detail)
+      console.log('📡 Détails:', {
+        sellerId: event.detail?.sellerId,
+        sellerName: event.detail?.sellerName,
+        sellerAvatar: event.detail?.sellerAvatar,
+        product: event.detail?.product
+      })
 
-      const { sellerId, sellerName, sellerAvatar, product } = event.detail
+      const { sellerId, sellerName, sellerAvatar, product } = event.detail || {}
       const { createChatSession, openChatSession, addProductToChat } = handlersRef.current
 
+      console.log('🔍 Vérification des fonctions du contexte:', {
+        hasCreateChatSession: !!createChatSession,
+        hasOpenChatSession: !!openChatSession,
+        hasAddProductToChat: !!addProductToChat
+      })
+
+      if (!sellerId) {
+        console.error('❌ sellerId manquant!')
+        return
+      }
+
       try {
-        console.log('🔍 Création de la session de chat...')
+        console.log('🔍 Création de la session de chat pour:', sellerId)
 
         // Créer une nouvelle session de chat
         const sessionId = await createChatSession(sellerId, sellerName, sellerAvatar)
@@ -37,8 +54,11 @@ export const GlobalChatEventListener: React.FC = () => {
 
         // Ouvrir la session
         if (sessionId) {
+          console.log('🔍 Ouverture de la session:', sessionId)
           openChatSession(sessionId)
           console.log('✅ Session ouverte')
+        } else {
+          console.error('❌ sessionId vide ou null - Impossible d\'ouvrir le chat')
         }
 
         // Si un produit est fourni, l'ajouter au chat

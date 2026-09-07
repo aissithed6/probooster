@@ -1740,18 +1740,25 @@ function SellerDashboardPageInner() {
 
   // Fonctions de gestion du chat support
   const handleChatSupportClick = () => {
-    setShowHelpModal(false)
+    console.log('🔘 Clic sur Chat Support dans Help Modal')
 
     // Utiliser le nouveau système de chat global
     // UUID valide pour le support technique
-    window.dispatchEvent(new CustomEvent('openGlobalChat', {
+    const event = new CustomEvent('openGlobalChat', {
       detail: {
         sellerId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
         sellerName: 'Support Probooster',
         sellerAvatar: undefined,
         product: undefined
       }
-    }))
+    })
+
+    console.log('📡 Dispatch événement openGlobalChat:', event.detail)
+    window.dispatchEvent(event)
+    console.log('✅ Événement dispatché avec succès')
+
+    // Fermer le modal après avoir dispatché l'événement
+    setShowHelpModal(false)
   }
 
   const handleChatMessageSubmit = () => {
