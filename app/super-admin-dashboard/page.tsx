@@ -41,6 +41,7 @@ import dynamic from 'next/dynamic'
 const SECTION_SLUG_BY_ID: Record<string, string> = {
   overview: '',
   users: 'utilisateurs',
+  roles: 'roles',
   products: 'produits',
   orders: 'commandes',
   deliveries: 'livraisons',
@@ -88,6 +89,7 @@ const SharesEngagementSuperAdmin = dynamic(() => import('@/components/super-admi
 const EditableMessagesManager = dynamic(() => import('@/components/admin/editable-messages-manager'), { ssr: false })
 const SupportVideosAdmin = dynamic(() => import('@/app/dashboard/super-admin/support-videos/page'), { ssr: false })
 const SellerApplicationsAdmin = dynamic(() => import('@/components/super-admin/seller-applications'), { ssr: false })
+const RoleManagement = dynamic(() => import('@/components/super-admin/role-management'), { ssr: false })
 const WhatsAppPulseDashboard = dynamic(() => import('@/components/super-admin/whatsapp-pulse-dashboard'), { ssr: false })
 
 const EMPTY_OVERVIEW: SuperAdminOverviewStats = {
@@ -656,6 +658,13 @@ function SuperAdminDashboardClient() {
       color: 'from-green-500 to-green-600'
     },
     {
+      id: 'roles',
+      title: 'Gestion des Rôles',
+      icon: Shield,
+      description: 'Configuration des rôles et attributions',
+      color: 'from-teal-500 to-teal-600'
+    },
+    {
       id: 'products',
       title: 'Gestion Produits',
       icon: Package,
@@ -790,6 +799,8 @@ function SuperAdminDashboardClient() {
         return <SuperAdminOverview stats={stats} />
       case 'users':
         return <UserManagement prefetchedUsers={prefetchedUsers ?? undefined} />
+      case 'roles':
+        return <RoleManagement />
       case 'products':
         return <ProductManagement prefetchedProducts={prefetchedProducts ?? undefined} />
       case 'orders':
