@@ -708,7 +708,7 @@ export default function HeaderModular({
       : role === 'admin'
         ? '/super-admin-dashboard'
         : '/dashboard'
-    return section ? `${basePath}?section=${section}` : basePath
+    return section ? `${basePath}?tab=${section}` : basePath
   }
 
   const navigateToDashboardSection = (section: string) => {
