@@ -119,7 +119,7 @@ export const useChatContext = () => {
 // Provider du contexte avec synchronisation Supabase
 export const ChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast()
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
   const [userId, setUserId] = useState('')
   

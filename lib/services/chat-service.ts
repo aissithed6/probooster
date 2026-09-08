@@ -139,7 +139,7 @@ export class ChatService {
     userId: string,
     otherUserId: string
   ): Promise<ChatSession | null> {
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     const safeUserId = String(userId ?? '').trim()
     const safeOtherUserId = String(otherUserId ?? '').trim()
     if (!safeUserId || !safeOtherUserId) return null
