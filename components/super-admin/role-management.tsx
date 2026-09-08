@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { roleService, ALL_SECTIONS, type RoleDefinition } from '@/lib/services/role-service'
+import { roleService, ALL_SECTIONS, ALL_FEATURES, type RoleDefinition } from '@/lib/services/role-service'
 
 const SL: Record<string, string> = {}
 ALL_SECTIONS.forEach(s => { SL[s.id] = s.label })
@@ -61,6 +61,13 @@ export default function RoleManagement() {
     })
   }
 
+  const toggleFeat = (r: RoleDefinition, f: string) => {
+    setSelectedRole({
+      ...r,
+      features: r.features.includes(f) ? r.features.filter(x => x !== f) : [...r.features, f]
+    })
+  }
+
   if (loading) return <div className="p-6">Chargement...</div>
 
   return (
@@ -110,12 +117,23 @@ export default function RoleManagement() {
             <DialogHeader><DialogTitle>Éditer: {selectedRole.role_name}</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <h4 className="font-semibold">Sections</h4>
+                <h4 className="font-semibold">Sections accessibles</h4>
                 <div className="grid grid-cols-2 gap-2">
                   {ALL_SECTIONS.map(sec => (
                     <div key={sec.id} className="flex items-center space-x-2 p-2 border rounded">
                       <Switch checked={selectedRole.sections.includes(sec.id)} onCheckedChange={() => toggleSec(selectedRole, sec.id)} />
                       <span className="text-sm">{sec.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-semibold">Fonctionnalités activées</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_FEATURES.filter(f => f !== 'all_features').map(f => (
+                    <div key={f} className="flex items-center space-x-2 p-2 border rounded">
+                      <Switch checked={selectedRole.features.includes(f)} onCheckedChange={() => toggleFeat(selectedRole, f)} />
+                      <span className="text-sm">{f}</span>
                     </div>
                   ))}
                 </div>

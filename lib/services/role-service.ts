@@ -136,7 +136,7 @@ class RoleService {
 
   async getUserRoles(userId: string): Promise<UserRoleAssignment[]> {
     const { data, error } = await supabase
-      .from('user_role_assignments')
+      .from('user_role_code_assignments')
       .select('*')
       .eq('user_id', userId)
       .eq('is_active', true)
@@ -147,7 +147,7 @@ class RoleService {
   async assignRoleToUser(userId: string, roleCode: string): Promise<UserRoleAssignment> {
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase
-      .from('user_role_assignments')
+      .from('user_role_code_assignments')
       .upsert({
         user_id: userId,
         role_code: roleCode,
@@ -162,7 +162,7 @@ class RoleService {
 
   async removeRoleFromUser(userId: string, roleCode: string): Promise<void> {
     const { error } = await supabase
-      .from('user_role_assignments')
+      .from('user_role_code_assignments')
       .update({ is_active: false })
       .eq('user_id', userId)
       .eq('role_code', roleCode)

@@ -1,5 +1,7 @@
 -- MIGRATION : 20260909000003_complete_role_system.sql
--- Crée le système complet de gestion des rôles
+-- Système complet de gestion des rôles (auto-suffisant et idempotent)
+-- NOTE : utilise user_role_code_assignments pour ne PAS entrer en conflit
+-- avec la table existante user_role_assignments (qui référence roles.id)
 
 -- 1. AJOUT DES NOUVEAUX RÔLES DANS LA CONTRAINTE
 DO $$
@@ -30,11 +32,11 @@ CREATE TABLE IF NOT EXISTS public.role_definitions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. TABLE user_role_assignments
-CREATE TABLE IF NOT EXISTS public.user_role_assignments (
+-- 4. TABLE user_role_code_assignments (attribution des rôles aux utilisateurs)
+CREATE TABLE IF NOT EXISTS public.user_role_code_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  role_code TEXT NOT NULL,
+  role_code TEXT NOT NULL REFERENCES public.role_definitions(role_code) ON DELETE CASCADE,
   assigned_by UUID REFERENCES public.users(id),
   assigned_at TIMESTAMPTZ DEFAULT NOW(),
   is_active BOOLEAN DEFAULT true,
@@ -43,7 +45,7 @@ CREATE TABLE IF NOT EXISTS public.user_role_assignments (
 
 -- 5. INDEX
 CREATE INDEX IF NOT EXISTS idx_role_definitions_role_code ON public.role_definitions(role_code);
-CREATE INDEX IF NOT EXISTS idx_user_role_assignments_user_id ON public.user_role_assignments(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_role_code_assignments_user_id ON public.user_role_code_assignments(user_id);
 
 -- 6. TRIGGER
 DROP TRIGGER IF EXISTS set_role_definitions_updated_at ON public.role_definitions;
@@ -52,15 +54,25 @@ CREATE TRIGGER set_role_definitions_updated_at BEFORE UPDATE ON public.role_defi
 
 -- 7. RLS
 ALTER TABLE public.role_definitions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_role_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_role_code_assignments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Super Admin can manage role_definitions" ON public.role_definitions;
 CREATE POLICY "Super Admin can manage role_definitions" ON public.role_definitions FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'super_admin'));
 
-DROP POLICY IF EXISTS "Super Admin can manage user_role_assignments" ON public.user_role_assignments;
-CREATE POLICY "Super Admin can manage user_role_assignments" ON public.user_role_assignments FOR ALL TO authenticated
+-- Les utilisateurs authentifiés peuvent lire les définitions de rôles
+DROP POLICY IF EXISTS "Authenticated can read role_definitions" ON public.role_definitions;
+CREATE POLICY "Authenticated can read role_definitions" ON public.role_definitions FOR SELECT TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "Super Admin can manage user_role_code_assignments" ON public.user_role_code_assignments;
+CREATE POLICY "Super Admin can manage user_role_code_assignments" ON public.user_role_code_assignments FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'super_admin'));
+
+-- Chacun peut lire ses propres attributions de rôles
+DROP POLICY IF EXISTS "Users can read own role assignments" ON public.user_role_code_assignments;
+CREATE POLICY "Users can read own role assignments" ON public.user_role_code_assignments FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
 
 -- 8. RÔLES PAR DÉFAUT
 INSERT INTO public.role_definitions (role_code, role_name, description, is_system, sections, features) VALUES
