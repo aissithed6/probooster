@@ -177,11 +177,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
   const resolveUserRole = async (authUser: SupabaseAuthUser | null): Promise<User['role']> => {
     if (!authUser) return 'client'
 
-    const metadataRole = authUser.user_metadata?.role as User['role'] | undefined
-    if (metadataRole) {
-      return metadataRole
-    }
-
+    // La base est la source de vérité : le rôle principal (ex: 'admin', 'super_admin')
+    // y est écrasé par le Super Admin. user_metadata peut être obsolète (ex: garder
+    // 'client' après une élévation de rôle), ce qui faisait afficher le mauvais dashboard.
     try {
       const { data, error } = await supabase
         .from('users')
@@ -194,6 +192,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children, initialSta
       }
     } catch (error) {
       console.warn('⚠️ Impossible de récupérer le rôle depuis la base:', error)
+    }
+
+    // Fallback : pour les comptes tout juste créés (OAuth) sans ligne users encore,
+    // on retombe sur le rôle des métadonnées.
+    const metadataRole = authUser.user_metadata?.role as User['role'] | undefined
+    if (metadataRole) {
+      return metadataRole
     }
 
     return 'client'

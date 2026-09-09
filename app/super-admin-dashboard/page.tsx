@@ -792,6 +792,33 @@ function SuperAdminDashboardClient() {
     }
   ]
 
+  // Mode d'affichage selon le rôle connecté (base = source de vérité, via user.role)
+  const ROLE_MODE_LABELS: Record<string, { label: string; subtitle: string }> = {
+    super_admin: { label: 'Super Admin', subtitle: 'Gestion totale et contrôle exhaustif de la marketplace' },
+    admin: { label: 'Administrateur', subtitle: 'Mode Administrateur - accès limité aux sections et fonctionnalités configurées' },
+    ops: { label: 'Exploitation', subtitle: 'Mode Exploitation - supervision des opérations' }
+  }
+  const userMode = ROLE_MODE_LABELS[String(user?.role ?? '').trim()] ?? ROLE_MODE_LABELS.super_admin
+
+  // Restrictions de sections par rôle (alignées sur role_definitions)
+  const ROLE_SECTION_ALLOW: Record<string, string[] | 'all'> = {
+    super_admin: 'all',
+    ops: 'all',
+    admin: ['overview', 'users', 'products', 'orders', 'deliveries', 'reviews', 'messaging', 'notifications']
+  }
+  const perRoleAllow = ROLE_SECTION_ALLOW[String(user?.role ?? '').trim()] ?? ['overview']
+  const allowedSections = perRoleAllow === 'all'
+    ? sections
+    : sections.filter(s => perRoleAllow.includes(s.id))
+
+  // Sécurité : si la section active n'est pas autorisée pour ce rôle, revenir à la vue d'ensemble.
+  useEffect(() => {
+    const allowList = Array.isArray(perRoleAllow) ? perRoleAllow : null
+    if (allowList && activeSection !== 'overview' && !allowList.includes(activeSection)) {
+      setActiveSection('overview')
+    }
+  }, [activeSection, user?.role])
+
   // Fonction pour rendre le contenu de la section active
   const renderSectionContent = () => {
     switch (activeSection) {
@@ -876,8 +903,8 @@ function SuperAdminDashboardClient() {
                 <Shield className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{resolvedSiteName} - Super Admin</h1>
-                <p className="text-sm text-gray-600">Gestion totale et contrôle exhaustif de la marketplace</p>
+                <h1 className="text-xl font-bold text-gray-900">{resolvedSiteName} - {userMode.label}</h1>
+                <p className="text-sm text-gray-600">{userMode.subtitle}</p>
               </div>
             </div>
             
@@ -1010,7 +1037,7 @@ function SuperAdminDashboardClient() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Sections d'Administration</h3>
               
               <div className="space-y-2">
-                {sections.map((section) => {
+                {allowedSections.map((section) => {
                   const IconComponent = section.icon
                   const isActive = activeSection === section.id
                   
