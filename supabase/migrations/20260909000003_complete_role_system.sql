@@ -76,6 +76,9 @@ CREATE POLICY "Users can read own role assignments" ON public.user_role_code_ass
 
 -- 8. RÔLES PAR DÉFAUT
 INSERT INTO public.role_definitions (role_code, role_name, description, is_system, sections, features) VALUES
+  ('admin', 'Admin', 'Administration générale : produits, commandes, utilisateurs et modération (sans finances ni configuration système)', true,
+   ARRAY['overview','users','products','orders','deliveries','reviews','messaging','notifications'],
+   ARRAY['view_users','edit_users','view_products','edit_products','view_orders','edit_orders','cancel_orders','view_deliveries','track_deliveries','view_reviews','respond_reviews','send_messages','view_notifications']),
   ('order_manager', 'Gestionnaire des commandes et des ventes', 'Gère les commandes et ventes', true,
    ARRAY['overview','orders','deliveries','reviews','messaging','notifications'],
    ARRAY['view_orders','edit_orders','cancel_orders','refund_orders','view_deliveries','track_deliveries','view_reviews','respond_reviews','send_messages','view_notifications']),
