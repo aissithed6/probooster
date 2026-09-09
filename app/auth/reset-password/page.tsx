@@ -35,6 +35,19 @@ export default function ResetPasswordPage() {
     return true
   }
 
+  /**
+   * Retourne la liste des critères de la politique de mot de passe non respectés.
+   */
+  const getPasswordPolicyViolations = (value: string): string[] => {
+    const pwd = (value ?? '').toString()
+    const violations: string[] = []
+    if (pwd.length < minPasswordLength) violations.push(`au moins ${minPasswordLength} caractères`)
+    if (requireUppercase && !/[A-Z]/.test(pwd)) violations.push('une lettre majuscule')
+    if (requireNumbers && !/[0-9]/.test(pwd)) violations.push('un chiffre')
+    if (requireSymbols && !/[^A-Za-z0-9]/.test(pwd)) violations.push('un symbole spécial (ex: !@#$%)')
+    return violations
+  }
+
   // Soumission de la mise à jour du mot de passe pour l'utilisateur authentifié.
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -46,7 +59,12 @@ export default function ResetPasswordPage() {
     }
 
     if (!passwordMeetsPolicy(newPassword)) {
-      setErrorMessage(`Le mot de passe ne respecte pas la politique de sécurité (min ${minPasswordLength} caractères).`)
+      const violations = getPasswordPolicyViolations(newPassword)
+      setErrorMessage(
+        violations.length > 0
+          ? `Le mot de passe doit contenir : ${violations.join(', ')}.`
+          : `Le mot de passe ne respecte pas la politique de sécurité (min ${minPasswordLength} caractères).`
+      )
       setSuccessMessage(null)
       return
     }

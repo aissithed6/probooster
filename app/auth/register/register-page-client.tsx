@@ -114,6 +114,20 @@ export default function RegisterPageClient() {
   const requireUppercase = Boolean(passwordPolicy?.requireUppercase)
   const requireNumbers = Boolean(passwordPolicy?.requireNumbers)
   const requireSymbols = Boolean(passwordPolicy?.requireSymbols)
+
+  /**
+   * Retourne la liste des critères de la politique de mot de passe non respectés.
+   * Permet d'afficher un message d'erreur précis à l'utilisateur.
+   */
+  const getPasswordPolicyViolations = (value: string): string[] => {
+    const pwd = (value ?? '').toString()
+    const violations: string[] = []
+    if (pwd.length < minPasswordLength) violations.push(`au moins ${minPasswordLength} caractères`)
+    if (requireUppercase && !/[A-Z]/.test(pwd)) violations.push('une lettre majuscule')
+    if (requireNumbers && !/[0-9]/.test(pwd)) violations.push('un chiffre')
+    if (requireSymbols && !/[^A-Za-z0-9]/.test(pwd)) violations.push('un symbole spécial (ex: !@#$%)')
+    return violations
+  }
   const allowNewsletter = publicSettings?.notificationConfig?.newsletter ?? true
 
   const allowGoogle = publicSettings?.securityConfig?.googleAuth ?? true
@@ -182,7 +196,12 @@ export default function RegisterPageClient() {
       }
 
       if (!passwordMeetsPolicy(formData.password)) {
-        setError(`Le mot de passe ne respecte pas la politique de sécurité (min ${minPasswordLength} caractères).`)
+        const violations = getPasswordPolicyViolations(formData.password)
+        setError(
+          violations.length > 0
+            ? `Le mot de passe doit contenir : ${violations.join(', ')}.`
+            : `Le mot de passe ne respecte pas la politique de sécurité (min ${minPasswordLength} caractères).`
+        )
         setIsLoading(false)
         return
       }
@@ -549,6 +568,12 @@ export default function RegisterPageClient() {
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Mot de passe requis : au moins {minPasswordLength} caractères
+                        {requireUppercase ? ', une majuscule' : ''}
+                        {requireNumbers ? ', un chiffre' : ''}
+                        {requireSymbols ? ', un symbole (ex: !@#$%)' : ''}.
+                      </p>
                     </div>
 
                     <div className="space-y-2">
