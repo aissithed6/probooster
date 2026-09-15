@@ -456,6 +456,14 @@ export class SuperAdminDashboardService {
   }
 
   /**
+   * Variante stricte de `getOverviewStats` : propage l'erreur au lieu de renvoyer des statistiques vides.
+   * Permet à l'UI d'afficher un message explicite plutôt que des zéros trompeurs (mode admin notamment).
+   */
+  static async getOverviewStatsStrict(): Promise<SuperAdminOverviewStats> {
+    return SuperAdminDashboardApi.getOverview()
+  }
+
+  /**
    * Récupère les réglages de configuration (vendors/admins/global).
    */
   static async getSettings(): Promise<SuperAdminSettings | null> {

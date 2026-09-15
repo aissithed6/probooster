@@ -26,14 +26,13 @@ import {
   SuperAdminDashboardService,
   type SuperAdminActivity,
   type SuperAdminOverviewStats,
-  type SuperAdminPermission,
-  type SuperAdminRole,
   type SuperAdminSupportMessage,
   type SuperAdminSupportTicket,
   type SuperAdminUserSummary,
   type CreateSuperAdminUserInput,
   type UpdateSuperAdminUserInput
 } from '@/lib/services/super-admin-dashboard-service'
+import { roleService, ALL_SECTIONS, ALL_FEATURES, type RoleDefinition } from '@/lib/services/role-service'
 import type { SuperAdminSettings } from '@/lib/types/super-admin-settings'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -228,6 +227,7 @@ type ManagementRole = SuperAdminUserSummary['role']
 
 interface ManagedRole {
   id: string
+  roleCode: string
   name: string
   description: string
   permissions: string[]
@@ -485,38 +485,25 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   const [selectedRoles, setSelectedRoles] = useState<Set<ManagementRole>>(new Set(['client']))
   const [customPermissions, setCustomPermissions] = useState<Set<string>>(new Set())
 
-  // État pour la gestion des fonctionnalités par rôle
-  const [roleFeatures, setRoleFeatures] = useState<Record<string, Record<string, string[]>>>({
+  // Fonctionnalités par défaut par rôle (alignées sur role-service.ts / role_definitions)
+  const DEFAULT_ROLE_FEATURES: Record<string, { sections: string[]; features: string[] }> = {
     client: {
-      dashboard: ['overview', 'orders', 'wishlist', 'dashboard_reviews', 'settings', 'profile', 'addresses', 'payment_methods', 'user_notifications', 'preferences'],
-      marketplace: ['browse', 'search', 'compare', 'favorites', 'categories', 'brands', 'deals', 'trending', 'recommendations', 'price_alerts'],
-      communication: ['chat', 'support', 'communication_reviews', 'ratings', 'feedback', 'help_center', 'faq'],
-      financial: ['payment_history', 'refunds', 'coupons', 'loyalty_points', 'gift_cards', 'subscriptions'],
-      social: ['follow_vendors', 'share_products', 'invite_friends', 'social_login', 'community_forum']
+      sections: ['overview', 'orders', 'wishlist', 'settings', 'profile', 'addresses', 'payment_methods', 'user_notifications', 'preferences'],
+      features: ['view_users', 'view_products', 'view_orders', 'view_deliveries', 'view_financial', 'view_reports', 'view_marketing', 'view_loyalty', 'view_shares', 'view_engagement', 'send_messages', 'view_notifications', 'send_notifications', 'view_reviews', 'respond_reviews', 'view_analytics', 'view_transactions', 'view_user_transactions']
     },
     vendor: {
-      dashboard: ['overview', 'products', 'orders', 'analytics', 'earnings', 'customers', 'inventory_overview', 'performance', 'insights', 'reports_dashboard'],
-      marketplace: ['manage_products', 'inventory_management', 'pricing', 'promotions', 'categories', 'brands', 'seo', 'marketing', 'advertising', 'partnerships'],
-      communication: ['chat', 'vendor_notifications', 'support', 'customer_service', 'email_marketing', 'sms_campaigns', 'social_media', 'live_chat', 'ticket_system'],
-      financial: ['payments', 'withdrawals', 'reports', 'taxes', 'invoicing', 'accounting', 'payouts', 'commissions', 'fees', 'currency_management'],
-      operations: ['shipping', 'fulfillment', 'returns', 'warranty', 'quality_control', 'supplier_management', 'logistics', 'warehouse']
+      sections: ['overview', 'products', 'orders', 'analytics', 'earnings', 'customers', 'inventory_overview', 'performance', 'insights', 'reports_dashboard', 'manage_products', 'inventory_management', 'pricing', 'promotions', 'categories', 'brands', 'seo', 'marketing', 'advertising', 'partnerships'],
+      features: ['view_products', 'edit_products', 'create_products', 'delete_products', 'view_orders', 'edit_orders', 'cancel_orders', 'view_deliveries', 'track_deliveries', 'manage_drivers', 'view_financial', 'view_reports', 'manage_payouts', 'export_reports', 'view_marketing', 'create_promotions', 'edit_promotions', 'delete_promotions', 'view_loyalty', 'manage_points', 'send_messages', 'view_notifications', 'send_notifications', 'view_reviews', 'respond_reviews', 'view_analytics', 'view_transactions', 'view_user_transactions']
     },
     admin: {
-      dashboard: ['overview', 'users', 'products', 'orders', 'analytics', 'system_health', 'performance', 'security', 'reports', 'insights'],
-      management: ['user_management', 'product_management', 'order_management', 'vendor_management', 'category_management', 'brand_management', 'content_moderation', 'dispute_resolution'],
-      system: ['settings', 'backup', 'logs', 'maintenance', 'updates', 'security', 'api_management', 'integrations', 'third_party_services', 'system_configuration'],
-      financial: ['reports_financial', 'transactions', 'refunds', 'commissions', 'payouts', 'taxes', 'audit', 'compliance', 'fraud_detection', 'risk_management_financial'],
-      analytics: ['user_analytics', 'product_analytics', 'sales_analytics', 'performance_metrics', 'kpi_dashboard', 'custom_reports', 'data_export', 'trend_analysis']
+      sections: ['overview', 'users', 'products', 'orders', 'analytics', 'system_health', 'performance', 'security', 'reports', 'insights', 'user_management', 'product_management', 'order_management', 'vendor_management', 'category_management', 'brand_management', 'content_moderation', 'dispute_resolution', 'settings', 'backup', 'logs', 'maintenance', 'updates', 'security', 'api_management', 'integrations', 'third_party_services', 'system_configuration', 'reports_financial', 'transactions', 'refunds', 'commissions', 'payouts', 'taxes', 'audit', 'compliance', 'fraud_detection', 'risk_management_financial', 'user_analytics', 'product_analytics', 'sales_analytics', 'performance_metrics', 'kpi_dashboard', 'custom_reports', 'data_export', 'trend_analysis'],
+      features: ['all_features', 'view_users', 'edit_users', 'delete_users', 'create_users', 'view_products', 'edit_products', 'delete_products', 'create_products', 'view_orders', 'edit_orders', 'cancel_orders', 'refund_orders', 'view_deliveries', 'assign_deliveries', 'track_deliveries', 'update_delivery_status', 'manage_drivers', 'view_financial', 'view_reports', 'manage_payouts', 'export_reports', 'view_marketing', 'create_promotions', 'edit_promotions', 'delete_promotions', 'view_loyalty', 'manage_points', 'view_shares', 'view_engagement', 'send_messages', 'view_notifications', 'send_notifications', 'view_reviews', 'respond_reviews', 'view_analytics', 'view_transactions', 'view_user_transactions']
     },
     super_admin: {
-      dashboard: ['overview', 'system_health', 'performance', 'security', 'global_analytics', 'user_insights', 'business_intelligence', 'real_time_monitoring', 'alerts', 'admin_notifications'],
-      management: ['all_features', 'role_management', 'permission_management', 'user_management', 'product_management', 'order_management', 'vendor_management', 'admin_management', 'content_management', 'system_administration'],
-      system: ['all_settings', 'database', 'api', 'integrations', 'infrastructure', 'cloud_services', 'backup_recovery', 'disaster_recovery', 'performance_tuning', 'scalability', 'security_audit', 'compliance_management'],
-      financial: ['all_financial', 'audit', 'compliance', 'risk_management', 'global_financial_control', 'multi_currency', 'tax_management', 'fraud_prevention', 'financial_reporting', 'budget_management'],
-      security: ['access_control', 'authentication', 'authorization', 'encryption', 'vpn_management', 'firewall_configuration', 'intrusion_detection', 'security_monitoring', 'incident_response', 'vulnerability_management'],
-      development: ['code_management', 'version_control', 'deployment', 'testing', 'quality_assurance', 'documentation', 'api_development', 'third_party_integrations', 'custom_development', 'maintenance']
+      sections: ['overview', 'system_health', 'performance', 'security', 'global_analytics', 'user_insights', 'business_intelligence', 'real_time_monitoring', 'alerts', 'admin_notifications', 'all_features', 'role_management', 'permission_management', 'user_management', 'product_management', 'order_management', 'vendor_management', 'admin_management', 'content_management', 'system_administration', 'all_settings', 'database', 'api', 'integrations', 'infrastructure', 'cloud_services', 'backup_recovery', 'disaster_recovery', 'performance_tuning', 'scalability', 'security_audit', 'compliance_management', 'all_financial', 'audit', 'compliance', 'risk_management', 'global_financial_control', 'multi_currency', 'tax_management', 'fraud_prevention', 'financial_reporting', 'budget_management', 'access_control', 'authentication', 'authorization', 'encryption', 'vpn_management', 'firewall_configuration', 'intrusion_detection', 'security_monitoring', 'incident_response', 'vulnerability_management', 'code_management', 'version_control', 'deployment', 'testing', 'quality_assurance', 'documentation', 'api_development', 'third_party_integrations', 'custom_development', 'maintenance'],
+      features: ['all_features', 'view_users', 'edit_users', 'delete_users', 'create_users', 'view_products', 'edit_products', 'delete_products', 'create_products', 'view_orders', 'edit_orders', 'cancel_orders', 'refund_orders', 'view_deliveries', 'assign_deliveries', 'track_deliveries', 'update_delivery_status', 'manage_drivers', 'view_financial', 'view_reports', 'manage_payouts', 'export_reports', 'view_marketing', 'create_promotions', 'edit_promotions', 'delete_promotions', 'view_loyalty', 'manage_points', 'view_shares', 'view_engagement', 'send_messages', 'view_notifications', 'send_notifications', 'view_reviews', 'respond_reviews', 'view_analytics', 'view_transactions', 'view_user_transactions']
     }
-  })
+  }
 
   // État pour les fonctionnalités sélectionnées pour l'utilisateur
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([])
@@ -589,16 +576,33 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   const [customRoles, setCustomRoles] = useState<ManagedRole[]>([])
   const [rolesLoading, setRolesLoading] = useState(false)
   const [rolesError, setRolesError] = useState<string | null>(null)
-  const [permissions, setPermissions] = useState<SuperAdminPermission[]>([])
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null)
   const [roleAssignmentUserId, setRoleAssignmentUserId] = useState('')
 
   /**
-   * Persiste les permissions d'un rôle personnalisé (best-effort côté service).
+   * Retrouve le `role_code` (identifiant role-service.ts) d'un rôle personnalisé à partir de son id local.
    */
-  const handlePersistRolePermissions = async (roleId: string, rolePermissions: string[]) => {
+  const getRoleCodeById = useCallback(
+    (roleId: string | null) => customRoles.find((role) => role.id === roleId)?.roleCode ?? null,
+    [customRoles]
+  )
+
+  /**
+   * Sépare une liste mélangée de sections et fonctionnalités pour la persistance role-service.
+   */
+  const splitSectionsAndFeatures = useCallback((values: string[]) => {
+    const sections = values.filter((value) => ALL_SECTIONS.some((section) => section.id === value))
+    const features = values.filter((value) => ALL_FEATURES.includes(value))
+    return { sections, features }
+  }, [])
+
+  /**
+   * Persiste les sections/fonctionnalités d'un rôle personnalisé via role-service.ts.
+   */
+  const handlePersistRolePermissions = async (roleCode: string, rolePermissions: string[]) => {
     try {
-      await SuperAdminDashboardService.updateRole(roleId, { permissions: rolePermissions } as any)
+      const { sections, features } = splitSectionsAndFeatures(rolePermissions)
+      await roleService.updateRole(roleCode, { sections, features })
     } catch (error) {
       console.warn('⚠️ handlePersistRolePermissions failed:', error)
     }
@@ -899,28 +903,27 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     setRolesError(null)
 
     try {
-      const [roles, perms] = await Promise.all([
-        SuperAdminDashboardService.getRoles(),
-        SuperAdminDashboardService.getPermissions()
-      ])
-
-      setPermissions(perms ?? [])
-
-      const mapped: ManagedRole[] = (roles ?? []).map((role: SuperAdminRole) => ({
-        id: role.id,
-        name: role.name,
-        description: role.description ?? '',
-        permissions: [],
-        userCount: role.userCount,
-        isActive: role.isActive,
-        createdAt: role.createdAt
-      }))
+      const allRoles = await roleService.getAllRoles()
+      const mapped: ManagedRole[] = allRoles
+        .filter(r => !r.is_system)
+        .map((role: RoleDefinition) => ({
+          id: role.id,
+          roleCode: role.role_code,
+          name: role.role_name,
+          description: role.description ?? '',
+          permissions: [...(role.sections ?? []), ...(role.features ?? [])],
+          userCount: 0,
+          isActive: role.is_active,
+          createdAt: role.created_at
+        }))
 
       setCustomRoles(mapped)
+      setSelectedRoleId((prev) => (prev && mapped.some((role) => role.id === prev) ? prev : null))
     } catch (error) {
-      console.error('Erreur lors du chargement des rôles:', error)
+      console.error('Erreur lors du chargement des rôles Supabase:', error)
       setRolesError("Impossible de charger les rôles Supabase.")
       setCustomRoles([])
+      setSelectedRoleId(null)
     } finally {
       setRolesLoading(false)
     }
@@ -2434,19 +2437,16 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     (roles: Set<User['role']>) => {
       const permissionsSet = new Set<string>()
       roles.forEach((role) => {
-        const groups = roleFeatures[role]
-        if (!groups) {
+        const def = DEFAULT_ROLE_FEATURES[role]
+        if (!def) {
           return
         }
-        Object.values(groups).forEach((features) => {
-          if (Array.isArray(features)) {
-            features.forEach((feature) => permissionsSet.add(feature))
-          }
-        })
+        def.sections.forEach(s => permissionsSet.add(s))
+        def.features.forEach(f => permissionsSet.add(f))
       })
       setSelectedFeatures(Array.from(permissionsSet))
     },
-    [roleFeatures]
+    []
   )
 
   /**
@@ -2567,22 +2567,28 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     setActionError(null)
 
     const created = await runWithLoader(async () => {
-      const role = await SuperAdminDashboardService.createRole({
-        name: roleForm.name.trim(),
+      const roleCode = roleForm.name
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+
+      if (!roleCode) {
+        throw new Error('Nom de rôle invalide')
+      }
+
+      const { sections, features } = splitSectionsAndFeatures(roleForm.permissions)
+
+      return await roleService.createRole({
+        role_code: roleCode,
+        role_name: roleForm.name.trim(),
         description: roleForm.description.trim(),
-        isActive: roleForm.isActive
+        sections,
+        features,
+        is_active: roleForm.isActive
       })
-
-      if (!role) {
-        throw new Error('Création du rôle échouée')
-      }
-
-      // Persiste aussi les permissions du nouveau rôle si sélectionnées
-      if (Array.isArray(roleForm.permissions) && roleForm.permissions.length > 0) {
-        await SuperAdminDashboardService.setRolePermissions(role.id, roleForm.permissions)
-      }
-
-      return role
     }, {
       successTitle: 'Rôle créé',
       successMessage: `Le rôle "${roleForm.name.trim()}" a été créé et sauvegardé dans Supabase.`
@@ -2627,21 +2633,15 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     setActionError(null)
 
     const updated = await runWithLoader(async () => {
-      const result = await SuperAdminDashboardService.updateRole(editingRole.id, {
-        name: roleForm.name.trim(),
+      const { sections, features } = splitSectionsAndFeatures(roleForm.permissions)
+
+      return await roleService.updateRole(editingRole.roleCode, {
+        role_name: roleForm.name.trim(),
         description: roleForm.description.trim(),
-        isActive: roleForm.isActive
+        sections,
+        features,
+        is_active: roleForm.isActive
       })
-
-      if (!result) {
-        throw new Error('Mise à jour du rôle échouée')
-      }
-
-      if (Array.isArray(roleForm.permissions)) {
-        await SuperAdminDashboardService.setRolePermissions(editingRole.id, roleForm.permissions)
-      }
-
-      return result
     }, {
       successTitle: 'Rôle mis à jour',
       successMessage: 'Le rôle a été mis à jour et sauvegardé dans Supabase.'
@@ -2672,11 +2672,13 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     setActionError(null)
 
     const deleted = await runWithLoader(async () => {
-      const result = await SuperAdminDashboardService.deleteRole(roleId)
-      if (!result) {
-        throw new Error('Suppression du rôle échouée')
+      const roleCode = getRoleCodeById(roleId)
+      if (!roleCode) {
+        throw new Error('Code du rôle introuvable')
       }
-      return result
+
+      await roleService.deleteRole(roleCode)
+      return roleCode
     }, {
       successTitle: 'Rôle supprimé',
       successMessage: 'Le rôle a été supprimé et retiré de Supabase.'
@@ -2704,11 +2706,12 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
 
   const handleAssignRoleToUser = async (userId: string, roleId: string) => {
     const success = await runWithLoader(async () => {
-      const response = await SuperAdminDashboardService.assignRoleToUser(userId, roleId)
-      if (!response) {
-        throw new Error('Assignation rôle utilisaiteur échouée')
+      const roleCode = getRoleCodeById(roleId)
+      if (!roleCode) {
+        throw new Error('Code du rôle introuvable')
       }
-      return response
+
+      return await roleService.assignRoleToUser(userId, roleCode)
     })
 
     if (!success) {
@@ -2720,11 +2723,13 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
 
   const handleRemoveRoleFromUser = async (userId: string, roleId: string) => {
     const success = await runWithLoader(async () => {
-      const response = await SuperAdminDashboardService.removeRoleFromUser(userId, roleId)
-      if (!response) {
-        throw new Error('Retrait rôle utilisateur échoué')
+      const roleCode = getRoleCodeById(roleId)
+      if (!roleCode) {
+        throw new Error('Code du rôle introuvable')
       }
-      return response
+
+      await roleService.removeRoleFromUser(userId, roleCode)
+      return roleCode
     })
 
     if (!success) {
@@ -4129,35 +4134,48 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                       <div className="border border-gray-200 rounded-lg p-4 bg-white">
                         <h4 className="text-sm font-semibold text-gray-700 mb-3">Permissions disponibles</h4>
                         <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-                          {permissions.length === 0 ? (
-                            <p className="text-sm text-gray-500">Aucune permission récupérée.</p>
-                          ) : (
-                            permissions.map((permission) => {
-                              const isChecked = roleForm.permissions.includes(permission.code)
+                          <div className="space-y-2">
+                            <p className="text-xs uppercase text-gray-500">Sections</p>
+                            {ALL_SECTIONS.map((section) => {
+                              const isChecked = roleForm.permissions.includes(section.id)
                               return (
                                 <label
-                                  key={permission.id}
+                                  key={`section-${section.id}`}
                                   className="flex items-start gap-3 border border-gray-200 rounded-lg p-3 hover:border-[#ff6600]/60"
                                 >
                                   <Switch
                                     checked={isChecked}
-                                    onCheckedChange={(checked) => {
-                                      togglePermission(permission.code)
-                                    }}
+                                    onCheckedChange={() => togglePermission(section.id)}
                                   />
                                   <div>
-                                    <p className="text-sm font-semibold text-gray-800">{permission.name}</p>
-                                    <p className="text-xs text-gray-500">{permission.description || 'Pas de description'}</p>
-                                    {permission.category && (
-                                      <Badge variant="outline" className="mt-2 border-[#535455]/40 text-[#535455]">
-                                        {permission.category}
-                                      </Badge>
-                                    )}
+                                    <p className="text-sm font-semibold text-gray-800">{section.label}</p>
+                                    <p className="text-xs text-gray-500">{section.id}</p>
                                   </div>
                                 </label>
                               )
-                            })
-                          )}
+                            })}
+                          </div>
+                          <div className="space-y-2 mt-3">
+                            <p className="text-xs uppercase text-gray-500">Fonctionnalités</p>
+                            {ALL_FEATURES.filter((feature) => feature !== 'all_features').map((feature) => {
+                              const isChecked = roleForm.permissions.includes(feature)
+                              return (
+                                <label
+                                  key={`feature-${feature}`}
+                                  className="flex items-start gap-3 border border-gray-200 rounded-lg p-3 hover:border-[#ff6600]/60"
+                                >
+                                  <Switch
+                                    checked={isChecked}
+                                    onCheckedChange={() => togglePermission(feature)}
+                                  />
+                                  <div>
+                                    <p className="text-sm font-semibold text-gray-800">{feature.replace(/_/g, ' ')}</p>
+                                    <p className="text-xs text-gray-500">{feature}</p>
+                                  </div>
+                                </label>
+                              )
+                            })}
+                          </div>
                         </div>
                         <Button
                           onClick={() => {
@@ -4166,7 +4184,10 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                                 ? { ...role, permissions: roleForm.permissions }
                                 : role
                             ))
-                            void handlePersistRolePermissions(selectedRoleId, roleForm.permissions)
+                            const roleCode = getRoleCodeById(selectedRoleId)
+                            if (roleCode) {
+                              void handlePersistRolePermissions(roleCode, roleForm.permissions)
+                            }
                           }}
                           className="mt-4 bg-[#ff6600] hover:bg-[#ff6600]/90 text-white"
                         >
@@ -5206,95 +5227,41 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
               </p>
 
               <div className="space-y-4">
-                {/* Dashboard */}
+                {/* Fonctionnalités par défaut du rôle (source: DEFAULT_ROLE_FEATURES / role-service) */}
                 <div className="border border-purple-200 rounded-lg p-4">
                   <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
                     <Activity className="h-4 w-4" />
-                    Tableau de bord
+                    Fonctionnalités par défaut du rôle <span className="capitalize text-purple-600">({userForm.role})</span>
                   </h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    {roleFeatures[userForm.role]?.dashboard?.map((feature, index) => (
-                      <label key={`create-dashboard-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
+                  <p className="text-sm text-purple-700 mb-3">
+                    Fonctionnalités activées par défaut pour ce rôle (synchronisées avec la gestion des rôles).
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(DEFAULT_ROLE_FEATURES[userForm.role]?.sections || []).slice().sort((a, b) => a.localeCompare(b)).map((section) => (
+                      <label key={`section-${section}`} className="flex items-center gap-2 p-2 border border-purple-200 rounded cursor-pointer hover:bg-purple-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedFeatures.includes(section)}
+                          onChange={() => handleFeatureToggle(section)}
+                          className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+                        />
+                        <span className="text-sm capitalize">{section.replace(/_/g, ' ')}</span>
+                        <Badge variant="outline" className="ml-auto text-[10px] border-purple-300 text-purple-700">section</Badge>
+                      </label>
+                    ))}
+                    {(DEFAULT_ROLE_FEATURES[userForm.role]?.features || []).slice().sort((a, b) => a.localeCompare(b)).map((feature) => (
+                      <label key={`feature-${feature}`} className="flex items-center gap-2 p-2 border border-purple-100 rounded cursor-pointer hover:bg-purple-50">
                         <input
                           type="checkbox"
                           checked={selectedFeatures.includes(feature)}
                           onChange={() => handleFeatureToggle(feature)}
                           className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
                         />
-                        <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
+                        <span className="text-sm capitalize">{feature.replace(/_/g, ' ')}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-
-                {/* Marketplace */}
-                {userForm.role === 'vendor' && (
-                  <div className="border border-purple-200 rounded-lg p-4">
-                    <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
-                      <Store className="h-4 w-4" />
-                      Gestion de la boutique
-                    </h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {roleFeatures.vendor.marketplace.map((feature, index) => (
-                        <label key={`create-vendor-marketplace-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedFeatures.includes(feature)}
-                            onChange={() => handleFeatureToggle(feature)}
-                            className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                          />
-                          <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Administration */}
-                {(userForm.role === 'admin' || userForm.role === 'super_admin') && (
-                  <div className="border border-purple-200 rounded-lg p-4">
-                    <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Gestion administrative
-                    </h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {roleFeatures[userForm.role]?.management?.map((feature, index) => (
-                        <label key={`edit-management-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedFeatures.includes(feature)}
-                            onChange={() => handleFeatureToggle(feature)}
-                            className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                          />
-                          <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Système */}
-                {userForm.role === 'super_admin' && (
-                  <div className="border border-purple-200 rounded-lg p-4">
-                    <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
-                      <Cog className="h-4 w-4" />
-                      Configuration système
-                    </h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {roleFeatures.super_admin.system.map((feature, index) => (
-                        <label key={`edit-system-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedFeatures.includes(feature)}
-                            onChange={() => handleFeatureToggle(feature)}
-                            className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                          />
-                          <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Permissions personnalisées */}
                 <div className="border border-purple-200 rounded-lg p-4 mt-4">
@@ -5330,7 +5297,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-purple-700">
-                      <span className="font-semibold">Fonctionnalités par rôle :</span> {selectedFeatures.length} / {Object.values(roleFeatures[userForm.role] || {}).flat().length}
+                      <span className="font-semibold">Fonctionnalités par rôle :</span> {selectedFeatures.length} / {(DEFAULT_ROLE_FEATURES[userForm.role]?.sections?.length || 0) + (DEFAULT_ROLE_FEATURES[userForm.role]?.features?.length || 0)}
                     </p>
                     {selectedFeatures.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
@@ -5728,95 +5695,41 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
               </p>
 
               <div className="space-y-4">
-                {/* Dashboard */}
+                {/* Fonctionnalités par défaut du rôle (source: DEFAULT_ROLE_FEATURES / role-service) */}
                 <div className="border border-purple-200 rounded-lg p-4">
                   <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
                     <Activity className="h-4 w-4" />
-                    Tableau de bord
+                    Fonctionnalités par défaut du rôle <span className="capitalize text-purple-600">({userForm.role})</span>
                   </h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    {roleFeatures[userForm.role]?.dashboard?.map((feature, index) => (
-                      <label key={`create-dashboard-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
+                  <p className="text-sm text-purple-700 mb-3">
+                    Fonctionnalités activées par défaut pour ce rôle (synchronisées avec la gestion des rôles).
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(DEFAULT_ROLE_FEATURES[userForm.role]?.sections || []).slice().sort((a, b) => a.localeCompare(b)).map((section) => (
+                      <label key={`section-${section}`} className="flex items-center gap-2 p-2 border border-purple-200 rounded cursor-pointer hover:bg-purple-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedFeatures.includes(section)}
+                          onChange={() => handleFeatureToggle(section)}
+                          className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
+                        />
+                        <span className="text-sm capitalize">{section.replace(/_/g, ' ')}</span>
+                        <Badge variant="outline" className="ml-auto text-[10px] border-purple-300 text-purple-700">section</Badge>
+                      </label>
+                    ))}
+                    {(DEFAULT_ROLE_FEATURES[userForm.role]?.features || []).slice().sort((a, b) => a.localeCompare(b)).map((feature) => (
+                      <label key={`feature-${feature}`} className="flex items-center gap-2 p-2 border border-purple-100 rounded cursor-pointer hover:bg-purple-50">
                         <input
                           type="checkbox"
                           checked={selectedFeatures.includes(feature)}
                           onChange={() => handleFeatureToggle(feature)}
                           className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
                         />
-                        <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
+                        <span className="text-sm capitalize">{feature.replace(/_/g, ' ')}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-
-                {/* Marketplace */}
-                {userForm.role === 'vendor' && (
-                  <div className="border border-purple-200 rounded-lg p-4">
-                    <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
-                      <Store className="h-4 w-4" />
-                      Gestion de la boutique
-                    </h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {roleFeatures.vendor.marketplace.map((feature, index) => (
-                        <label key={`create-vendor-marketplace-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedFeatures.includes(feature)}
-                            onChange={() => handleFeatureToggle(feature)}
-                            className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                          />
-                          <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Administration */}
-                {(userForm.role === 'admin' || userForm.role === 'super_admin') && (
-                  <div className="border border-purple-200 rounded-lg p-4">
-                    <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Gestion administrative
-                    </h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {roleFeatures[userForm.role]?.management?.map((feature, index) => (
-                        <label key={`create-management-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedFeatures.includes(feature)}
-                            onChange={() => handleFeatureToggle(feature)}
-                            className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                          />
-                          <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Système */}
-                {userForm.role === 'super_admin' && (
-                  <div className="border border-purple-200 rounded-lg p-4">
-                    <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
-                      <Cog className="h-4 w-4" />
-                      Configuration système
-                    </h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {roleFeatures.super_admin.system.map((feature, index) => (
-                        <label key={`create-system-${feature}-${index}`} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedFeatures.includes(feature)}
-                            onChange={() => handleFeatureToggle(feature)}
-                            className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 focus:ring-2"
-                          />
-                          <span className="text-sm capitalize">{feature.replace('_', ' ')}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Permissions personnalisées */}
                 <div className="border border-purple-200 rounded-lg p-4 mt-4">
@@ -5852,7 +5765,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-purple-700">
-                      <span className="font-semibold">Fonctionnalités par rôle :</span> {selectedFeatures.length} / {Object.values(roleFeatures[userForm.role] || {}).flat().length}
+                      <span className="font-semibold">Fonctionnalités par rôle :</span> {selectedFeatures.length} / {(DEFAULT_ROLE_FEATURES[userForm.role]?.sections?.length || 0) + (DEFAULT_ROLE_FEATURES[userForm.role]?.features?.length || 0)}
                     </p>
                     {selectedFeatures.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
@@ -6851,24 +6764,39 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                />
              </div>
              
-             <div>
-               <Label className="text-sm font-medium mb-3 block">Permissions</Label>
-               <div className="grid grid-cols-2 gap-3">
-                 {[
-                   'view_dashboard', 'manage_users', 'manage_products', 'manage_orders',
-                   'view_analytics', 'moderate_content', 'manage_reports', 'view_tickets',
-                   'respond_tickets', 'escalate_tickets', 'manage_settings', 'view_logs'
-                 ].map((permission) => (
-                   <label key={permission} className="flex items-center gap-2 cursor-pointer">
-                     <input
-                       type="checkbox"
-                       checked={roleForm.permissions.includes(permission)}
-                       onChange={() => togglePermission(permission)}
-                       className="w-4 h-4 text-[#ff6600] bg-gray-100 border-gray-300 rounded focus:ring-[#ff6600] focus:ring-2"
-                     />
-                     <span className="text-sm capitalize">{permission.replace('_', ' ')}</span>
-                   </label>
-                 ))}
+             <div className="space-y-4">
+               <div>
+                 <Label className="text-sm font-medium mb-3 block">Sections accessibles</Label>
+                 <div className="grid grid-cols-2 gap-3">
+                   {ALL_SECTIONS.map((section) => (
+                     <label key={`section-${section.id}`} className="flex items-center gap-2 cursor-pointer">
+                       <input
+                         type="checkbox"
+                         checked={roleForm.permissions.includes(section.id)}
+                         onChange={() => togglePermission(section.id)}
+                         className="w-4 h-4 text-[#ff6600] bg-gray-100 border-gray-300 rounded focus:ring-[#ff6600] focus:ring-2"
+                       />
+                       <span className="text-sm">{section.label}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+
+               <div>
+                 <Label className="text-sm font-medium mb-3 block">Fonctionnalités activées</Label>
+                 <div className="grid grid-cols-2 gap-3">
+                   {ALL_FEATURES.filter((feature) => feature !== 'all_features').map((feature) => (
+                     <label key={`feature-${feature}`} className="flex items-center gap-2 cursor-pointer">
+                       <input
+                         type="checkbox"
+                         checked={roleForm.permissions.includes(feature)}
+                         onChange={() => togglePermission(feature)}
+                         className="w-4 h-4 text-[#ff6600] bg-gray-100 border-gray-300 rounded focus:ring-[#ff6600] focus:ring-2"
+                       />
+                       <span className="text-sm capitalize">{feature.replace(/_/g, ' ')}</span>
+                     </label>
+                   ))}
+                 </div>
                </div>
              </div>
              

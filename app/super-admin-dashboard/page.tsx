@@ -11,7 +11,7 @@ import {
   CheckCircle, AlertTriangle, Clock,
   Heart, Share2, CreditCard, Truck,
   FileText, Lock, Mail, Smartphone, Trash2,
-  MessageCircleMore, Loader2, Video, Store
+  MessageCircleMore, Loader2, Video, Store, RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +24,7 @@ import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 // Composants des sections
 import SuperAdminOverview from '@/components/super-admin/overview-section'
@@ -187,6 +188,7 @@ function SuperAdminDashboardClient() {
   const [prefetchedProducts, setPrefetchedProducts] = useState<{ items: SuperAdminProduct[]; count: number } | null>(null)
   const [prefetchedOrders, setPrefetchedOrders] = useState<any[] | null>(null)
   const [loadingError, setLoadingError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
   const [isRefreshingStats, setIsRefreshingStats] = useState(false)
 
   const defaultConfigState = useMemo(() => ({
@@ -232,15 +234,24 @@ function SuperAdminDashboardClient() {
   const refreshOverviewStats = useCallback(async () => {
     try {
       setIsRefreshingStats(true)
-      const latest = await SuperAdminDashboardService.getOverviewStats()
+      const latest = await SuperAdminDashboardService.getOverviewStatsStrict()
       if (latest) {
         setStats(latest)
       }
+      setLoadingError(null)
     } catch (error) {
       console.error('Erreur lors du rafraîchissement des stats:', error)
+      setLoadingError("Impossible de rafraîchir les statistiques du tableau de bord.")
     } finally {
       setIsRefreshingStats(false)
     }
+  }, [])
+
+  /**
+   * Relance le chargement complet du tableau de bord (utilisé par le bouton « Réessayer »).
+   */
+  const reloadDashboard = useCallback(() => {
+    setReloadToken((token) => token + 1)
   }, [])
 
   useEffect(() => {
@@ -342,8 +353,12 @@ function SuperAdminDashboardClient() {
       setLoadingError(null)
 
       try {
-        const [stats, alerts, messages, contacts, users, productsPayload] = await Promise.all([
-          SuperAdminDashboardService.getOverviewStats(),
+        // Les statistiques sont récupérées en mode "strict" afin de détecter les échecs silencieux
+        // (le rôle admin peut se voir refuser l'accès) sans empêcher le reste du tableau de bord de charger.
+        const [statsResult, alerts, messages, contacts, users, productsPayload] = await Promise.all([
+          SuperAdminDashboardService.getOverviewStatsStrict()
+            .then((value) => ({ ok: true as const, value }))
+            .catch((error) => ({ ok: false as const, error })),
           SuperAdminDashboardService.getSystemAlerts(100),
           SuperAdminDashboardService.getInboxMessages(user.id, 50),
           SuperAdminDashboardService.getAdminContacts(),
@@ -351,7 +366,14 @@ function SuperAdminDashboardClient() {
           SuperAdminDashboardService.getProducts({ limit: 50, offset: 0 })
         ])
 
-        setStats(stats ?? emptyStats)
+        if (statsResult.ok) {
+          setStats(statsResult.value ?? emptyStats)
+        } else {
+          console.error('Erreur lors du chargement des statistiques du tableau de bord:', statsResult.error)
+          setStats(emptyStats)
+          setLoadingError("Impossible de charger les statistiques du tableau de bord. Vérifiez vos droits d'accès ou réessayez.")
+        }
+
         setSystemAlerts((alerts ?? []).filter((alert) => alert.status === 'active'))
         setUnreadMessages((messages ?? []).filter((message) => !message.isRead && message.status !== 'deleted'))
         setTeams(contacts ?? [])
@@ -383,7 +405,7 @@ function SuperAdminDashboardClient() {
     }
 
     void loadData()
-  }, [user?.id])
+  }, [user?.id, reloadToken])
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -940,6 +962,42 @@ function SuperAdminDashboardClient() {
           </div>
         </div>
       </div>
+
+      {isLoading && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <Alert className="border-blue-200 bg-blue-50">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            <AlertTitle className="text-blue-800">Chargement du tableau de bord…</AlertTitle>
+            <AlertDescription className="text-blue-700">
+              Récupération des statistiques et des données super admin.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
+      {loadingError && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Données indisponibles</AlertTitle>
+            <AlertDescription>
+              <p>{loadingError}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={reloadDashboard}
+                disabled={isLoading || isRefreshingStats}
+              >
+                {isLoading || isRefreshingStats
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <RefreshCw className="mr-2 h-4 w-4" />}
+                Réessayer
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       {/* Statistiques globales en temps réel */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
