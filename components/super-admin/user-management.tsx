@@ -262,6 +262,25 @@ type UserManagementProps = {
 
 export default function UserManagement({ prefetchedUsers }: UserManagementProps) {
   const { user, session } = useAuth()
+  // Seul un super admin peut voir et modifier les comptes/rôles super_admin.
+  // Un simple admin ne doit jamais toucher au super admin.
+  const canManageSuperAdmin = String(user?.role ?? '').trim().toLowerCase() === 'super_admin'
+  const restrictSuperAdminUsers = useCallback(
+    (list: ExtendedUser[]) => (canManageSuperAdmin ? list : list.filter((item) => item.role !== 'super_admin')),
+    [canManageSuperAdmin]
+  )
+  /**
+   * Vérifie (défensive) qu'un utilisateur ciblé par une action n'est pas un super admin
+   * lorsque l'opérateur courant n'est qu'un admin.
+   */
+  const isProtectedSuperAdminUser = useCallback(
+    (userId: string) => {
+      if (canManageSuperAdmin) return false
+      const target = usersRef.current.find((item) => item.id === userId)
+      return target?.role === 'super_admin'
+    },
+    [canManageSuperAdmin]
+  )
   const { addNotification } = useNotifications()
   const { formatMoney } = useMoney()
   const [users, setUsers] = useState<ExtendedUser[]>([])
@@ -600,6 +619,14 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
    * Persiste les sections/fonctionnalités d'un rôle personnalisé via role-service.ts.
    */
   const handlePersistRolePermissions = async (roleCode: string, rolePermissions: string[]) => {
+    if (!canManageSuperAdmin && roleCode === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Les permissions du rôle Super Administrateur ne peuvent pas être modifiées par un administrateur.'
+      })
+      return
+    }
     try {
       const { sections, features } = splitSectionsAndFeatures(rolePermissions)
       await roleService.updateRole(roleCode, { sections, features })
@@ -861,7 +888,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
     try {
       const data = await SuperAdminDashboardService.getUsers({ limit: 200 })
 
-      const extended = normalizeUsersForUi(data)
+      const extended = restrictSuperAdminUsers(normalizeUsersForUi(data))
       setUsers(extended)
       setFilteredUsers(extended)
     } catch (error) {
@@ -876,13 +903,13 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
         setIsLoading(false)
       }
     }
-  }, [normalizeUsersForUi])
+  }, [normalizeUsersForUi, restrictSuperAdminUsers])
 
   useEffect(() => {
     const seeded = Array.isArray(prefetchedUsers) && prefetchedUsers.length > 0
 
     if (seeded) {
-      const extended = normalizeUsersForUi(prefetchedUsers)
+      const extended = restrictSuperAdminUsers(normalizeUsersForUi(prefetchedUsers))
       setUsers(extended)
       setFilteredUsers(extended)
     }
@@ -1556,18 +1583,29 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
             }))
           : []
       })) as unknown as ExtendedUser[]
-      setUsers(extended)
-      setFilteredUsers(extended)
+      const visible = restrictSuperAdminUsers(extended)
+      setUsers(visible)
+      setFilteredUsers(visible)
     } catch (error) {
       console.error('Erreur lors du rafraîchissement des utilisateurs:', error)
       setLoadError("Impossible de rafraîchir les utilisateurs. Veuillez réessayer.")
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [restrictSuperAdminUsers])
 
   const handleCreateUser = async () => {
     if (actionLoading) {
+      return
+    }
+
+    // Un admin ne peut pas créer de compte super admin.
+    if (!canManageSuperAdmin && userForm.role === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Seul un super administrateur peut créer un compte Super Administrateur.'
+      })
       return
     }
 
@@ -1643,6 +1681,15 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   }
 
   const handleEditUser = (user: User) => {
+    // Un admin ne peut pas éditer un compte super admin.
+    if (!canManageSuperAdmin && user.role === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le compte Super Administrateur ne peut pas être modifié par un administrateur.'
+      })
+      return
+    }
     setSelectedUser(user)
 
     // Initialiser le formulaire avec les données de l'utilisateur
@@ -1701,6 +1748,24 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
 
   const handleUpdateUser = async () => {
     if (!selectedUser) return
+
+    if (!canManageSuperAdmin && selectedUser.role === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le compte Super Administrateur ne peut pas être modifié par un administrateur.'
+      })
+      return
+    }
+    // Un admin ne peut pas promouvoir quelqu'un au rang de super admin.
+    if (!canManageSuperAdmin && userForm.role === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Seul un super administrateur peut attribuer le rôle Super Administrateur.'
+      })
+      return
+    }
 
     const updated = await runWithLoader(async () => {
       const response = await SuperAdminDashboardService.updateUser({
@@ -1803,6 +1868,14 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   }, [])
 
   const handleDeleteUser = async (userId: string, skipConfirm = false): Promise<boolean> => {
+    if (isProtectedSuperAdminUser(userId)) {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le compte Super Administrateur ne peut pas être supprimé par un administrateur.'
+      })
+      return false
+    }
     if (!skipConfirm) {
       const confirmed = await openConfirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')
       if (!confirmed) return false
@@ -1831,6 +1904,14 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   }
 
   const handleStatusChange = async (userId: string, newStatus: User['status']): Promise<boolean> => {
+    if (isProtectedSuperAdminUser(userId)) {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le statut du compte Super Administrateur ne peut pas être modifié par un administrateur.'
+      })
+      return false
+    }
     const success = await runWithLoader(async () => {
       const response = await SuperAdminDashboardService.updateUserStatus(userId, newStatus)
       if (!response) {
@@ -1872,6 +1953,22 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
   }
 
   const handleRoleChange = async (userId: string, newRole: User['role']) => {
+    if (isProtectedSuperAdminUser(userId)) {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le rôle du compte Super Administrateur ne peut pas être modifié par un administrateur.'
+      })
+      return
+    }
+    if (!canManageSuperAdmin && newRole === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Seul un super administrateur peut attribuer le rôle Super Administrateur.'
+      })
+      return
+    }
     const success = await runWithLoader(async () => {
       const response = await SuperAdminDashboardService.updateUserRole(userId, newRole)
       if (!response) {
@@ -2388,6 +2485,14 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
    * Met à jour le rôle principal du formulaire et réinitialise les fonctionnalités sélectionnées.
    */
   const handleFormRoleChange = (newRole: User['role']) => {
+    if (!canManageSuperAdmin && newRole === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Seul un super administrateur peut attribuer le rôle Super Administrateur.'
+      })
+      return
+    }
     setUserForm((prev) => {
       const nextType: User['type'] =
         newRole === 'vendor'
@@ -2415,6 +2520,14 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
    * Ajoute ou retire un rôle secondaire dans la sélection multiple.
    */
   const handleRoleToggle = (role: User['role']) => {
+    if (!canManageSuperAdmin && role === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Seul un super administrateur peut attribuer le rôle Super Administrateur.'
+      })
+      return
+    }
     const updatedRoles = new Set(selectedRoles)
     if (updatedRoles.has(role)) {
       updatedRoles.delete(role)
@@ -2579,6 +2692,11 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
         throw new Error('Nom de rôle invalide')
       }
 
+      // Le rôle système super_admin ne peut pas être recréé/usurpé par un admin.
+      if (!canManageSuperAdmin && roleCode === 'super_admin') {
+        throw new Error('Seul un super administrateur peut gérer le rôle Super Administrateur.')
+      }
+
       const { sections, features } = splitSectionsAndFeatures(roleForm.permissions)
 
       return await roleService.createRole({
@@ -2608,6 +2726,14 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
    * Pré-remplit le formulaire pour éditer un rôle existant.
    */
   const handleEditRole = (role: ManagedRole) => {
+    if (!canManageSuperAdmin && role.roleCode === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le rôle Super Administrateur ne peut pas être modifié par un administrateur.'
+      })
+      return
+    }
     setEditingRole(role)
     setRoleForm({
       name: role.name,
@@ -2623,6 +2749,15 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
    */
   const handleUpdateRole = async () => {
     if (!editingRole || !roleForm.name.trim()) {
+      return
+    }
+
+    if (!canManageSuperAdmin && editingRole.roleCode === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le rôle Super Administrateur ne peut pas être modifié par un administrateur.'
+      })
       return
     }
 
@@ -2662,6 +2797,14 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
    * Supprime définitivement un rôle (et ses permissions/associations) dans Supabase.
    */
   const handleDeleteRole = async (roleId: string) => {
+    if (!canManageSuperAdmin && getRoleCodeById(roleId) === 'super_admin') {
+      addNotification({
+        type: 'error',
+        title: 'Action non autorisée',
+        message: 'Le rôle Super Administrateur ne peut pas être supprimé par un administrateur.'
+      })
+      return
+    }
     const confirmed = await openConfirm('Êtes-vous sûr de vouloir supprimer ce rôle ? Cette action est définitive.')
     if (!confirmed) return
 
@@ -2709,6 +2852,10 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
       const roleCode = getRoleCodeById(roleId)
       if (!roleCode) {
         throw new Error('Code du rôle introuvable')
+      }
+
+      if (!canManageSuperAdmin && roleCode === 'super_admin') {
+        throw new Error('Seul un super administrateur peut attribuer le rôle Super Administrateur.')
       }
 
       return await roleService.assignRoleToUser(userId, roleCode)
@@ -2967,7 +3114,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                   <SelectItem value="driver">Livreur</SelectItem>
                   <SelectItem value="ops">Service commandes & livraisons</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                  {canManageSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
                 </SelectContent>
               </Select>
               <Button
@@ -5026,7 +5173,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                       <SelectItem value="driver">🚚 Livreur</SelectItem>
                       <SelectItem value="ops">🧭 Service commandes & livraisons</SelectItem>
                       <SelectItem value="admin">👑 Administrateur</SelectItem>
-                      <SelectItem value="super_admin">⭐ Super Administrateur</SelectItem>
+                      {canManageSuperAdmin && <SelectItem value="super_admin">⭐ Super Administrateur</SelectItem>}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-500 mt-1">
@@ -5062,7 +5209,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                   </p>
                   
                   <div className="grid grid-cols-2 gap-3">
-                    {(['client', 'vendor', 'driver', 'ops', 'admin', 'super_admin'] as User['role'][]).map(role => (
+                    {(['client', 'vendor', 'driver', 'ops', 'admin', ...(canManageSuperAdmin ? ['super_admin' as const] : [])] as User['role'][]).map(role => (
                       <label key={role} className="flex items-center gap-2 cursor-pointer p-2 bg-white rounded border hover:bg-blue-50">
                         <input
                           type="checkbox"
@@ -5615,7 +5762,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                       <SelectItem value="driver">🚚 Livreur</SelectItem>
                       <SelectItem value="ops">🧭 Service commandes & livraisons</SelectItem>
                       <SelectItem value="admin">👑 Administrateur</SelectItem>
-                      <SelectItem value="super_admin">⭐ Super Administrateur</SelectItem>
+                      {canManageSuperAdmin && <SelectItem value="super_admin">⭐ Super Administrateur</SelectItem>}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-500 mt-1">
@@ -5651,7 +5798,7 @@ export default function UserManagement({ prefetchedUsers }: UserManagementProps)
                   </p>
                   
                   <div className="grid grid-cols-2 gap-3">
-                    {(['buyer', 'vendor', 'admin', 'super_admin'] as User['role'][]).map(role => (
+                    {(['buyer', 'vendor', 'admin', ...(canManageSuperAdmin ? ['super_admin' as const] : [])] as User['role'][]).map(role => (
                       <label key={role} className="flex items-center gap-2 cursor-pointer p-2 bg-white rounded border hover:bg-blue-50">
                         <input
                           type="checkbox"
