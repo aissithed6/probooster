@@ -72,6 +72,58 @@ export async function assertSuperAdmin(request?: NextRequest): Promise<string> {
 }
 
 /**
+ * Détermine le rôle réel de l'appelant ('super_admin' | 'admin' | null).
+ */
+export async function getCallerRole(request?: NextRequest): Promise<'super_admin' | 'admin' | null> {
+  const supabase = getSupabaseAdmin()
+  const accessToken = await extractAccessToken(request)
+
+  if (!accessToken) return null
+
+  const { data: authData, error } = await supabase.auth.getUser(accessToken)
+  if (error || !authData?.user) return null
+
+  const userId = authData.user.id
+
+  const { data: roleRow } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle()
+
+  const candidates: string[] = []
+  if (roleRow?.role) candidates.push(roleRow.role)
+
+  const appMeta = authData.user.app_metadata ?? {}
+  const userMeta = authData.user.user_metadata ?? {}
+  ;[appMeta.role, userMeta.role, userMeta.account_type, userMeta.primary_role].forEach((value) => {
+    if (typeof value === 'string') candidates.push(value)
+  })
+  if (Array.isArray(appMeta.roles)) appMeta.roles.forEach((value) => {
+    if (typeof value === 'string') candidates.push(value)
+  })
+
+  const normalized = candidates
+    .map((role) => role.toLowerCase().replace(/-/g, '_'))
+    .find((role) => role === 'super_admin' || role === 'admin')
+
+  return normalized ?? null
+}
+
+/**
+ * Vérifie si l'utilisateur cible est un super administrateur (table users).
+ */
+export async function isSuperAdminTarget(userId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin()
+  const { data } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle()
+  return data?.role === 'super_admin'
+}
+
+/**
  * Vérifie que l'utilisateur courant est super administrateur OU membre du service commandes & livraisons.
  * Retourne l'identifiant utilisateur si la vérification réussit.
  */

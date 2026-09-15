@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { assertSuperAdmin } from '../_helpers/auth'
+import { assertSuperAdmin, getCallerRole, isSuperAdminTarget } from '../_helpers/auth'
 import {
   createUserAdmin,
   deleteUserAdmin,
@@ -34,7 +34,12 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await fetchUsersAdmin(options)
-    return NextResponse.json({ data })
+    // Un simple admin ne doit jamais voir ni manipuler les comptes super administrateur.
+    const callerRole = await getCallerRole(request)
+    const filtered = callerRole === 'super_admin'
+      ? data
+      : data.filter((user) => user.role !== 'super_admin')
+    return NextResponse.json({ data: filtered })
   } catch (error) {
     console.error('GET /api/super-admin/users failed:', error)
     const message = error instanceof Error ? error.message : "Erreur lors de la récupération des utilisateurs."
@@ -50,6 +55,13 @@ export async function PUT(request: NextRequest) {
 
     if (!body?.id) {
       return NextResponse.json({ error: "Identifiant utilisateur manquant." }, { status: 400 })
+    }
+
+    if (await isSuperAdminTarget(body.id)) {
+      const callerRole = await getCallerRole(request)
+      if (callerRole !== 'super_admin') {
+        return NextResponse.json({ error: "Action non autorisée : un administrateur ne peut pas modifier un super administrateur." }, { status: 403 })
+      }
     }
 
     const updated = await updateUserAdmin(body as UpdateSuperAdminUserInput)
@@ -71,6 +83,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Identifiant utilisateur requis." }, { status: 400 })
     }
 
+    if (await isSuperAdminTarget(userId)) {
+      const callerRole = await getCallerRole(request)
+      if (callerRole !== 'super_admin') {
+        return NextResponse.json({ error: "Action non autorisée : un administrateur ne peut pas supprimer un super administrateur." }, { status: 403 })
+      }
+    }
+
     await deleteUserAdmin(userId)
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -90,6 +109,19 @@ export async function PATCH(request: NextRequest) {
 
     if (!body?.id) {
       return NextResponse.json({ error: "Identifiant utilisateur requis." }, { status: 400 })
+    }
+
+    const callerRole = await getCallerRole(request)
+
+    if (body.role) {
+      const normalizedRole = typeof body.role === 'string' ? body.role : (body.role as { value?: string })?.value
+      if (normalizedRole && normalizedRole.toLowerCase().replace(/-/g, '_') === 'super_admin' && callerRole !== 'super_admin') {
+        return NextResponse.json({ error: "Action non autorisée : seul un super administrateur peut attribuer le rôle super administrateur." }, { status: 403 })
+      }
+    }
+
+    if (await isSuperAdminTarget(body.id) && callerRole !== 'super_admin') {
+      return NextResponse.json({ error: "Action non autorisée : un administrateur ne peut pas modifier un super administrateur." }, { status: 403 })
     }
 
     if (body.status) {
@@ -118,6 +150,14 @@ export async function POST(request: NextRequest) {
 
     if (!body?.email || !body.role || !body.type) {
       return NextResponse.json({ error: "Champs requis manquants (email, role, type)." }, { status: 400 })
+    }
+
+    const normalizedRole = typeof body.role === 'string' ? body.role : (body.role as { value?: string })?.value
+    if (normalizedRole && normalizedRole.toLowerCase().replace(/-/g, '_') === 'super_admin') {
+      const callerRole = await getCallerRole(request)
+      if (callerRole !== 'super_admin') {
+        return NextResponse.json({ error: "Action non autorisée : seul un super administrateur peut créer un compte super administrateur." }, { status: 403 })
+      }
     }
 
     const newUser = await createUserAdmin(body as CreateSuperAdminUserInput)

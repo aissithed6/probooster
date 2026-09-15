@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { assertSuperAdmin } from '@/app/api/super-admin/_helpers/auth'
+import { assertSuperAdmin, getCallerRole, isSuperAdminTarget } from '@/app/api/super-admin/_helpers/auth'
 import { assignRoleToUserAdmin, removeRoleFromUserAdmin } from '@/app/api/super-admin/_helpers/users'
 
 /**
@@ -8,11 +8,21 @@ import { assignRoleToUserAdmin, removeRoleFromUserAdmin } from '@/app/api/super-
  */
 export async function POST(request: NextRequest) {
   try {
-    await assertSuperAdmin()
+    await assertSuperAdmin(request)
     const body = (await request.json()) as { userId?: string; roleId?: string }
 
     if (!body?.userId || !body.roleId) {
       return NextResponse.json({ error: "Identifiants utilisateur et rôle requis." }, { status: 400 })
+    }
+
+    const callerRole = await getCallerRole(request)
+
+    if (body.roleId.toLowerCase().replace(/-/g, '_') === 'super_admin' && callerRole !== 'super_admin') {
+      return NextResponse.json({ error: "Action non autorisée : seul un super administrateur peut attribuer le rôle super administrateur." }, { status: 403 })
+    }
+
+    if (await isSuperAdminTarget(body.userId) && callerRole !== 'super_admin') {
+      return NextResponse.json({ error: "Action non autorisée : un administrateur ne peut pas modifier un super administrateur." }, { status: 403 })
     }
 
     await assignRoleToUserAdmin(body.userId, body.roleId)
@@ -25,13 +35,19 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    await assertSuperAdmin()
+    await assertSuperAdmin(request)
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const roleId = searchParams.get('roleId')
 
     if (!userId || !roleId) {
       return NextResponse.json({ error: "Identifiants utilisateur et rôle requis." }, { status: 400 })
+    }
+
+    const callerRole = await getCallerRole(request)
+
+    if (await isSuperAdminTarget(userId) && callerRole !== 'super_admin') {
+      return NextResponse.json({ error: "Action non autorisée : un administrateur ne peut pas modifier un super administrateur." }, { status: 403 })
     }
 
     await removeRoleFromUserAdmin(userId, roleId)
